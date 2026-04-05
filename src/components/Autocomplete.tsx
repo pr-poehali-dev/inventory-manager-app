@@ -70,8 +70,8 @@ export default function Autocomplete({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (filtered[highlighted]) {
-        onSelect(filtered[highlighted]);
         onChange(filtered[highlighted].label);
+        onSelect(filtered[highlighted]);
         setOpen(false);
       }
     } else if (e.key === 'Escape') {
@@ -80,8 +80,9 @@ export default function Autocomplete({
   }, [showDropdown, filtered, highlighted, onSelect, onChange]);
 
   const handleSelect = (opt: AutocompleteOption) => {
-    onSelect(opt);
+    // onChange first (sets text), then onSelect (sets id) — order matters
     onChange(opt.label);
+    onSelect(opt);
     setOpen(false);
     inputRef.current?.blur();
   };
