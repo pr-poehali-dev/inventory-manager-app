@@ -9,17 +9,18 @@ import ItemDetailModal from '@/components/ItemDetailModal';
 type Props = {
   state: AppState;
   onStateChange: (s: AppState) => void;
+  initialItemId?: string | null;
 };
 
 type SortKey = 'name' | 'quantity_asc' | 'quantity_desc' | 'date';
 
-export default function CatalogPage({ state, onStateChange }: Props) {
+export default function CatalogPage({ state, onStateChange, initialItemId }: Props) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [showLowOnly, setShowLowOnly] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(initialItemId ?? null);
 
   const filtered = useMemo(() => {
     let items = [...state.items];

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -567,19 +567,322 @@ function PickItemModal({
   );
 }
 
+// ─── QR Scan Modal (simulated — shows instruction for mobile) ────────────────
+function QRScanModal({ order, state, onStateChange, onClose }: {
+  order: WorkOrder; state: AppState;
+  onStateChange: (s: AppState) => void; onClose: () => void;
+}) {
+  const [manualInput, setManualInput] = useState('');
+  const [foundItem, setFoundItem] = useState<{ item: import('@/data/store').Item; locationId?: string } | null>(null);
+  const [qty, setQty] = useState('1');
+  const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [step, setStep] = useState<'scan' | 'confirm'>('scan');
+
+  // Parse QR data: could be full URL (?item=ID) or just item ID
+  const parseQR = (raw: string) => {
+    const trimmed = raw.trim();
+    // Try URL format
+    try {
+      const url = new URL(trimmed);
+      const itemId = url.searchParams.get('item');
+      const locId = url.searchParams.get('location');
+      if (itemId) {
+        const item = state.items.find(i => i.id === itemId);
+        if (item) { setFoundItem({ item, locationId: locId || undefined }); setStep('confirm'); return; }
+      }
+    } catch (_) { /* not a URL */ }
+    // Try direct item name search
+    const byName = state.items.find(i => i.name.toLowerCase() === trimmed.toLowerCase());
+    if (byName) { setFoundItem({ item: byName }); setStep('confirm'); return; }
+    // Try ID
+    const byId = state.items.find(i => i.id === trimmed);
+    if (byId) { setFoundItem({ item: byId }); setStep('confirm'); }
+  };
+
+  const locStocks = foundItem ? (state.locationStocks || [])
+    .filter(ls => ls.itemId === foundItem.item.id && ls.quantity > 0)
+    .map(ls => ({ ...ls, location: state.locations.find(l => l.id === ls.locationId) }))
+    .filter(ls => ls.location) : [];
+
+  const handleConfirm = () => {
+    if (!foundItem || !selectedLocationId) return;
+    const actual = parseInt(qty) || 0;
+    if (actual <= 0) return;
+    const locStock = (state.locationStocks || []).find(ls => ls.itemId === foundItem.item.id && ls.locationId === selectedLocationId)?.quantity || 0;
+    const pickQty = Math.min(actual, locStock);
+    if (pickQty <= 0) return;
+
+    // Find existing order item or create
+    const liveOrder = state.workOrders.find(o => o.id === order.id) || order;
+    const existingOi = liveOrder.items.find(oi => oi.itemId === foundItem.item.id);
+
+    let newItems: OrderItem[];
+    if (existingOi) {
+      const newPicked = existingOi.pickedQty + pickQty;
+      const newStatus: OrderItem['status'] = newPicked >= existingOi.requiredQty ? 'done' : 'partial';
+      newItems = liveOrder.items.map(oi => oi.id === existingOi.id ? { ...oi, pickedQty: newPicked, status: newStatus } : oi);
+    } else {
+      const newOi: OrderItem = { id: generateId(), itemId: foundItem.item.id, requiredQty: pickQty, pickedQty: pickQty, status: 'done' };
+      newItems = [...liveOrder.items, newOi];
+    }
+
+    const allDone = newItems.every(oi => oi.status === 'done');
+    let next = updateLocationStock(state, foundItem.item.id, selectedLocationId, -pickQty);
+    next = { ...next, items: next.items.map(i => i.id === foundItem.item.id ? { ...i, quantity: Math.max(0, i.quantity - pickQty) } : i) };
+
+    const op: Operation = {
+      id: generateId(), itemId: foundItem.item.id, type: 'out', quantity: pickQty,
+      comment: `QR-сборка по заявке ${liveOrder.number}`,
+      from: state.locations.find(l => l.id === selectedLocationId)?.name,
+      to: liveOrder.recipientName || liveOrder.title,
+      performedBy: state.currentUser, date: new Date().toISOString(),
+      orderId: liveOrder.id, locationId: selectedLocationId,
+    };
+    next = {
+      ...next,
+      operations: [op, ...next.operations],
+      workOrders: next.workOrders.map(o => o.id === liveOrder.id
+        ? { ...o, items: newItems, status: allDone ? 'assembled' as OrderStatus : o.status, updatedAt: new Date().toISOString() }
+        : o
+      ),
+    };
+    onStateChange(next); saveState(next);
+    onClose();
+  };
+
+  // Auto-select location from QR if provided
+  const handleFoundItem = (item: import('@/data/store').Item, locId?: string) => {
+    setFoundItem({ item, locationId: locId });
+    if (locId) setSelectedLocationId(locId);
+    else {
+      const stocks = (state.locationStocks || []).filter(ls => ls.itemId === item.id && ls.quantity > 0);
+      if (stocks.length === 1) setSelectedLocationId(stocks[0].locationId);
+    }
+    setQty('1');
+    setStep('confirm');
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md animate-scale-in">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
+              <Icon name="ScanLine" size={16} />
+            </div>
+            Отсканировать QR-код
+          </DialogTitle>
+        </DialogHeader>
+
+        {step === 'scan' ? (
+          <div className="space-y-4 pt-1">
+            {/* Mobile instruction */}
+            <div className="p-4 bg-primary/8 border border-primary/20 rounded-xl text-sm space-y-2">
+              <div className="flex items-center gap-2 font-semibold text-foreground">
+                <Icon name="Smartphone" size={15} className="text-primary" />
+                Сканирование с телефона
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Направьте камеру телефона на QR-код товара. Приложение откроется автоматически и добавит товар в эту заявку.
+              </p>
+            </div>
+
+            {/* QR for this order (for mobile scanner) */}
+            <div className="flex flex-col items-center gap-3 py-2">
+              <div className="p-3 bg-white rounded-xl border border-border shadow-card">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(window.location.origin + '/?order=' + order.id)}`}
+                  alt="QR заявки"
+                  className="w-40 h-40"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground text-center">QR этой заявки — для привязки сканирования товаров</p>
+            </div>
+
+            <div className="relative flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground shrink-0">или введите вручную</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* Manual input */}
+            <div className="space-y-1.5">
+              <Label>ID товара или название</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={manualInput}
+                  onChange={e => setManualInput(e.target.value)}
+                  placeholder="Вставьте или введите..."
+                  onKeyDown={e => e.key === 'Enter' && parseQR(manualInput)}
+                />
+                <Button onClick={() => parseQR(manualInput)} disabled={!manualInput.trim()}>
+                  <Icon name="Search" size={14} />
+                </Button>
+              </div>
+            </div>
+
+            {/* Quick pick from order items */}
+            {order.items.filter(oi => oi.status !== 'done').length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Быстрый выбор из заявки:</Label>
+                <div className="space-y-1">
+                  {order.items.filter(oi => oi.status !== 'done').map(oi => {
+                    const item = state.items.find(i => i.id === oi.itemId);
+                    if (!item) return null;
+                    return (
+                      <button key={oi.id} onClick={() => handleFoundItem(item)}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted text-sm transition-colors">
+                        <span className="font-medium truncate">{item.name}</span>
+                        <span className="text-muted-foreground ml-2 shrink-0">{oi.requiredQty - oi.pickedQty} {item.unit}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <Button variant="outline" onClick={onClose} className="w-full">Отмена</Button>
+          </div>
+        ) : foundItem ? (
+          <div className="space-y-4 pt-1">
+            {/* Found item */}
+            <div className="p-3 bg-success/8 border border-success/30 rounded-xl flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center shrink-0">
+                <Icon name="CheckCircle2" size={16} />
+              </div>
+              <div>
+                <div className="font-semibold text-sm text-foreground">{foundItem.item.name}</div>
+                <div className="text-xs text-muted-foreground">Товар найден по QR-коду</div>
+              </div>
+            </div>
+
+            {/* Location selector */}
+            <div className="space-y-1.5">
+              <Label>С какой полки списать</Label>
+              {locStocks.length === 0 ? (
+                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive flex items-center gap-2">
+                  <Icon name="AlertCircle" size={14} />Нет остатков на складе
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {locStocks.map(ls => (
+                    <button key={ls.locationId} type="button"
+                      onClick={() => setSelectedLocationId(ls.locationId)}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg border-2 text-sm transition-all
+                        ${selectedLocationId === ls.locationId ? 'border-primary bg-accent' : 'border-border bg-card hover:border-primary/40'}`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedLocationId === ls.locationId ? 'border-primary bg-primary' : 'border-border'}`}>
+                          {selectedLocationId === ls.locationId && <Icon name="Check" size={10} className="text-primary-foreground" />}
+                        </div>
+                        <span className="font-medium">{ls.location?.name}</span>
+                      </div>
+                      <span className="font-bold text-muted-foreground tabular-nums">{ls.quantity} {foundItem.item.unit}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Qty */}
+            {selectedLocationId && (
+              <div className="space-y-1.5">
+                <Label>Количество</Label>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setQty(String(Math.max(1, (parseInt(qty)||0) - 1)))}
+                    className="w-10 h-10 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center shrink-0">
+                    <Icon name="Minus" size={14} />
+                  </button>
+                  <Input type="number" min="1" value={qty} onChange={e => setQty(e.target.value)} className="text-center text-lg font-bold" />
+                  <button type="button" onClick={() => setQty(String((parseInt(qty)||0) + 1))}
+                    className="w-10 h-10 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center shrink-0">
+                    <Icon name="Plus" size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => { setStep('scan'); setFoundItem(null); }} className="flex-1">
+                <Icon name="ArrowLeft" size={13} className="mr-1" />Назад
+              </Button>
+              <Button onClick={handleConfirm} disabled={!selectedLocationId || (parseInt(qty)||0) <= 0 || locStocks.length === 0}
+                className="flex-1 bg-success hover:bg-success/90 text-success-foreground font-semibold">
+                <Icon name="PackageCheck" size={14} className="mr-1.5" />Собрать
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Close Warning Modal ──────────────────────────────────────────────────────
+function CloseWarningModal({ order, state, onConfirm, onCancel }: {
+  order: WorkOrder; state: AppState; onConfirm: () => void; onCancel: () => void;
+}) {
+  const unfinished = order.items.filter(oi => oi.status !== 'done');
+  return (
+    <Dialog open onOpenChange={onCancel}>
+      <DialogContent className="max-w-sm animate-scale-in">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-warning/15 text-warning flex items-center justify-center shrink-0">
+              <Icon name="AlertTriangle" size={16} />
+            </div>
+            Закрыть заявку?
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-1">
+          <p className="text-sm text-muted-foreground">
+            Осталось <b className="text-foreground">{unfinished.length} несобранных позиций</b>. Закрытую заявку можно возобновить позже.
+          </p>
+          <div className="space-y-1.5">
+            {unfinished.slice(0, 4).map(oi => {
+              const item = state.items.find(i => i.id === oi.itemId);
+              return (
+                <div key={oi.id} className="flex items-center justify-between text-sm px-3 py-2 bg-muted rounded-lg gap-2">
+                  <span className="text-foreground truncate font-medium">{item?.name || '—'}</span>
+                  <span className="font-semibold text-warning shrink-0">{oi.pickedQty}/{oi.requiredQty} {item?.unit}</span>
+                </div>
+              );
+            })}
+            {unfinished.length > 4 && <p className="text-xs text-muted-foreground text-center">+{unfinished.length - 4} ещё</p>}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onCancel} className="flex-1">Продолжить сборку</Button>
+            <Button onClick={onConfirm} className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground font-semibold">
+              <Icon name="Archive" size={14} className="mr-1.5" />
+              Закрыть (частично)
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Order Detail ─────────────────────────────────────────────────────────────
 function OrderDetail({ order, state, onStateChange, onBack }: {
   order: WorkOrder; state: AppState;
   onStateChange: (s: AppState) => void; onBack: () => void;
 }) {
   const [pickingItem, setPickingItem] = useState<OrderItem | null>(null);
+  const [showQRScan, setShowQRScan] = useState(false);
+  const [showCloseWarning, setShowCloseWarning] = useState(false);
 
   const doneCount = order.items.filter(i => i.status === 'done').length;
   const progress = order.items.length > 0 ? Math.round((doneCount / order.items.length) * 100) : 0;
+  const hasUnfinished = order.items.some(i => i.status !== 'done');
 
   const changeStatus = (status: OrderStatus) => {
     const next = { ...state, workOrders: state.workOrders.map(o => o.id === order.id ? { ...o, status, updatedAt: new Date().toISOString() } : o) };
     onStateChange(next); saveState(next);
+  };
+
+  const handleClose = () => {
+    if (hasUnfinished) { setShowCloseWarning(true); return; }
+    changeStatus('closed');
   };
 
   const orderHistory = state.operations.filter(op => op.orderId === order.id)
@@ -626,6 +929,22 @@ function OrderDetail({ order, state, onStateChange, onBack }: {
         <div className="text-xs text-muted-foreground">{doneCount} из {liveOrder.items.length} позиций собрано</div>
       </div>
 
+      {/* QR Scan big button — visible when active */}
+      {(liveOrder.status === 'active') && (
+        <button
+          onClick={() => setShowQRScan(true)}
+          className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/70 transition-all group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Icon name="ScanLine" size={20} className="text-primary-foreground" />
+          </div>
+          <div className="text-left">
+            <div className="font-bold text-base text-foreground">Отсканировать QR-код</div>
+            <div className="text-sm text-muted-foreground">Добавить товар в заявку по QR</div>
+          </div>
+        </button>
+      )}
+
       {/* Status flow */}
       <div className="flex gap-1 flex-wrap">
         {statusFlow.map((s, i) => (
@@ -638,6 +957,14 @@ function OrderDetail({ order, state, onStateChange, onBack }: {
             {getOrderStatusLabel(s)}
           </button>
         ))}
+        {/* Reopen closed order */}
+        {liveOrder.status === 'closed' && (
+          <button onClick={() => changeStatus('active')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-warning/12 text-warning hover:bg-warning/20 transition-all">
+            <Icon name="RotateCcw" size={11} />
+            Возобновить сборку
+          </button>
+        )}
       </div>
 
       {/* Items */}
@@ -750,19 +1077,45 @@ function OrderDetail({ order, state, onStateChange, onBack }: {
           className="flex items-center gap-1.5">
           <Icon name="QrCode" size={14} />QR
         </Button>
-        {liveOrder.status === 'draft' && <Button onClick={() => changeStatus('active')} className="flex-1"><Icon name="Play" size={14} className="mr-1.5" />Запустить в работу</Button>}
+        {liveOrder.status === 'draft' && (
+          <>
+            <Button variant="outline" onClick={() => {}} className="flex items-center gap-1.5">
+              <Icon name="Pencil" size={14} />Черновик
+            </Button>
+            <Button onClick={() => changeStatus('active')} className="flex-1"><Icon name="Play" size={14} className="mr-1.5" />Запустить в работу</Button>
+          </>
+        )}
+        {liveOrder.status === 'active' && (
+          <Button onClick={() => setShowQRScan(true)} variant="outline" className="flex items-center gap-1.5">
+            <Icon name="ScanLine" size={14} />Сканировать
+          </Button>
+        )}
         {liveOrder.status === 'pending_stock' && <Button onClick={() => changeStatus('active')} className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground"><Icon name="Play" size={14} className="mr-1.5" />Запустить (поставка пришла)</Button>}
-        {liveOrder.status === 'assembled' && <Button onClick={() => changeStatus('closed')} className="flex-1 bg-muted text-foreground hover:bg-muted/80"><Icon name="Archive" size={14} className="mr-1.5" />Закрыть заявку</Button>}
+        {liveOrder.status === 'assembled' && <Button onClick={handleClose} className="flex-1 bg-muted text-foreground hover:bg-muted/80"><Icon name="Archive" size={14} className="mr-1.5" />Закрыть заявку</Button>}
+        {liveOrder.status === 'closed' && (
+          <Button onClick={() => changeStatus('active')} className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground">
+            <Icon name="RotateCcw" size={14} className="mr-1.5" />Возобновить сборку
+          </Button>
+        )}
       </div>
 
       {pickingItem && <PickItemModal state={state} onStateChange={onStateChange} order={liveOrder} orderItem={pickingItem} onClose={() => setPickingItem(null)} />}
+      {showQRScan && <QRScanModal order={liveOrder} state={state} onStateChange={onStateChange} onClose={() => setShowQRScan(false)} />}
+      {showCloseWarning && (
+        <CloseWarningModal
+          order={liveOrder}
+          state={state}
+          onConfirm={() => { setShowCloseWarning(false); changeStatus('closed'); }}
+          onCancel={() => setShowCloseWarning(false)}
+        />
+      )}
     </div>
   );
 }
 
 // ─── Main Assembly Page ───────────────────────────────────────────────────────
-export default function AssemblyPage({ state, onStateChange }: Props) {
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+export default function AssemblyPage({ state, onStateChange, initialOrderId }: Props & { initialOrderId?: string | null }) {
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(initialOrderId ?? null);
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
 
@@ -791,6 +1144,9 @@ export default function AssemblyPage({ state, onStateChange }: Props) {
     { status: 'assembled' as const, label: 'Собраны', icon: 'PackageCheck' },
     { status: 'closed' as const, label: 'Закрыты', icon: 'Archive' },
   ];
+
+  // Closed but not fully assembled — can be reopened
+  const reopenableCount = orders.filter(o => o.status === 'closed' && o.items.some(oi => oi.status !== 'done')).length;
 
   return (
     <div className="space-y-5 pb-20 md:pb-0">
@@ -824,6 +1180,13 @@ export default function AssemblyPage({ state, onStateChange }: Props) {
           <Icon name="Clock" size={14} className="text-warning shrink-0" />
           <span className="text-warning font-medium">{counts.pending_stock} заявок ожидают поставки</span>
           <button onClick={() => setStatusFilter('pending_stock')} className="ml-auto text-xs text-warning/70 hover:text-warning underline underline-offset-2">Показать</button>
+        </div>
+      )}
+      {reopenableCount > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-destructive/8 border border-destructive/20 rounded-lg text-sm">
+          <Icon name="AlertTriangle" size={14} className="text-destructive shrink-0" />
+          <span className="text-destructive font-medium">{reopenableCount} закрытых заявок не полностью собраны</span>
+          <button onClick={() => setStatusFilter('closed')} className="ml-auto text-xs text-destructive/70 hover:text-destructive underline underline-offset-2">Показать</button>
         </div>
       )}
 
@@ -862,6 +1225,7 @@ export default function AssemblyPage({ state, onStateChange }: Props) {
               const avail = (state.locationStocks || []).filter(ls => ls.itemId === item.id).reduce((s, ls) => s + ls.quantity, 0);
               return avail < (oi.requiredQty - oi.pickedQty);
             });
+            const isReopenable = order.status === 'closed' && order.items.some(oi => oi.status !== 'done');
 
             return (
               <button key={order.id} onClick={() => setSelectedOrderId(order.id)}
@@ -880,6 +1244,7 @@ export default function AssemblyPage({ state, onStateChange }: Props) {
                       <span className="font-mono text-xs text-muted-foreground">{order.number}</span>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getOrderStatusColor(order.status)}`}>{getOrderStatusLabel(order.status)}</span>
                       {hasShortage && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-destructive/12 text-destructive flex items-center gap-1"><Icon name="AlertTriangle" size={10} />Нехватка</span>}
+                      {isReopenable && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-warning/12 text-warning flex items-center gap-1"><Icon name="RotateCcw" size={10} />Возобновить</span>}
                     </div>
                     <div className="font-semibold text-foreground group-hover:text-primary transition-colors">{order.title}</div>
                     {order.recipientName && (

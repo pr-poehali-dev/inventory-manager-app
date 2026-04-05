@@ -10,6 +10,7 @@ import ItemDetailModal from '@/components/ItemDetailModal';
 type Props = {
   state: AppState;
   onStateChange: (s: AppState) => void;
+  initialLocationId?: string | null;
 };
 
 // ─── Types for map layout ─────────────────────────────────────────────────────
@@ -492,8 +493,8 @@ function LocationDetailPanel({
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function WarehouseMapPage({ state, onStateChange }: Props) {
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+export default function WarehouseMapPage({ state, onStateChange, initialLocationId }: Props) {
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(initialLocationId ?? null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showAddLocation, setShowAddLocation] = useState(false);
