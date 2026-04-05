@@ -340,11 +340,29 @@ function CreateOrderModal({
                         </button>
                       </div>
 
-                      {/* Stock info row */}
+                      {/* Stock info row with location breakdown */}
                       {item && (
-                        <div className="flex items-center gap-3 text-xs px-1">
-                          <span className="text-muted-foreground">Склад: <b className="text-foreground">{item.quantity} {item.unit}</b></span>
-                          <span className="text-muted-foreground">Свободно: <b className={getFreeQty(state, item.id) <= 0 ? 'text-destructive' : 'text-foreground'}>{getFreeQty(state, item.id)} {item.unit}</b></span>
+                        <div className="space-y-1.5 px-1">
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="text-muted-foreground">Всего: <b className={item.quantity === 0 ? 'text-destructive' : 'text-foreground'}>{item.quantity} {item.unit}</b></span>
+                            <span className="text-muted-foreground">Свободно: <b className={getFreeQty(state, item.id) <= 0 ? 'text-destructive' : 'text-success'}>{getFreeQty(state, item.id)} {item.unit}</b></span>
+                          </div>
+                          {(() => {
+                            const locs = (state.locationStocks || [])
+                              .filter(ls => ls.itemId === item.id && ls.quantity > 0)
+                              .map(ls => ({ ...ls, loc: state.locations.find(l => l.id === ls.locationId) }))
+                              .filter(ls => ls.loc);
+                            if (locs.length === 0) return null;
+                            return (
+                              <div className="flex flex-wrap gap-1">
+                                {locs.map(ls => (
+                                  <span key={ls.locationId} className="text-[11px] bg-background border border-border px-2 py-0.5 rounded-full text-muted-foreground">
+                                    {ls.loc?.name}: <b className="text-foreground">{ls.quantity}</b>
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
 

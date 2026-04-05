@@ -59,7 +59,7 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return items;
-  }, [state, search, categoryFilter, locationFilter, stockFilter, sortField, sortDir]);
+  }, [state.items, state.categories, state.locations, search, categoryFilter, locationFilter, stockFilter, sortField, sortDir]);
 
   const selectedItem = selectedItemId ? state.items.find(i => i.id === selectedItemId) || null : null;
 
@@ -71,35 +71,31 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
   const zeroCount = state.items.filter(i => i.quantity === 0).length;
   const lowCount = state.items.filter(i => i.quantity > 0 && i.quantity <= i.lowStockThreshold).length;
   const okCount = state.items.filter(i => i.quantity > i.lowStockThreshold).length;
-
   const activeFilters = [categoryFilter !== 'all', locationFilter !== 'all', stockFilter !== 'all', search !== ''].filter(Boolean).length;
 
   return (
     <div className="space-y-5 pb-20 md:pb-0">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Номенклатура</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{state.items.length} позиций · {state.categories.length} категорий</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {state.items.length} позиций · {state.categories.length} категорий
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {zeroCount > 0 && (
-            <button
-              onClick={() => setStockFilter(stockFilter === 'zero' ? 'all' : 'zero')}
+            <button onClick={() => setStockFilter(stockFilter === 'zero' ? 'all' : 'zero')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all
-                ${stockFilter === 'zero' ? 'bg-destructive text-destructive-foreground border-destructive' : 'border-destructive/30 text-destructive bg-destructive/8 hover:bg-destructive/15'}`}
-            >
-              <span className="w-2 h-2 rounded-full bg-current" />
-              Нет: {zeroCount}
+                ${stockFilter === 'zero' ? 'bg-destructive text-destructive-foreground border-destructive' : 'border-destructive/30 text-destructive bg-destructive/8 hover:bg-destructive/15'}`}>
+              <span className="w-2 h-2 rounded-full bg-current" />Нет: {zeroCount}
             </button>
           )}
           {lowCount > 0 && (
-            <button
-              onClick={() => setStockFilter(stockFilter === 'low' ? 'all' : 'low')}
+            <button onClick={() => setStockFilter(stockFilter === 'low' ? 'all' : 'low')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all
-                ${stockFilter === 'low' ? 'bg-warning text-warning-foreground border-warning' : 'border-warning/40 text-warning bg-warning/8 hover:bg-warning/15'}`}
-            >
-              <span className="w-2 h-2 rounded-full bg-current" />
-              Мало: {lowCount}
+                ${stockFilter === 'low' ? 'bg-warning text-warning-foreground border-warning' : 'border-warning/40 text-warning bg-warning/8 hover:bg-warning/15'}`}>
+              <span className="w-2 h-2 rounded-full bg-current" />Мало: {lowCount}
             </button>
           )}
         </div>
@@ -110,11 +106,7 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
         <div className="relative flex-1 min-w-44">
           <Icon name="Search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input placeholder="Поиск по названию, описанию..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-              <Icon name="X" size={13} />
-            </button>
-          )}
+          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><Icon name="X" size={13} /></button>}
         </div>
         <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
           className="h-9 px-3 pr-8 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer">
@@ -128,7 +120,7 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
         </select>
         {activeFilters > 0 && (
           <button onClick={() => { setSearch(''); setCategoryFilter('all'); setLocationFilter('all'); setStockFilter('all'); }}
-            className="h-9 px-3 text-sm rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1.5">
+            className="h-9 px-3 text-sm rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1.5 transition-colors">
             <Icon name="X" size={13} />Сбросить ({activeFilters})
           </button>
         )}
@@ -150,6 +142,12 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
         ))}
       </div>
 
+      {/* Tip */}
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-accent/50 border border-primary/20 rounded-lg text-sm">
+        <Icon name="Paperclip" size={14} className="text-primary shrink-0" />
+        <span className="text-muted-foreground">Нажмите на позицию — откроется карточка с <b className="text-foreground">вложениями</b> (Word, PDF, фото), историей и операциями</span>
+      </div>
+
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
@@ -165,15 +163,18 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-3 w-8 text-xs text-muted-foreground">#</th>
+                  <th className="text-left px-4 py-3 w-8 text-xs text-muted-foreground/50">#</th>
                   {([['name','Наименование'],['category','Категория'],['location','Локация'],['quantity','Остаток']] as [SortField,string][]).map(([f,l]) => (
                     <th key={f} onClick={() => handleSort(f)}
                       className={`px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:text-foreground select-none ${f === 'quantity' ? 'text-right' : 'text-left'}`}>
-                      <span className={`flex items-center gap-0.5 ${f === 'quantity' ? 'justify-end' : ''}`}>{l}<SortIcon field={f} /></span>
+                      <span className={`flex items-center ${f === 'quantity' ? 'justify-end' : ''}`}>{l}<SortIcon field={f} /></span>
                     </th>
                   ))}
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Порог</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Статус</th>
+                  <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Статус</th>
+                  <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    <Icon name="Paperclip" size={12} className="mx-auto" />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -182,12 +183,14 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                   const loc = state.locations.find(l => l.id === item.locationId);
                   const isLow = item.quantity > 0 && item.quantity <= item.lowStockThreshold;
                   const isZero = item.quantity === 0;
-                  const locCount = state.locationStocks.filter(ls => ls.itemId === item.id && ls.quantity > 0).length;
+                  const locCount = (state.locationStocks || []).filter(ls => ls.itemId === item.id && ls.quantity > 0).length;
+                  const attCount = item.attachments?.length || 0;
+
                   return (
                     <tr key={item.id} onClick={() => setSelectedItemId(item.id)}
-                      className="border-b border-border/50 hover:bg-muted/30 cursor-pointer group animate-fade-in transition-colors"
+                      className="border-b border-border/50 hover:bg-muted/30 cursor-pointer group transition-colors animate-fade-in"
                       style={{ animationDelay: `${idx * 12}ms` }}>
-                      <td className="px-4 py-3 text-xs text-muted-foreground/40 tabular-nums">{idx + 1}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground/30 tabular-nums">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-foreground group-hover:text-primary transition-colors">{item.name}</div>
                         {item.description && <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{item.description}</div>}
@@ -198,7 +201,7 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                         ) : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-sm text-foreground">{loc?.name || '—'}</div>
+                        <div className="text-sm">{loc?.name || '—'}</div>
                         {locCount > 1 && <div className="text-xs text-muted-foreground">+{locCount - 1} локаций</div>}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -215,13 +218,22 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-success/12 text-success"><span className="w-1.5 h-1.5 rounded-full bg-current" />Норма</span>
                         )}
                       </td>
+                      <td className="px-3 py-3 text-center">
+                        {attCount > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
+                            <Icon name="Paperclip" size={12} />{attCount}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/30">—</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
             <div className="px-4 py-2.5 border-t border-border bg-muted/20 text-xs text-muted-foreground">
-              Показано {filtered.length} из {state.items.length} позиций
+              Показано {filtered.length} из {state.items.length} · Нажмите на строку для открытия карточки и вложений
             </div>
           </div>
 
@@ -232,22 +244,22 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
               const loc = state.locations.find(l => l.id === item.locationId);
               const isLow = item.quantity > 0 && item.quantity <= item.lowStockThreshold;
               const isZero = item.quantity === 0;
+              const attCount = item.attachments?.length || 0;
               return (
                 <button key={item.id} onClick={() => setSelectedItemId(item.id)}
                   className="w-full text-left bg-card rounded-xl border border-border p-3.5 shadow-card hover:border-primary/30 transition-all animate-fade-in"
                   style={{ animationDelay: `${idx * 20}ms` }}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm">{item.name}</div>
+                      <div className="font-semibold text-sm text-foreground">{item.name}</div>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {cat && <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: cat.color + '18', color: cat.color }}>{cat.name}</span>}
                         {loc && <span className="text-xs text-muted-foreground flex items-center gap-0.5"><Icon name="MapPin" size={10} />{loc.name}</span>}
+                        {attCount > 0 && <span className="text-xs text-primary flex items-center gap-0.5"><Icon name="Paperclip" size={10} />{attCount} файл.</span>}
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className={`text-lg font-bold tabular-nums ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
-                        {item.quantity} <span className="text-xs font-normal text-muted-foreground">{item.unit}</span>
-                      </div>
+                    <div className={`text-lg font-bold tabular-nums shrink-0 ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
+                      {item.quantity} <span className="text-xs font-normal text-muted-foreground">{item.unit}</span>
                     </div>
                   </div>
                 </button>

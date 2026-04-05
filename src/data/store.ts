@@ -14,6 +14,15 @@ export type Location = {
   description?: string;
 };
 
+export type Attachment = {
+  id: string;
+  name: string;
+  size: number;
+  mimeType: string;
+  dataUrl: string;
+  uploadedAt: string;
+};
+
 export type Item = {
   id: string;
   name: string;
@@ -25,6 +34,7 @@ export type Item = {
   lowStockThreshold: number;
   imageUrl?: string;
   createdAt: string;
+  attachments?: Attachment[];
 };
 
 export type OperationType = 'in' | 'out';
