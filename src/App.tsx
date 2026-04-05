@@ -7,6 +7,7 @@ import CatalogPage from '@/pages/CatalogPage';
 import NomenclaturePage from '@/pages/NomenclaturePage';
 import AssemblyPage from '@/pages/AssemblyPage';
 import PartnersPage from '@/pages/PartnersPage';
+import WarehouseMapPage from '@/pages/WarehouseMapPage';
 import HistoryPage from '@/pages/HistoryPage';
 import SettingsPage from '@/pages/SettingsPage';
 
@@ -26,6 +27,7 @@ export default function App() {
         {page === 'catalog'      && <CatalogPage state={state} onStateChange={setState} />}
         {page === 'nomenclature' && <NomenclaturePage state={state} onStateChange={setState} />}
         {page === 'assembly'     && <AssemblyPage state={state} onStateChange={setState} />}
+        {page === 'warehouse'    && <WarehouseMapPage state={state} onStateChange={setState} />}
         {page === 'partners'     && <PartnersPage state={state} onStateChange={setState} />}
         {page === 'history'      && <HistoryPage state={state} />}
         {page === 'settings'     && <SettingsPage state={state} onStateChange={setState} />}

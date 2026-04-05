@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import { AppState, saveState } from '@/data/store';
 
-export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'partners' | 'history' | 'settings';
+export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'partners' | 'history' | 'settings';
 
 type LayoutProps = {
   state: AppState;
@@ -32,6 +32,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     { id: 'catalog',       label: 'Каталог',       icon: 'LayoutGrid',  badge: lowStockCount > 0 ? lowStockCount : undefined, badgeColor: 'destructive' },
     { id: 'nomenclature',  label: 'Номенклатура',   icon: 'List' },
     { id: 'assembly',      label: 'Сборка',          icon: 'PackageCheck', badge: activeOrdersCount > 0 ? activeOrdersCount : undefined, badgeColor: 'blue' },
+    { id: 'warehouse',     label: 'Карта склада',    icon: 'Map' },
     { id: 'partners',      label: 'Партнёры',        icon: 'Users2' },
     { id: 'history',       label: 'История',         icon: 'History' },
     { id: 'settings',      label: 'Настройки',       icon: 'Settings' },
@@ -90,13 +91,13 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
 
         {/* Tablet/mobile dropdown */}
         {mobileMenuOpen && (
-          <div className="xl:hidden border-t border-border bg-card px-3 py-2 grid grid-cols-6 gap-1 animate-fade-in">
+          <div className="xl:hidden border-t border-border bg-card px-3 py-2 grid grid-cols-7 gap-1 animate-fade-in">
             {navItems.map(n => (
               <button key={n.id} onClick={() => { onPageChange(n.id); setMobileMenuOpen(false); }}
                 className={`relative flex flex-col items-center gap-1 px-1 py-2.5 rounded-lg text-[10px] font-medium transition-all
                   ${activePage === n.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
                 <Icon name={n.icon} size={17} />
-                <span className="leading-tight text-center">{n.label}</span>
+                <span className="leading-tight text-center">{n.id === 'warehouse' ? 'Карта' : n.label}</span>
                 {n.badge !== undefined && (
                   <span className={`absolute top-1 right-0.5 text-[9px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center
                     ${n.badgeColor === 'blue' ? 'bg-blue-500 text-white' : 'bg-destructive text-destructive-foreground'}`}>
