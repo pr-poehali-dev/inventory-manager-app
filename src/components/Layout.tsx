@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import { AppState, saveState } from '@/data/store';
 
-export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'partners' | 'history' | 'settings';
+export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'partners' | 'history' | 'settings';
 
 type LayoutProps = {
   state: AppState;
@@ -33,6 +33,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     { id: 'nomenclature',  label: 'Номенклатура',   icon: 'List' },
     { id: 'assembly',      label: 'Сборка',          icon: 'PackageCheck', badge: activeOrdersCount > 0 ? activeOrdersCount : undefined, badgeColor: 'blue' },
     { id: 'warehouse',     label: 'Карта склада',    icon: 'Map' },
+    { id: 'receipts',      label: 'Оприходование',   icon: 'PackagePlus' },
     { id: 'partners',      label: 'Партнёры',        icon: 'Users2' },
     { id: 'history',       label: 'История',         icon: 'History' },
     { id: 'settings',      label: 'Настройки',       icon: 'Settings' },
@@ -91,7 +92,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
 
         {/* Tablet/mobile dropdown */}
         {mobileMenuOpen && (
-          <div className="xl:hidden border-t border-border bg-card px-3 py-2 grid grid-cols-7 gap-1 animate-fade-in">
+          <div className="xl:hidden border-t border-border bg-card px-3 py-2 grid grid-cols-8 gap-0.5 animate-fade-in">
             {navItems.map(n => (
               <button key={n.id} onClick={() => { onPageChange(n.id); setMobileMenuOpen(false); }}
                 className={`relative flex flex-col items-center gap-1 px-1 py-2.5 rounded-lg text-[10px] font-medium transition-all

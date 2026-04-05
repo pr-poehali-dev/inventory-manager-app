@@ -102,6 +102,37 @@ export type WorkOrder = {
   comment?: string;
 };
 
+// ─── Receipts (Оприходование) ─────────────────────────────────────────────────
+
+export type ReceiptLine = {
+  id: string;
+  itemId: string;          // existing or newly created
+  itemName: string;        // display name (for new items before creation)
+  qty: number;
+  locationId: string;
+  price?: number;
+  unit: string;
+  isNew?: boolean;         // true = item was created during this receipt
+};
+
+export type ReceiptCustomField = {
+  key: string;
+  value: string;
+};
+
+export type Receipt = {
+  id: string;
+  number: string;           // document number / номер документа
+  supplierId?: string;
+  supplierName: string;
+  date: string;
+  createdBy: string;
+  lines: ReceiptLine[];
+  customFields: ReceiptCustomField[];  // дополнительные поля документа
+  comment?: string;
+  totalAmount?: number;
+};
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 export type AppState = {
@@ -112,10 +143,12 @@ export type AppState = {
   locationStocks: LocationStock[];
   workOrders: WorkOrder[];
   partners: Partner[];
+  receipts: Receipt[];
   darkMode: boolean;
   defaultLowStockThreshold: number;
   currentUser: string;
   orderCounter: number;
+  receiptCounter: number;
 };
 
 // ─── Initial Data ─────────────────────────────────────────────────────────────
@@ -125,6 +158,8 @@ const initialState: AppState = {
   defaultLowStockThreshold: 5,
   currentUser: 'Администратор',
   orderCounter: 3,
+  receiptCounter: 1,
+  receipts: [],
   categories: [
     { id: 'cat-1', name: 'Электроника', color: '#6366f1' },
     { id: 'cat-2', name: 'Офисные принадлежности', color: '#0ea5e9' },
@@ -228,6 +263,8 @@ export function loadState(): AppState {
       if (!p.workOrders) p.workOrders = initialState.workOrders;
       if (!p.partners) p.partners = initialState.partners;
       if (p.orderCounter === undefined) p.orderCounter = initialState.orderCounter;
+      if (!p.receipts) p.receipts = [];
+      if (p.receiptCounter === undefined) p.receiptCounter = 1;
       return p;
     }
   } catch (e) {
