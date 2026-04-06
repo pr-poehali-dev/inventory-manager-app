@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState, Location, saveState, generateId, LocationStock } from '@/data/store';
+import { AppState, Location, Operation, saveState, generateId, LocationStock, updateLocationStock } from '@/data/store';
 import ItemDetailModal from '@/components/ItemDetailModal';
 
 type Props = {
@@ -64,6 +64,120 @@ function stockDotColor(level: 'ok' | 'low' | 'critical') {
   if (level === 'ok') return 'bg-success';
   if (level === 'low') return 'bg-warning';
   return 'bg-destructive';
+}
+
+// ─── Add Item To Location Modal ───────────────────────────────────────────────
+function AddItemToLocationModal({
+  locationId, state, onStateChange, onClose,
+}: {
+  locationId: string;
+  state: AppState;
+  onStateChange: (s: AppState) => void;
+  onClose: () => void;
+}) {
+  const location = state.locations.find(l => l.id === locationId);
+  const [itemId, setItemId] = useState('');
+  const [qty, setQty] = useState('1');
+  const [search, setSearch] = useState('');
+
+  const filteredItems = state.items.filter(i =>
+    !search.trim() || i.name.toLowerCase().includes(search.toLowerCase())
+  ).slice(0, 20);
+
+  const selectedItem = itemId ? state.items.find(i => i.id === itemId) : null;
+  const currentStock = itemId ? (state.locationStocks || []).find(ls => ls.itemId === itemId && ls.locationId === locationId)?.quantity || 0 : 0;
+
+  const handleAdd = () => {
+    if (!itemId || (parseInt(qty) || 0) <= 0) return;
+    const amount = parseInt(qty);
+    let next = updateLocationStock(state, itemId, locationId, amount);
+    next = { ...next, items: next.items.map(i => i.id === itemId ? { ...i, quantity: i.quantity + amount } : i) };
+    const op: Operation = {
+      id: generateId(), itemId, type: 'in', quantity: amount,
+      comment: `Добавлено на ${location?.name || 'локацию'}`,
+      to: location?.name, performedBy: next.currentUser,
+      date: new Date().toISOString(), locationId,
+    };
+    next = { ...next, operations: [op, ...next.operations] };
+    onStateChange(next); saveState(next); onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-sm animate-scale-in">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon name="PackagePlus" size={16} className="text-primary" />
+            Добавить товар на {location?.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 pt-2">
+          <div className="space-y-1.5">
+            <Label>Поиск товара</Label>
+            <Input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setItemId(''); }}
+              placeholder="Начните вводить название..."
+              autoFocus
+            />
+          </div>
+          {search.trim() && (
+            <div className="border border-border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+              {filteredItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Товары не найдены</p>
+              ) : filteredItems.map(item => {
+                const cat = state.categories.find(c => c.id === item.categoryId);
+                const locStock = (state.locationStocks || []).find(ls => ls.itemId === item.id && ls.locationId === locationId)?.quantity || 0;
+                return (
+                  <button key={item.id} onClick={() => { setItemId(item.id); setSearch(item.name); }}
+                    className={`w-full text-left flex items-center justify-between px-3 py-2.5 text-sm transition-colors border-b border-border/50 last:border-0
+                      ${itemId === item.id ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'}`}>
+                    <div>
+                      <div className="font-medium">{item.name}</div>
+                      {cat && <div className="text-xs" style={{ color: cat.color }}>{cat.name}</div>}
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <div className="text-xs text-muted-foreground">Склад: {item.quantity} {item.unit}</div>
+                      {locStock > 0 && <div className="text-xs text-primary">Здесь: {locStock}</div>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {selectedItem && (
+            <div className="p-3 bg-muted/50 rounded-lg text-sm">
+              <div className="font-medium">{selectedItem.name}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                На складе: {selectedItem.quantity} {selectedItem.unit}
+                {currentStock > 0 && ` · Уже здесь: ${currentStock}`}
+              </div>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label>Количество</Label>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setQty(String(Math.max(1, (parseInt(qty)||0) - 1)))}
+                className="w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center">
+                <Icon name="Minus" size={13} />
+              </button>
+              <Input type="number" min="1" value={qty} onChange={e => setQty(e.target.value)} className="text-center font-bold" />
+              <button type="button" onClick={() => setQty(String((parseInt(qty)||0) + 1))}
+                className="w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center">
+                <Icon name="Plus" size={13} />
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
+            <Button onClick={handleAdd} disabled={!itemId || (parseInt(qty)||0) <= 0} className="flex-1 bg-success hover:bg-success/90 text-success-foreground font-semibold">
+              <Icon name="PackagePlus" size={14} className="mr-1.5" />Добавить
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // ─── Add Location Modal ───────────────────────────────────────────────────────
@@ -378,6 +492,7 @@ function LocationDetailPanel({
   onItemSelect: (itemId: string) => void;
   onItemDragStart: (e: React.DragEvent, itemId: string, fromLocationId: string) => void;
 }) {
+  const [showAddItem, setShowAddItem] = useState(false);
   const locStocks = (state.locationStocks || [])
     .filter(ls => ls.locationId === location.id && ls.quantity > 0)
     .map(ls => ({ ...ls, item: state.items.find(i => i.id === ls.itemId) }))
@@ -411,10 +526,21 @@ function LocationDetailPanel({
 
       {/* Actions */}
       <div className="flex gap-2 mb-4">
-        <Button variant="outline" size="sm" onClick={handleQR} className="flex items-center gap-1.5 flex-1">
-          <Icon name="QrCode" size={13} />QR-код
+        <Button size="sm" onClick={() => setShowAddItem(true)} className="flex items-center gap-1.5 flex-1 bg-success hover:bg-success/90 text-success-foreground font-semibold">
+          <Icon name="PackagePlus" size={14} />Добавить товар
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleQR} className="flex items-center gap-1.5">
+          <Icon name="QrCode" size={13} />QR
         </Button>
       </div>
+      {showAddItem && (
+        <AddItemToLocationModal
+          locationId={location.id}
+          state={state}
+          onStateChange={onStateChange}
+          onClose={() => setShowAddItem(false)}
+        />
+      )}
 
       {/* Items */}
       {locStocks.length === 0 ? (

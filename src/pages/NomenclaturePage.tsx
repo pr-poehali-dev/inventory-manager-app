@@ -1,8 +1,110 @@
 import { useState, useMemo } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState } from '@/data/store';
+import { AppState, Item, saveState, generateId } from '@/data/store';
 import ItemDetailModal from '@/components/ItemDetailModal';
+
+const UNITS = ['шт', 'кг', 'л', 'м', 'м²', 'уп', 'пачка', 'рул', 'упак', 'кор', 'пар'];
+
+function NewItemModal({ state, onStateChange, onClose }: {
+  state: AppState; onStateChange: (s: AppState) => void; onClose: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [unit, setUnit] = useState('шт');
+  const [categoryId, setCategoryId] = useState(state.categories[0]?.id || '');
+  const [locationId, setLocationId] = useState('');
+  const [description, setDescription] = useState('');
+  const [qty, setQty] = useState('0');
+  const [threshold, setThreshold] = useState('5');
+  const [error, setError] = useState('');
+
+  const handleSave = () => {
+    if (!name.trim()) { setError('Введите название'); return; }
+    const newItem: Item = {
+      id: generateId(),
+      name: name.trim(),
+      unit,
+      categoryId,
+      locationId: locationId || (state.locations[0]?.id || ''),
+      description: description.trim() || undefined,
+      quantity: parseInt(qty) || 0,
+      lowStockThreshold: parseInt(threshold) || 5,
+      createdAt: new Date().toISOString(),
+    };
+    const next = { ...state, items: [...state.items, newItem] };
+    onStateChange(next); saveState(next); onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md animate-scale-in">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
+              <Icon name="Plus" size={16} />
+            </div>
+            Новая номенклатура
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <Label>Название <span className="text-destructive">*</span></Label>
+            <Input value={name} onChange={e => { setName(e.target.value); setError(''); }}
+              placeholder="Например: Болт М8×40..." autoFocus />
+            {error && <p className="text-xs text-destructive">{error}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Ед. измерения</Label>
+              <select value={unit} onChange={e => setUnit(e.target.value)}
+                className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Нач. количество</Label>
+              <Input type="number" min="0" value={qty} onChange={e => setQty(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Категория</Label>
+              <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
+                className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                {state.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Порог минимума</Label>
+              <Input type="number" min="0" value={threshold} onChange={e => setThreshold(e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Локация</Label>
+            <select value={locationId} onChange={e => setLocationId(e.target.value)}
+              className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+              <option value="">— Не указана —</option>
+              {state.locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Описание</Label>
+            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Краткое описание..." />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
+            <Button onClick={handleSave} className="flex-1 font-semibold">
+              <Icon name="Plus" size={14} className="mr-1.5" />Создать
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 type Props = {
   state: AppState;
@@ -20,6 +122,7 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [showNewItem, setShowNewItem] = useState(false);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -83,7 +186,15 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
             {state.items.length} позиций · {state.categories.length} категорий
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          <button
+            onClick={() => setShowNewItem(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-sm active:scale-95"
+          >
+            <Icon name="Plus" size={16} />
+            Добавить номенклатуру
+          </button>
+
           {zeroCount > 0 && (
             <button onClick={() => setStockFilter(stockFilter === 'zero' ? 'all' : 'zero')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all
@@ -149,12 +260,27 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
           <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <Icon name="PackageSearch" size={28} className="text-muted-foreground" />
           </div>
-          <h3 className="text-base font-semibold mb-1">Позиции не найдены</h3>
-          <p className="text-sm text-muted-foreground">Попробуйте изменить фильтры</p>
+          <h3 className="text-base font-semibold mb-1">
+            {state.items.length === 0 ? 'Номенклатура пуста' : 'Позиции не найдены'}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            {state.items.length === 0
+              ? 'Добавьте первую позицию вручную или через Оприходование'
+              : 'Попробуйте изменить фильтры'}
+          </p>
+          {state.items.length === 0 && (
+            <button
+              onClick={() => setShowNewItem(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-sm"
+            >
+              <Icon name="Plus" size={16} />
+              Добавить первую позицию
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -270,6 +396,7 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
       )}
 
       <ItemDetailModal item={selectedItem} state={state} onStateChange={onStateChange} onClose={() => setSelectedItemId(null)} />
+      {showNewItem && <NewItemModal state={state} onStateChange={onStateChange} onClose={() => setShowNewItem(false)} />}
     </div>
   );
 }

@@ -9,12 +9,10 @@ import AssemblyPage from '@/pages/AssemblyPage';
 import PartnersPage from '@/pages/PartnersPage';
 import WarehouseMapPage from '@/pages/WarehouseMapPage';
 import ReceiptsPage from '@/pages/ReceiptsPage';
+import TechnicianPage from '@/pages/TechnicianPage';
 import HistoryPage from '@/pages/HistoryPage';
 import SettingsPage from '@/pages/SettingsPage';
 
-// QR deep-link: ?item=ID → открыть карточку товара
-//               ?location=ID → открыть карту склада с нужной локацией
-//               ?order=ID → открыть заявку
 function parseQRParams() {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -28,7 +26,6 @@ export default function App() {
   const [state, setState] = useState<AppState>(loadState);
   const [page, setPage] = useState<Page>('catalog');
 
-  // Deep-link state for QR scan routing
   const [qrItemId, setQrItemId] = useState<string | null>(null);
   const [qrLocationId, setQrLocationId] = useState<string | null>(null);
   const [qrOrderId, setQrOrderId] = useState<string | null>(null);
@@ -38,40 +35,46 @@ export default function App() {
     else document.documentElement.classList.remove('dark');
   }, [state.darkMode]);
 
-  // Handle QR scan deep-links on mount
   useEffect(() => {
     const { itemId, locationId, orderId } = parseQRParams();
-    if (itemId) {
-      setQrItemId(itemId);
-      setPage('catalog');
-    } else if (locationId) {
-      setQrLocationId(locationId);
-      setPage('warehouse');
-    } else if (orderId) {
-      setQrOrderId(orderId);
-      setPage('assembly');
-    }
-    // Clean URL without reload
+    if (itemId) { setQrItemId(itemId); setPage('catalog'); }
+    else if (locationId) { setQrLocationId(locationId); setPage('warehouse'); }
+    else if (orderId) { setQrOrderId(orderId); setPage('assembly'); }
     if (itemId || locationId || orderId) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
 
+  // Handle QR scan results from Layout's scanner
+  const handleQRResult = (type: string, id: string) => {
+    if (type === 'item')     { setQrItemId(id); setPage('catalog'); }
+    if (type === 'location') { setQrLocationId(id); setPage('warehouse'); }
+    if (type === 'order')    { setQrOrderId(id); setPage('assembly'); }
+  };
+
+  const handlePageChange = (p: Page) => {
+    setPage(p);
+    if (p !== 'catalog')   setQrItemId(null);
+    if (p !== 'warehouse') setQrLocationId(null);
+    if (p !== 'assembly')  setQrOrderId(null);
+  };
+
   return (
     <TooltipProvider>
       <Toaster position="top-right" />
-      <Layout state={state} onStateChange={setState} activePage={page} onPageChange={p => {
-        setPage(p);
-        // Clear QR state when navigating away
-        if (p !== 'catalog') setQrItemId(null);
-        if (p !== 'warehouse') setQrLocationId(null);
-        if (p !== 'assembly') setQrOrderId(null);
-      }}>
+      <Layout
+        state={state}
+        onStateChange={setState}
+        activePage={page}
+        onPageChange={handlePageChange}
+        onQRResult={handleQRResult}
+      >
         {page === 'catalog'      && <CatalogPage state={state} onStateChange={setState} initialItemId={qrItemId} />}
         {page === 'nomenclature' && <NomenclaturePage state={state} onStateChange={setState} />}
         {page === 'assembly'     && <AssemblyPage state={state} onStateChange={setState} initialOrderId={qrOrderId} />}
         {page === 'warehouse'    && <WarehouseMapPage state={state} onStateChange={setState} initialLocationId={qrLocationId} />}
         {page === 'receipts'     && <ReceiptsPage state={state} onStateChange={setState} />}
+        {page === 'technician'   && <TechnicianPage state={state} onStateChange={setState} />}
         {page === 'partners'     && <PartnersPage state={state} onStateChange={setState} />}
         {page === 'history'      && <HistoryPage state={state} />}
         {page === 'settings'     && <SettingsPage state={state} onStateChange={setState} />}

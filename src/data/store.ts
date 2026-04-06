@@ -133,6 +133,42 @@ export type Receipt = {
   totalAmount?: number;
 };
 
+// ─── Technician Tasks ─────────────────────────────────────────────────────────
+
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'overdue';
+export type TaskPriority = 'low' | 'normal' | 'high' | 'critical';
+
+export type TaskCheckItem = {
+  id: string;
+  text: string;
+  done: boolean;
+};
+
+export type TaskCustomField = {
+  key: string;
+  value: string;
+};
+
+export type TechTask = {
+  id: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  category: string;
+  assignee?: string;
+  locationId?: string;
+  itemId?: string;
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  checklist: TaskCheckItem[];
+  customFields: TaskCustomField[];
+  attachments: Attachment[];
+  progress: number; // 0-100
+  tags: string[];
+};
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 export type AppState = {
@@ -144,11 +180,13 @@ export type AppState = {
   workOrders: WorkOrder[];
   partners: Partner[];
   receipts: Receipt[];
+  techTasks: TechTask[];
   darkMode: boolean;
   defaultLowStockThreshold: number;
   currentUser: string;
   orderCounter: number;
   receiptCounter: number;
+  taskCounter: number;
 };
 
 // ─── Initial Data ─────────────────────────────────────────────────────────────
@@ -159,7 +197,9 @@ const initialState: AppState = {
   currentUser: 'Администратор',
   orderCounter: 3,
   receiptCounter: 1,
+  taskCounter: 1,
   receipts: [],
+  techTasks: [],
   categories: [
     { id: 'cat-1', name: 'Электроника', color: '#6366f1' },
     { id: 'cat-2', name: 'Офисные принадлежности', color: '#0ea5e9' },
@@ -271,6 +311,8 @@ export function loadState(): AppState {
       // Guard scalars
       if (p.orderCounter === undefined)   p.orderCounter = initialState.orderCounter;
       if (p.receiptCounter === undefined) p.receiptCounter = 1;
+      if (!Array.isArray(p.techTasks))    p.techTasks = [];
+      if (p.taskCounter === undefined)    p.taskCounter = 1;
       if (!p.currentUser)                 p.currentUser = initialState.currentUser;
       if (p.defaultLowStockThreshold === undefined) p.defaultLowStockThreshold = initialState.defaultLowStockThreshold;
       if (typeof p.darkMode !== 'boolean') p.darkMode = false;

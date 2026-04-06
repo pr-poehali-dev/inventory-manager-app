@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import Icon from '@/components/ui/icon';
 import { AppState, saveState } from '@/data/store';
+import QRScanner from '@/components/QRScanner';
 
-export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'partners' | 'history' | 'settings';
+export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'technician' | 'partners' | 'history' | 'settings';
 
 type LayoutProps = {
   state: AppState;
@@ -12,9 +13,12 @@ type LayoutProps = {
   children: React.ReactNode;
 };
 
-export default function Layout({ state, onStateChange, activePage, onPageChange, children }: LayoutProps) {
+export default function Layout({ state, onStateChange, activePage, onPageChange, children, onQRResult }: LayoutProps & {
+  onQRResult?: (type: string, id: string) => void;
+}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,6 +51,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     { id: 'assembly',      label: 'Сборка',           icon: 'PackageCheck', badge: activeOrdersCount > 0 ? activeOrdersCount : undefined, badgeColor: 'blue' },
     { id: 'warehouse',     label: 'Карта склада',     icon: 'Map' },
     { id: 'receipts',      label: 'Оприходование',    icon: 'PackagePlus' },
+    { id: 'technician',    label: 'Техник',           icon: 'Wrench' },
     { id: 'partners',      label: 'Партнёры',         icon: 'Users2' },
     { id: 'history',       label: 'История',          icon: 'History' },
     { id: 'settings',      label: 'Настройки',        icon: 'Settings' },
@@ -98,6 +103,12 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
 
           {/* Right */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* QR Scanner button */}
+            <button onClick={() => setQrOpen(true)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              title="Сканировать QR-код">
+              <Icon name="ScanLine" size={16} />
+            </button>
             <button onClick={toggleDark}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
               <Icon name={state.darkMode ? 'Sun' : 'Moon'} size={15} />
@@ -154,6 +165,20 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 pb-24 xl:pb-6">
         {children}
       </main>
+
+      {/* QR Scanner Modal */}
+      <QRScanner
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        onResult={result => {
+          setQrOpen(false);
+          if (result.type === 'item')     { onPageChange('catalog');    onQRResult?.(result.type, result.id); }
+          if (result.type === 'location') { onPageChange('warehouse');  onQRResult?.(result.type, result.id); }
+          if (result.type === 'order')    { onPageChange('assembly');   onQRResult?.(result.type, result.id); }
+          if (result.type === 'receipt')  { onPageChange('receipts');   onQRResult?.(result.type, result.id); }
+          if (result.type === 'unknown')  { onQRResult?.(result.type, result.raw); }
+        }}
+      />
 
       {/* Mobile bottom nav — fixed, only on non-xl screens */}
       <nav className="xl:hidden fixed bottom-0 left-0 right-0 bg-card/95 border-t border-border z-40 backdrop-blur-md safe-bottom">
