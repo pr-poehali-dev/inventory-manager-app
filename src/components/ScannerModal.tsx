@@ -16,14 +16,16 @@ type Props = {
   onConfirm: (codes: ScannedCode[]) => void;
   title?: string;
   itemBarcodes?: string[]; // known codes for this item
+  mode?: 'in' | 'out';    // out = only known codes allowed
 };
 
-export default function ScannerModal({ open, onClose, onConfirm, title = 'Сканирование', itemBarcodes = [] }: Props) {
+export default function ScannerModal({ open, onClose, onConfirm, title = 'Сканирование', itemBarcodes = [], mode }: Props) {
   const [scanned, setScanned] = useState<ScannedCode[]>([]);
   const [manualCode, setManualCode] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [lastFlash, setLastFlash] = useState(false);
+  const [rejectFlash, setRejectFlash] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<BarcodeDetector | null>(null);
@@ -60,11 +62,18 @@ export default function ScannerModal({ open, onClose, onConfirm, title = 'Ска
     lastCodeRef.current = code;
     lastCodeTimeRef.current = now;
 
+    // При расходе — пропускаем коды не из базы
+    if (mode === 'out' && itemBarcodes.length > 0 && !itemBarcodes.includes(code)) {
+      setRejectFlash(true);
+      setTimeout(() => setRejectFlash(false), 400);
+      return;
+    }
+
     setLastFlash(true);
     setTimeout(() => setLastFlash(false), 300);
 
     setScanned(prev => [...prev, { code, format, scannedAt: new Date().toISOString() }]);
-  }, []);
+  }, [mode, itemBarcodes]);
 
   const startCamera = async () => {
     setCameraError('');
@@ -153,8 +162,16 @@ export default function ScannerModal({ open, onClose, onConfirm, title = 'Ска
         </DialogHeader>
 
         <div className="px-5 pt-4 pb-5 space-y-4">
+          {/* Out-mode hint */}
+          {mode === 'out' && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-destructive/10 border border-destructive/25 rounded-lg text-xs text-destructive">
+              <Icon name="ShieldAlert" size={13} className="shrink-0" />
+              Коды, не привязанные к этому товару, будут отклонены
+            </div>
+          )}
+
           {/* Camera viewport */}
-          <div className={`relative rounded-xl overflow-hidden bg-black aspect-video transition-all ${lastFlash ? 'ring-4 ring-success' : ''}`}>
+          <div className={`relative rounded-xl overflow-hidden bg-black aspect-video transition-all ${lastFlash ? 'ring-4 ring-success' : rejectFlash ? 'ring-4 ring-destructive' : ''}`}>
             <video
               ref={videoRef}
               className="w-full h-full object-cover"
@@ -195,6 +212,9 @@ export default function ScannerModal({ open, onClose, onConfirm, title = 'Ска
                 </div>
                 {lastFlash && (
                   <div className="absolute inset-0 bg-success/20 pointer-events-none animate-pulse" />
+                )}
+                {rejectFlash && (
+                  <div className="absolute inset-0 bg-destructive/30 pointer-events-none animate-pulse" />
                 )}
               </>
             )}

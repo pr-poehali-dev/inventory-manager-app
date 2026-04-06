@@ -58,23 +58,35 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
     setOpType(null);
   };
 
-  const handleQuickScan = (codes: ScannedCode[], scanType: 'in' | 'out') => {
-    if (codes.length === 0) return;
+  const handleQuickScan = (rawCodes: ScannedCode[], scanType: 'in' | 'out') => {
+    if (rawCodes.length === 0) return;
     const warehouses = state.warehouses || [];
     const defaultWh = warehouses[0];
     if (!defaultWh) return;
 
+    const knownCodes = (state.barcodes || []).map(b => b.code);
+
+    // При расходе — пропускаем коды не из базы
+    const codes = scanType === 'out'
+      ? rawCodes.filter(sc => knownCodes.includes(sc.code))
+      : rawCodes;
+
+    if (codes.length === 0) return;
+
     let newState = state;
-    for (const sc of codes) {
-      const alreadyKnown = (newState.barcodes || []).some(b => b.code === sc.code);
-      if (!alreadyKnown) {
-        newState = {
-          ...newState,
-          barcodes: [...(newState.barcodes || []), {
-            id: generateId(), itemId: liveItem.id, code: sc.code,
-            format: sc.format, label: '', createdAt: new Date().toISOString(),
-          }],
-        };
+    // При приходе — добавляем новые коды в базу
+    if (scanType === 'in') {
+      for (const sc of codes) {
+        const alreadyKnown = (newState.barcodes || []).some(b => b.code === sc.code);
+        if (!alreadyKnown) {
+          newState = {
+            ...newState,
+            barcodes: [...(newState.barcodes || []), {
+              id: generateId(), itemId: liveItem.id, code: sc.code,
+              format: sc.format, label: '', createdAt: new Date().toISOString(),
+            }],
+          };
+        }
       }
     }
 
@@ -342,6 +354,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
           onConfirm={(codes) => handleQuickScan(codes, quickScanType)}
           title={quickScanType === 'in' ? 'Сканировать приход' : 'Сканировать расход'}
           itemBarcodes={itemBarcodes.map(b => b.code)}
+          mode={quickScanType}
         />
       )}
     </>
