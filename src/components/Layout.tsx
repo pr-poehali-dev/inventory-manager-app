@@ -3,7 +3,7 @@ import Icon from '@/components/ui/icon';
 import { AppState, saveState } from '@/data/store';
 import QRScanner from '@/components/QRScanner';
 
-export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'technician' | 'partners' | 'history' | 'settings';
+export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'technician' | 'partners' | 'history' | 'settings';
 
 type LayoutProps = {
   state: AppState;
@@ -50,6 +50,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     { id: 'nomenclature',  label: 'Номенклатура',    icon: 'List' },
     { id: 'assembly',      label: 'Сборка',           icon: 'PackageCheck', badge: activeOrdersCount > 0 ? activeOrdersCount : undefined, badgeColor: 'blue' },
     { id: 'warehouse',     label: 'Карта складов',    icon: 'Map' },
+    { id: 'receipts',      label: 'Оприходование',   icon: 'PackagePlus' },
     { id: 'technician',    label: 'Техник',           icon: 'Wrench' },
     { id: 'partners',      label: 'Партнёры',         icon: 'Users2' },
     { id: 'history',       label: 'История',          icon: 'History' },

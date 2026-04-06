@@ -309,8 +309,12 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                   const loc = state.locations.find(l => l.id === item.locationId);
                   const isLow = item.quantity > 0 && item.quantity <= item.lowStockThreshold;
                   const isZero = item.quantity === 0;
-                  const locCount = (state.locationStocks || []).filter(ls => ls.itemId === item.id && ls.quantity > 0).length;
                   const attCount = item.attachments?.length || 0;
+                  // Остатки по складам
+                  const whStocks = (state.warehouseStocks || [])
+                    .filter(ws => ws.itemId === item.id && ws.quantity > 0)
+                    .map(ws => ({ ...ws, wh: (state.warehouses || []).find(w => w.id === ws.warehouseId) }))
+                    .filter(ws => ws.wh);
 
                   return (
                     <tr key={item.id} onClick={() => setSelectedItemId(item.id)}
@@ -327,12 +331,26 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                         ) : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-sm">{loc?.name || '—'}</div>
-                        {locCount > 1 && <div className="text-xs text-muted-foreground">+{locCount - 1} локаций</div>}
+                        <div className="text-sm text-muted-foreground">{loc?.name || '—'}</div>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`font-bold tabular-nums text-base ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>{item.quantity}</span>
-                        <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                      {/* Остаток итого + разбивка по складам */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="text-right">
+                            <span className={`font-bold tabular-nums text-base ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>{item.quantity}</span>
+                            <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                          </div>
+                        </div>
+                        {whStocks.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1 justify-end">
+                            {whStocks.map(ws => (
+                              <span key={ws.warehouseId}
+                                className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/8 border border-primary/20 text-primary font-medium whitespace-nowrap">
+                                {ws.wh!.name}: {ws.quantity}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-muted-foreground tabular-nums">{item.lowStockThreshold}</td>
                       <td className="px-4 py-3 text-center">
@@ -371,6 +389,10 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
               const isLow = item.quantity > 0 && item.quantity <= item.lowStockThreshold;
               const isZero = item.quantity === 0;
               const attCount = item.attachments?.length || 0;
+              const whStocks = (state.warehouseStocks || [])
+                .filter(ws => ws.itemId === item.id && ws.quantity > 0)
+                .map(ws => ({ ...ws, wh: (state.warehouses || []).find(w => w.id === ws.warehouseId) }))
+                .filter(ws => ws.wh);
               return (
                 <button key={item.id} onClick={() => setSelectedItemId(item.id)}
                   className="w-full text-left bg-card rounded-xl border border-border p-3.5 shadow-card hover:border-primary/30 transition-all animate-fade-in"
@@ -383,6 +405,16 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                         {loc && <span className="text-xs text-muted-foreground flex items-center gap-0.5"><Icon name="MapPin" size={10} />{loc.name}</span>}
                         {attCount > 0 && <span className="text-xs text-primary flex items-center gap-0.5"><Icon name="Paperclip" size={10} />{attCount} файл.</span>}
                       </div>
+                      {whStocks.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {whStocks.map(ws => (
+                            <span key={ws.warehouseId}
+                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/8 border border-primary/20 text-primary font-medium">
+                              {ws.wh!.name}: {ws.quantity} {item.unit}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className={`text-lg font-bold tabular-nums shrink-0 ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
                       {item.quantity} <span className="text-xs font-normal text-muted-foreground">{item.unit}</span>

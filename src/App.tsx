@@ -8,7 +8,7 @@ import NomenclaturePage from '@/pages/NomenclaturePage';
 import AssemblyPage from '@/pages/AssemblyPage';
 import PartnersPage from '@/pages/PartnersPage';
 import WarehouseMapPage from '@/pages/WarehouseMapPage';
-
+import ReceiptsPage from '@/pages/ReceiptsPage';
 import TechnicianPage from '@/pages/TechnicianPage';
 import HistoryPage from '@/pages/HistoryPage';
 import SettingsPage from '@/pages/SettingsPage';
@@ -73,7 +73,7 @@ export default function App() {
         {page === 'nomenclature' && <NomenclaturePage state={state} onStateChange={setState} />}
         {page === 'assembly'     && <AssemblyPage state={state} onStateChange={setState} initialOrderId={qrOrderId} />}
         {page === 'warehouse'    && <WarehouseMapPage state={state} onStateChange={setState} initialLocationId={qrLocationId} />}
-
+        {page === 'receipts'     && <ReceiptsPage state={state} onStateChange={setState} />}
         {page === 'technician'   && <TechnicianPage state={state} onStateChange={setState} />}
         {page === 'partners'     && <PartnersPage state={state} onStateChange={setState} />}
         {page === 'history'      && <HistoryPage state={state} />}
