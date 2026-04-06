@@ -53,7 +53,47 @@ export default function CatalogPage({ state, onStateChange, initialItemId }: Pro
   ].filter(Boolean).length;
 
   return (
-    <div className="space-y-5 pb-20 md:pb-0">
+    <div className="space-y-5 pb-20 md:pb-0 relative">
+
+      {/* Floating boxes background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden style={{ zIndex: -1 }}>
+        {[
+          { size: 52, x: 5,  y: 8,  delay: 0,   dur: 7.0, rot: 18  },
+          { size: 30, x: 82, y: 5,  delay: 1.2, dur: 5.8, rot: -22 },
+          { size: 64, x: 90, y: 50, delay: 0.5, dur: 8.2, rot: 32  },
+          { size: 22, x: 50, y: 75, delay: 2.1, dur: 5.0, rot: -12 },
+          { size: 40, x: 15, y: 62, delay: 0.9, dur: 7.4, rot: 25  },
+          { size: 26, x: 68, y: 15, delay: 1.7, dur: 6.1, rot: -38 },
+          { size: 72, x: 38, y: 35, delay: 0.3, dur: 9.0, rot: 10  },
+          { size: 20, x: 93, y: 25, delay: 2.6, dur: 5.3, rot: 48  },
+          { size: 34, x: 25, y: 88, delay: 1.4, dur: 7.6, rot: -20 },
+          { size: 18, x: 75, y: 85, delay: 0.7, dur: 4.7, rot: 30  },
+          { size: 44, x: 55, y: 45, delay: 1.9, dur: 6.5, rot: -5  },
+          { size: 28, x: 3,  y: 45, delay: 0.1, dur: 8.8, rot: 42  },
+        ].map((b, i) => (
+          <div key={i} className="absolute" style={{
+            left: `${b.x}%`, top: `${b.y}%`,
+            width: b.size, height: b.size,
+            animation: `catalogFloat ${b.dur}s ease-in-out ${b.delay}s infinite`,
+            rotate: `${b.rot}deg`,
+          }}>
+            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width={b.size} height={b.size} opacity="0.07">
+              <rect x="8" y="18" width="24" height="18" rx="2" fill="#6366f1" />
+              <path d="M8 18 L20 10 L32 18 L20 26 Z" fill="#818cf8" />
+              <path d="M32 18 L32 36 L20 32 L20 26 Z" fill="#4f46e5" />
+              <line x1="8" y1="27" x2="32" y2="27" stroke="white" strokeWidth="1.2" strokeOpacity="0.5" />
+              <line x1="20" y1="18" x2="20" y2="36" stroke="white" strokeWidth="1.2" strokeOpacity="0.5" />
+            </svg>
+          </div>
+        ))}
+        <style>{`
+          @keyframes catalogFloat {
+            0%   { translate: 0 0px;   }
+            50%  { translate: 0 -16px; }
+            100% { translate: 0 0px;   }
+          }
+        `}</style>
+      </div>
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
