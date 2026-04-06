@@ -3,7 +3,7 @@ import Icon from '@/components/ui/icon';
 import { AppState, saveState } from '@/data/store';
 import QRScanner from '@/components/QRScanner';
 
-export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'technician' | 'partners' | 'history' | 'settings';
+export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'technician' | 'partners' | 'history' | 'settings';
 
 type LayoutProps = {
   state: AppState;
@@ -49,8 +49,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     { id: 'catalog',       label: 'Каталог',        icon: 'LayoutGrid',  badge: lowStockCount > 0 ? lowStockCount : undefined, badgeColor: 'destructive' },
     { id: 'nomenclature',  label: 'Номенклатура',    icon: 'List' },
     { id: 'assembly',      label: 'Сборка',           icon: 'PackageCheck', badge: activeOrdersCount > 0 ? activeOrdersCount : undefined, badgeColor: 'blue' },
-    { id: 'warehouse',     label: 'Карта склада',     icon: 'Map' },
-    { id: 'receipts',      label: 'Оприходование',    icon: 'PackagePlus' },
+    { id: 'warehouse',     label: 'Карта складов',    icon: 'Map' },
     { id: 'technician',    label: 'Техник',           icon: 'Wrench' },
     { id: 'partners',      label: 'Партнёры',         icon: 'Users2' },
     { id: 'history',       label: 'История',          icon: 'History' },
@@ -59,7 +58,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
 
   // Mobile bottom nav — 4 primary + "Ещё" button
   const mobileNavPrimary = navItems.slice(0, 4);
-  const mobileNavMore = navItems.slice(4); // receipts, partners, history, settings
+  const mobileNavMore = navItems.slice(4);
 
   // "Ещё" is active if current page is in the "more" group
   const moreIsActive = mobileNavMore.some(n => n.id === activePage);
@@ -175,7 +174,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
           if (result.type === 'item')     { onPageChange('catalog');    onQRResult?.(result.type, result.id); }
           if (result.type === 'location') { onPageChange('warehouse');  onQRResult?.(result.type, result.id); }
           if (result.type === 'order')    { onPageChange('assembly');   onQRResult?.(result.type, result.id); }
-          if (result.type === 'receipt')  { onPageChange('receipts');   onQRResult?.(result.type, result.id); }
+
           if (result.type === 'unknown')  { onQRResult?.(result.type, result.raw); }
         }}
       />

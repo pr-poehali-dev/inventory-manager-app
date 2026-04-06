@@ -533,19 +533,47 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                 </div>
               </div>
 
-              {/* Warehouse stocks */}
+              {/* Warehouse + location stocks */}
               {whStocks.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
-                    <Icon name="Warehouse" size={11} />По складам:
+                    <Icon name="Warehouse" size={11} />Остатки по складам:
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {whStocks.map(ws => (
-                      <div key={ws.warehouseId} className="flex items-center justify-between px-2.5 py-1.5 bg-background/70 border border-border rounded-lg">
-                        <span className="text-xs text-muted-foreground truncate">{ws.warehouse?.name}</span>
-                        <span className="text-xs font-bold text-foreground ml-2 shrink-0">{ws.quantity} {liveItem.unit}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-1.5">
+                    {whStocks.map(ws => {
+                      // Find locationStocks for this item that belong to this warehouse's locations
+                      const whLocStocks = (state.locationStocks || [])
+                        .filter(ls => ls.itemId === liveItem.id && ls.quantity > 0)
+                        .map(ls => ({ ...ls, loc: state.locations.find(l => l.id === ls.locationId) }))
+                        .filter(ls => ls.loc);
+                      return (
+                        <div key={ws.warehouseId} className="rounded-lg border border-border bg-background/70 overflow-hidden">
+                          <div className="flex items-center justify-between px-2.5 py-1.5 bg-muted/30">
+                            <div className="flex items-center gap-1.5">
+                              <Icon name="Warehouse" size={11} className="text-primary shrink-0" />
+                              <span className="text-xs font-semibold text-foreground">{ws.warehouse?.name}</span>
+                            </div>
+                            <span className={`text-sm font-bold tabular-nums ${ws.quantity === 0 ? 'text-destructive' : 'text-foreground'}`}>
+                              {ws.quantity} <span className="text-xs font-normal text-muted-foreground">{liveItem.unit}</span>
+                            </span>
+                          </div>
+                          {whLocStocks.length > 0 && (
+                            <div className="divide-y divide-border/50">
+                              {whLocStocks.map(ls => (
+                                <div key={ls.locationId} className="flex items-center justify-between px-3 py-1 text-xs">
+                                  <div className="flex items-center gap-1 text-muted-foreground">
+                                    <Icon name="MapPin" size={9} />
+                                    <span>{ls.loc?.name}</span>
+                                    {ls.loc?.description && <span className="opacity-60">· {ls.loc.description}</span>}
+                                  </div>
+                                  <span className="font-semibold text-foreground">{ls.quantity}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

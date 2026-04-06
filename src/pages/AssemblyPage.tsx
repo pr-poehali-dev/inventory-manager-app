@@ -340,22 +340,31 @@ function CreateOrderModal({
                         </button>
                       </div>
 
-                      {/* Stock info row with location breakdown */}
+                      {/* Stock info row with warehouse + location breakdown */}
                       {item && (
                         <div className="space-y-1.5 px-1">
                           <div className="flex items-center gap-3 text-xs">
                             <span className="text-muted-foreground">Всего: <b className={item.quantity === 0 ? 'text-destructive' : 'text-foreground'}>{item.quantity} {item.unit}</b></span>
                             <span className="text-muted-foreground">Свободно: <b className={getFreeQty(state, item.id) <= 0 ? 'text-destructive' : 'text-success'}>{getFreeQty(state, item.id)} {item.unit}</b></span>
                           </div>
+                          {/* Warehouse breakdown */}
                           {(() => {
+                            const whStocks = (state.warehouseStocks || [])
+                              .filter(ws => ws.itemId === item.id && ws.quantity > 0)
+                              .map(ws => ({ ...ws, wh: (state.warehouses || []).find(w => w.id === ws.warehouseId) }))
+                              .filter(ws => ws.wh);
                             const locs = (state.locationStocks || [])
                               .filter(ls => ls.itemId === item.id && ls.quantity > 0)
                               .map(ls => ({ ...ls, loc: state.locations.find(l => l.id === ls.locationId) }))
                               .filter(ls => ls.loc);
-                            if (locs.length === 0) return null;
+                            if (whStocks.length === 0 && locs.length === 0) return null;
                             return (
                               <div className="flex flex-wrap gap-1">
-                                {locs.map(ls => (
+                                {whStocks.length > 0 ? whStocks.map(ws => (
+                                  <span key={ws.warehouseId} className="text-[11px] bg-primary/8 border border-primary/20 px-2 py-0.5 rounded-full text-primary flex items-center gap-1">
+                                    <span className="opacity-60">⬛</span>{ws.wh?.name}: <b>{ws.quantity}</b>
+                                  </span>
+                                )) : locs.map(ls => (
                                   <span key={ls.locationId} className="text-[11px] bg-background border border-border px-2 py-0.5 rounded-full text-muted-foreground">
                                     {ls.loc?.name}: <b className="text-foreground">{ls.quantity}</b>
                                   </span>
@@ -495,7 +504,22 @@ function PickItemModal({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Выберите полку / стеллаж</Label>
+            <Label>Выберите склад и стеллаж</Label>
+            {/* Warehouse breakdown */}
+            {(state.warehouseStocks || []).filter(ws => ws.itemId === item.id && ws.quantity > 0).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-1">
+                {(state.warehouseStocks || [])
+                  .filter(ws => ws.itemId === item.id && ws.quantity > 0)
+                  .map(ws => {
+                    const wh = (state.warehouses || []).find(w => w.id === ws.warehouseId);
+                    return wh ? (
+                      <span key={ws.warehouseId} className="text-[11px] bg-primary/8 border border-primary/20 px-2 py-0.5 rounded-full text-primary font-medium">
+                        {wh.name}: {ws.quantity} {item.unit}
+                      </span>
+                    ) : null;
+                  })}
+              </div>
+            )}
             {locStocks.length === 0 ? (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive flex items-center gap-2">
                 <Icon name="AlertCircle" size={14} />Нет в наличии на складе
