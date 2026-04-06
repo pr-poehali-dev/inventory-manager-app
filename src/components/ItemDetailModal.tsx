@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import { Item, AppState, saveState, generateId, getItemBarcodes, getWarehouseStock } from '@/data/store';
+import { Item, AppState, saveState } from '@/data/store';
 import OperationModal from './OperationModal';
-import ScannerModal, { ScannedCode } from './ScannerModal';
 import { TechDocsList } from './ItemAttachmentsTab';
 import { BarcodesSection } from './ItemBarcodesSection';
 import { ItemHistoryTab } from './ItemHistoryTab';
@@ -21,7 +20,6 @@ type Props = {
 export default function ItemDetailModal({ item, state, onStateChange, onClose }: Props) {
   const [opType, setOpType] = useState<'in' | 'out' | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('info');
-  const [quickScanType, setQuickScanType] = useState<'in' | 'out' | null>(null);
 
   if (!item) return null;
 
@@ -58,78 +56,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
     setOpType(null);
   };
 
-  const handleQuickScan = (rawCodes: ScannedCode[], scanType: 'in' | 'out') => {
-    if (rawCodes.length === 0) return;
-    const warehouses = state.warehouses || [];
-    const defaultWh = warehouses[0];
-    if (!defaultWh) return;
 
-    const knownCodes = (state.barcodes || []).map(b => b.code);
-
-    // При расходе — пропускаем коды не из базы
-    const codes = scanType === 'out'
-      ? rawCodes.filter(sc => knownCodes.includes(sc.code))
-      : rawCodes;
-
-    if (codes.length === 0) return;
-
-    let newState = state;
-    // При приходе — добавляем новые коды в базу
-    if (scanType === 'in') {
-      for (const sc of codes) {
-        const alreadyKnown = (newState.barcodes || []).some(b => b.code === sc.code);
-        if (!alreadyKnown) {
-          newState = {
-            ...newState,
-            barcodes: [...(newState.barcodes || []), {
-              id: generateId(), itemId: liveItem.id, code: sc.code,
-              format: sc.format, label: '', createdAt: new Date().toISOString(),
-            }],
-          };
-        }
-      }
-    }
-
-    const qty = codes.length;
-    const delta = scanType === 'in' ? qty : -qty;
-    const whId = defaultWh.id;
-    const whStock = getWarehouseStock(newState, liveItem.id, whId);
-    if (scanType === 'out' && qty > whStock) return;
-
-    const stocks = newState.warehouseStocks || [];
-    const existing = stocks.find(ws => ws.itemId === liveItem.id && ws.warehouseId === whId);
-    let nextStocks;
-    if (existing) {
-      nextStocks = stocks.map(ws => ws.itemId === liveItem.id && ws.warehouseId === whId
-        ? { ...ws, quantity: Math.max(0, ws.quantity + delta) } : ws);
-    } else if (delta > 0) {
-      nextStocks = [...stocks, { itemId: liveItem.id, warehouseId: whId, quantity: delta }];
-    } else {
-      nextStocks = stocks;
-    }
-    const totalQty = nextStocks.filter(ws => ws.itemId === liveItem.id).reduce((s, ws) => s + ws.quantity, 0);
-    newState = {
-      ...newState,
-      warehouseStocks: nextStocks,
-      items: newState.items.map(i => i.id === liveItem.id ? { ...i, quantity: totalQty } : i),
-    };
-
-    const op: import('@/data/store').Operation = {
-      id: generateId(), itemId: liveItem.id, type: scanType, quantity: qty,
-      comment: `[Сканирование] ${scanType === 'in' ? 'Приход' : 'Расход'} ${qty} шт. — ${codes.map(c => c.code).join(', ')}`,
-      from: scanType === 'in' ? 'Сканирование' : defaultWh.name,
-      to: scanType === 'in' ? defaultWh.name : 'Сканирование',
-      performedBy: state.currentUser,
-      date: new Date().toISOString(),
-      warehouseId: whId,
-      scannedCodes: codes.map(c => c.code),
-    };
-
-    const finalState: AppState = { ...newState, operations: [op, ...newState.operations] };
-    onStateChange(finalState);
-    saveState(finalState);
-    setQuickScanType(null);
-  };
 
   const handleQR = () => {
     const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/?item=' + liveItem.id)}`;
@@ -258,19 +185,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                 </div>
               )}
 
-              {/* Quick scan buttons */}
-              {itemBarcodes.length > 0 && (
-                <div className="flex gap-2">
-                  <button onClick={() => setQuickScanType('in')}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-success/10 border border-success/30 text-success text-xs font-semibold hover:bg-success/20 transition-colors">
-                    <Icon name="ScanLine" size={13} />Сканировать приход
-                  </button>
-                  <button onClick={() => setQuickScanType('out')} disabled={liveItem.quantity === 0}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-destructive/8 border border-destructive/30 text-destructive text-xs font-semibold hover:bg-destructive/15 transition-colors disabled:opacity-40 disabled:pointer-events-none">
-                    <Icon name="ScanLine" size={13} />Сканировать расход
-                  </button>
-                </div>
-              )}
+
             </div>
 
             {/* Tabs */}
@@ -347,16 +262,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
         />
       )}
 
-      {quickScanType && (
-        <ScannerModal
-          open={!!quickScanType}
-          onClose={() => setQuickScanType(null)}
-          onConfirm={(codes) => handleQuickScan(codes, quickScanType)}
-          title={quickScanType === 'in' ? 'Сканировать приход' : 'Сканировать расход'}
-          itemBarcodes={itemBarcodes.map(b => b.code)}
-          mode={quickScanType}
-        />
-      )}
+
     </>
   );
 }
