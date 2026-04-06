@@ -278,6 +278,10 @@ export default function HistoryPage({ state }: Props) {
                       {op.from && <div className="text-xs">← {op.from}</div>}
                       {op.to && <div className="text-xs">→ {op.to}</div>}
                       {!op.from && !op.to && <span>—</span>}
+                      {op.warehouseId && (() => {
+                        const wh = (state.warehouses || []).find(w => w.id === op.warehouseId);
+                        return wh ? <div className="text-xs mt-0.5 flex items-center gap-0.5 text-primary/70"><Icon name="Warehouse" size={9} />{wh.name}</div> : null;
+                      })()}
                     </td>
                   </tr>
                 ))}
@@ -320,4 +324,3 @@ export default function HistoryPage({ state }: Props) {
     </div>
   );
 }
-

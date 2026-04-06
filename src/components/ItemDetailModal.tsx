@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import Icon from '@/components/ui/icon';
-import { Item, AppState, Attachment, saveState, generateId } from '@/data/store';
+import { Item, AppState, Attachment, Barcode, saveState, generateId, getItemBarcodes, getWarehouseStock } from '@/data/store';
 import OperationModal from './OperationModal';
+import ScannerModal, { ScannedCode } from './ScannerModal';
 
 type Tab = 'info' | 'history' | 'documents';
 
@@ -206,10 +208,147 @@ function AttachmentsTab({ item, state, onStateChange }: {
   );
 }
 
+// ─── Barcodes section ────────────────────────────────────────────────────────
+function BarcodesSection({ item, state, onStateChange }: {
+  item: Item; state: AppState; onStateChange: (s: AppState) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [newCode, setNewCode] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
+  const barcodes = getItemBarcodes(state, item.id);
+
+  const handleAdd = () => {
+    const code = newCode.trim();
+    if (!code) return;
+    const already = (state.barcodes || []).some(b => b.code === code);
+    if (already) { setNewCode(''); setNewLabel(''); return; }
+    const next: AppState = {
+      ...state,
+      barcodes: [...(state.barcodes || []), {
+        id: generateId(), itemId: item.id, code, format: 'manual',
+        label: newLabel.trim() || undefined, createdAt: new Date().toISOString(),
+      }],
+    };
+    onStateChange(next);
+    saveState(next);
+    setNewCode(''); setNewLabel(''); setAdding(false);
+  };
+
+  const handleRemove = (id: string) => {
+    const next: AppState = { ...state, barcodes: (state.barcodes || []).filter(b => b.id !== id) };
+    onStateChange(next);
+    saveState(next);
+  };
+
+  const handleScanAdd = (codes: ScannedCode[]) => {
+    let next = state;
+    for (const sc of codes) {
+      const already = (next.barcodes || []).some(b => b.code === sc.code);
+      if (!already) {
+        next = {
+          ...next,
+          barcodes: [...(next.barcodes || []), {
+            id: generateId(), itemId: item.id, code: sc.code,
+            format: sc.format, label: '', createdAt: new Date().toISOString(),
+          }],
+        };
+      }
+    }
+    if (next !== state) { onStateChange(next); saveState(next); }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+          <Icon name="Barcode" size={14} />
+          Штрих-коды и QR-коды
+          {barcodes.length > 0 && <span className="text-xs text-muted-foreground font-normal">({barcodes.length})</span>}
+        </span>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setShowScanner(true)}
+            className="h-7 px-2.5 rounded-lg border border-primary/40 text-primary text-xs font-medium hover:bg-primary/8 flex items-center gap-1.5 transition-colors">
+            <Icon name="ScanLine" size={12} />Сканировать
+          </button>
+          <button onClick={() => setAdding(v => !v)}
+            className="h-7 px-2.5 rounded-lg border border-border text-muted-foreground text-xs font-medium hover:bg-muted flex items-center gap-1.5 transition-colors">
+            <Icon name="Plus" size={12} />Вручную
+          </button>
+        </div>
+      </div>
+
+      {barcodes.length === 0 && !adding && (
+        <div className="flex items-center gap-2 py-2 px-3 bg-muted/40 rounded-lg text-xs text-muted-foreground">
+          <Icon name="Info" size={12} />
+          Кодов пока нет. Добавьте вручную или отсканируйте.
+        </div>
+      )}
+
+      {barcodes.length > 0 && (
+        <div className="space-y-1.5">
+          {barcodes.map((b: Barcode) => (
+            <div key={b.id} className="flex items-center gap-2.5 p-2 bg-muted/40 rounded-lg border border-border group">
+              <div className="w-7 h-7 rounded-md bg-background border border-border flex items-center justify-center shrink-0">
+                <Icon name={b.format === 'qr_code' ? 'QrCode' : 'Barcode'} size={14} className="text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-mono text-xs font-semibold text-foreground truncate">{b.code}</div>
+                {b.label && <div className="text-[11px] text-muted-foreground">{b.label}</div>}
+                {b.format && b.format !== 'manual' && (
+                  <div className="text-[11px] text-muted-foreground">{b.format.toUpperCase().replace('_', '-')}</div>
+                )}
+              </div>
+              <button onClick={() => handleRemove(b.id)}
+                className="w-6 h-6 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-muted-foreground transition-all shrink-0">
+                <Icon name="Trash2" size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {adding && (
+        <div className="space-y-2 p-3 bg-muted/30 rounded-xl border border-border">
+          <Input
+            value={newCode} onChange={e => setNewCode(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            placeholder="Код (EAN-13, QR, CODE-128...)"
+            className="font-mono text-sm h-9"
+            autoFocus
+          />
+          <Input
+            value={newLabel} onChange={e => setNewLabel(e.target.value)}
+            placeholder="Метка (необязательно)"
+            className="text-sm h-9"
+          />
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setAdding(false); setNewCode(''); setNewLabel(''); }} className="flex-1">
+              Отмена
+            </Button>
+            <Button size="sm" onClick={handleAdd} disabled={!newCode.trim()} className="flex-1">
+              Добавить
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <ScannerModal
+        open={showScanner}
+        onClose={() => setShowScanner(false)}
+        onConfirm={handleScanAdd}
+        title="Привязать коды к товару"
+        itemBarcodes={barcodes.map(b => b.code)}
+      />
+    </div>
+  );
+}
+
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 export default function ItemDetailModal({ item, state, onStateChange, onClose }: Props) {
   const [opType, setOpType] = useState<'in' | 'out' | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('info');
+  const [quickScanType, setQuickScanType] = useState<'in' | 'out' | null>(null);
 
   if (!item) return null;
 
@@ -229,6 +368,13 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
     .map(ls => ({ ...ls, location: state.locations.find(l => l.id === ls.locationId) }))
     .filter(ls => ls.location);
 
+  const whStocks = (state.warehouseStocks || [])
+    .filter(ws => ws.itemId === liveItem.id)
+    .map(ws => ({ ...ws, warehouse: (state.warehouses || []).find(w => w.id === ws.warehouseId) }))
+    .filter(ws => ws.warehouse);
+
+  const itemBarcodes = getItemBarcodes(state, liveItem.id);
+
   const handleOperation = (op: import('@/data/store').Operation, newQty: number, updatedState?: AppState) => {
     const base = updatedState || state;
     const next: AppState = {
@@ -239,6 +385,69 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
     onStateChange(next);
     saveState(next);
     setOpType(null);
+  };
+
+  const handleQuickScan = (codes: ScannedCode[], scanType: 'in' | 'out') => {
+    if (codes.length === 0) return;
+    const warehouses = state.warehouses || [];
+    const defaultWh = warehouses[0];
+    if (!defaultWh) return;
+
+    let newState = state;
+    // Auto-register new barcodes
+    for (const sc of codes) {
+      const alreadyKnown = (newState.barcodes || []).some(b => b.code === sc.code);
+      if (!alreadyKnown) {
+        newState = {
+          ...newState,
+          barcodes: [...(newState.barcodes || []), {
+            id: generateId(), itemId: liveItem.id, code: sc.code,
+            format: sc.format, label: '', createdAt: new Date().toISOString(),
+          }],
+        };
+      }
+    }
+
+    const qty = codes.length;
+    const delta = scanType === 'in' ? qty : -qty;
+    const whId = defaultWh.id;
+    const whStock = getWarehouseStock(newState, liveItem.id, whId);
+    if (scanType === 'out' && qty > whStock) return; // not enough
+
+    // Import updateWarehouseStock inline
+    const stocks = newState.warehouseStocks || [];
+    const existing = stocks.find(ws => ws.itemId === liveItem.id && ws.warehouseId === whId);
+    let nextStocks;
+    if (existing) {
+      nextStocks = stocks.map(ws => ws.itemId === liveItem.id && ws.warehouseId === whId
+        ? { ...ws, quantity: Math.max(0, ws.quantity + delta) } : ws);
+    } else if (delta > 0) {
+      nextStocks = [...stocks, { itemId: liveItem.id, warehouseId: whId, quantity: delta }];
+    } else {
+      nextStocks = stocks;
+    }
+    const totalQty = nextStocks.filter(ws => ws.itemId === liveItem.id).reduce((s, ws) => s + ws.quantity, 0);
+    newState = {
+      ...newState,
+      warehouseStocks: nextStocks,
+      items: newState.items.map(i => i.id === liveItem.id ? { ...i, quantity: totalQty } : i),
+    };
+
+    const op: import('@/data/store').Operation = {
+      id: generateId(), itemId: liveItem.id, type: scanType, quantity: qty,
+      comment: `[Сканирование] ${scanType === 'in' ? 'Приход' : 'Расход'} ${qty} шт. — ${codes.map(c => c.code).join(', ')}`,
+      from: scanType === 'in' ? 'Сканирование' : defaultWh.name,
+      to: scanType === 'in' ? defaultWh.name : 'Сканирование',
+      performedBy: state.currentUser,
+      date: new Date().toISOString(),
+      warehouseId: whId,
+      scannedCodes: codes.map(c => c.code),
+    };
+
+    const finalState: AppState = { ...newState, operations: [op, ...newState.operations] };
+    onStateChange(finalState);
+    saveState(finalState);
+    setQuickScanType(null);
   };
 
   const handleQR = () => {
@@ -301,35 +510,59 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
             </div>
 
             {/* Quantity block */}
-            <div className={`flex items-center justify-between p-4 rounded-xl border-2
+            <div className={`p-4 rounded-xl border-2 space-y-3
               ${isCritical ? 'bg-destructive/8 border-destructive/30' : isLow ? 'bg-warning/8 border-warning/30' : 'bg-muted/50 border-transparent'}`}>
-              <div>
-                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-0.5">Текущий остаток</div>
-                <div className={`text-4xl font-bold tabular-nums ${isCritical ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
-                  {liveItem.quantity}
-                  <span className="text-base font-normal text-muted-foreground ml-1.5">{liveItem.unit}</span>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-0.5">Текущий остаток</div>
+                  <div className={`text-4xl font-bold tabular-nums ${isCritical ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
+                    {liveItem.quantity}
+                    <span className="text-base font-normal text-muted-foreground ml-1.5">{liveItem.unit}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">порог: {liveItem.lowStockThreshold} {liveItem.unit}</div>
                 </div>
-                {locStocks.length > 1 && (
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {locStocks.map(ls => (
-                      <span key={ls.locationId} className="text-[11px] bg-background/80 border border-border px-2 py-0.5 rounded-full text-muted-foreground">
-                        {ls.location?.name}: <b className="text-foreground">{ls.quantity}</b>
-                      </span>
+                <div className="flex flex-col gap-2 shrink-0">
+                  <Button onClick={() => setOpType('in')}
+                    className="bg-success hover:bg-success/90 text-success-foreground font-semibold h-9 px-3 text-sm">
+                    <Icon name="Plus" size={14} className="mr-1" />Приход
+                  </Button>
+                  <Button variant="outline" onClick={() => setOpType('out')} disabled={liveItem.quantity === 0}
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10 font-semibold h-9 px-3 text-sm">
+                    <Icon name="Minus" size={14} className="mr-1" />Расход
+                  </Button>
+                </div>
+              </div>
+
+              {/* Warehouse stocks */}
+              {whStocks.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                    <Icon name="Warehouse" size={11} />По складам:
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {whStocks.map(ws => (
+                      <div key={ws.warehouseId} className="flex items-center justify-between px-2.5 py-1.5 bg-background/70 border border-border rounded-lg">
+                        <span className="text-xs text-muted-foreground truncate">{ws.warehouse?.name}</span>
+                        <span className="text-xs font-bold text-foreground ml-2 shrink-0">{ws.quantity} {liveItem.unit}</span>
+                      </div>
                     ))}
                   </div>
-                )}
-                <div className="text-xs text-muted-foreground mt-1">порог: {liveItem.lowStockThreshold} {liveItem.unit}</div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Button onClick={() => setOpType('in')}
-                  className="bg-success hover:bg-success/90 text-success-foreground font-semibold h-10 px-4">
-                  <Icon name="Plus" size={15} className="mr-1.5" />Приход
-                </Button>
-                <Button variant="outline" onClick={() => setOpType('out')} disabled={liveItem.quantity === 0}
-                  className="border-destructive/40 text-destructive hover:bg-destructive/10 font-semibold h-10 px-4">
-                  <Icon name="Minus" size={15} className="mr-1.5" />Расход
-                </Button>
-              </div>
+                </div>
+              )}
+
+              {/* Quick scan buttons */}
+              {itemBarcodes.length > 0 && (
+                <div className="flex gap-2">
+                  <button onClick={() => setQuickScanType('in')}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-success/10 border border-success/30 text-success text-xs font-semibold hover:bg-success/20 transition-colors">
+                    <Icon name="ScanLine" size={13} />Сканировать приход
+                  </button>
+                  <button onClick={() => setQuickScanType('out')} disabled={liveItem.quantity === 0}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-destructive/8 border border-destructive/30 text-destructive text-xs font-semibold hover:bg-destructive/15 transition-colors disabled:opacity-40 disabled:pointer-events-none">
+                    <Icon name="ScanLine" size={13} />Сканировать расход
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Tabs */}
@@ -349,23 +582,30 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
 
             {/* Tab content */}
             {activeTab === 'info' && (
-              <div className="space-y-0 divide-y divide-border text-sm">
-                {[
-                  { label: 'Единица измерения', value: liveItem.unit },
-                  { label: 'Добавлен', value: new Date(liveItem.createdAt).toLocaleDateString('ru-RU') },
-                  { label: 'Категория', value: category?.name || '—' },
-                  { label: 'Основная локация', value: location?.name || '—' },
-                ].map(row => (
-                  <div key={row.label} className="flex justify-between py-2.5">
-                    <span className="text-muted-foreground">{row.label}</span>
-                    <span className="font-medium">{row.value}</span>
+              <div className="space-y-4">
+                <div className="space-y-0 divide-y divide-border text-sm">
+                  {[
+                    { label: 'Единица измерения', value: liveItem.unit },
+                    { label: 'Добавлен', value: new Date(liveItem.createdAt).toLocaleDateString('ru-RU') },
+                    { label: 'Категория', value: category?.name || '—' },
+                    { label: 'Основная локация', value: location?.name || '—' },
+                  ].map(row => (
+                    <div key={row.label} className="flex justify-between py-2.5">
+                      <span className="text-muted-foreground">{row.label}</span>
+                      <span className="font-medium">{row.value}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-muted-foreground">QR-код товара</span>
+                    <button onClick={handleQR} className="flex items-center gap-1.5 text-primary hover:text-primary/80 font-medium">
+                      <Icon name="QrCode" size={13} />Открыть
+                    </button>
                   </div>
-                ))}
-                <div className="flex justify-between py-2.5">
-                  <span className="text-muted-foreground">QR-код товара</span>
-                  <button onClick={handleQR} className="flex items-center gap-1.5 text-primary hover:text-primary/80 font-medium">
-                    <Icon name="QrCode" size={13} />Открыть
-                  </button>
+                </div>
+
+                {/* Barcode section */}
+                <div className="pt-1">
+                  <BarcodesSection item={liveItem} state={state} onStateChange={onStateChange} />
                 </div>
               </div>
             )}
@@ -377,30 +617,52 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                     <Icon name="History" size={24} className="mx-auto mb-2 opacity-40" />
                     Операций пока нет
                   </div>
-                ) : itemOps.map(op => (
-                  <div key={op.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/50 text-sm">
-                    <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5
-                      ${op.type === 'in' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
-                      <Icon name={op.type === 'in' ? 'ArrowDown' : 'ArrowUp'} size={12} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`font-semibold tabular-nums ${op.type === 'in' ? 'text-success' : 'text-destructive'}`}>
-                          {op.type === 'in' ? '+' : '-'}{op.quantity} {liveItem.unit}
-                        </span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {new Date(op.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                        </span>
+                ) : itemOps.map(op => {
+                  const wh = op.warehouseId ? (state.warehouses || []).find(w => w.id === op.warehouseId) : null;
+                  return (
+                    <div key={op.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/50 text-sm">
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5
+                        ${op.type === 'in' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+                        <Icon name={op.scannedCodes?.length ? 'ScanLine' : op.type === 'in' ? 'ArrowDown' : 'ArrowUp'} size={12} />
                       </div>
-                      {op.comment && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{op.comment}</p>}
-                      {(op.from || op.to) && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {op.from && `← ${op.from}`}{op.from && op.to ? ' · ' : ''}{op.to && `→ ${op.to}`}
-                        </p>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-semibold tabular-nums ${op.type === 'in' ? 'text-success' : 'text-destructive'}`}>
+                              {op.type === 'in' ? '+' : '-'}{op.quantity} {liveItem.unit}
+                            </span>
+                            {wh && (
+                              <span className="text-[11px] bg-background border border-border px-1.5 py-0.5 rounded-md text-muted-foreground flex items-center gap-0.5">
+                                <Icon name="Warehouse" size={9} />{wh.name}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {new Date(op.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                          </span>
+                        </div>
+                        {op.comment && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{op.comment}</p>}
+                        {(op.from || op.to) && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {op.from && `← ${op.from}`}{op.from && op.to ? ' · ' : ''}{op.to && `→ ${op.to}`}
+                          </p>
+                        )}
+                        {op.scannedCodes && op.scannedCodes.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {op.scannedCodes.slice(0, 5).map((code, i) => (
+                              <span key={i} className="font-mono text-[10px] bg-background border border-border px-1.5 py-0.5 rounded text-muted-foreground">
+                                {code}
+                              </span>
+                            ))}
+                            {op.scannedCodes.length > 5 && (
+                              <span className="text-[10px] text-muted-foreground py-0.5">+{op.scannedCodes.length - 5} ещё</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -502,6 +764,16 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
           performedBy={state.currentUser}
           state={state}
           onSave={handleOperation}
+        />
+      )}
+
+      {quickScanType && (
+        <ScannerModal
+          open={!!quickScanType}
+          onClose={() => setQuickScanType(null)}
+          onConfirm={(codes) => handleQuickScan(codes, quickScanType)}
+          title={quickScanType === 'in' ? 'Сканировать приход' : 'Сканировать расход'}
+          itemBarcodes={itemBarcodes.map(b => b.code)}
         />
       )}
     </>

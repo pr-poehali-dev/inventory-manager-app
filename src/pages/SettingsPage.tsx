@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import Icon from '@/components/ui/icon';
-import { AppState, saveState, Category, Location, generateId } from '@/data/store';
+import { AppState, saveState, Category, Location, Warehouse, generateId } from '@/data/store';
 
 type Props = {
   state: AppState;
@@ -14,7 +14,7 @@ type Props = {
 const CAT_COLORS = ['#6366f1', '#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
 export default function SettingsPage({ state, onStateChange }: Props) {
-  const [activeSection, setActiveSection] = useState<'profile' | 'alerts' | 'categories' | 'locations'>('profile');
+  const [activeSection, setActiveSection] = useState<'profile' | 'alerts' | 'categories' | 'locations' | 'warehouses'>('profile');
   const [userName, setUserName] = useState(state.currentUser);
   const [threshold, setThreshold] = useState(String(state.defaultLowStockThreshold));
   const [saved, setSaved] = useState(false);
@@ -27,6 +27,11 @@ export default function SettingsPage({ state, onStateChange }: Props) {
   const [newLocName, setNewLocName] = useState('');
   const [newLocDesc, setNewLocDesc] = useState('');
   const [newLocParent, setNewLocParent] = useState('');
+
+  // Warehouse add
+  const [newWhName, setNewWhName] = useState('');
+  const [newWhAddress, setNewWhAddress] = useState('');
+  const [newWhDesc, setNewWhDesc] = useState('');
 
   const saveProfile = () => {
     const next = { ...state, currentUser: userName, defaultLowStockThreshold: parseInt(threshold) || 5 };
@@ -73,9 +78,34 @@ export default function SettingsPage({ state, onStateChange }: Props) {
     saveState(next);
   };
 
+  const addWarehouse = () => {
+    if (!newWhName.trim()) return;
+    const wh: Warehouse = {
+      id: generateId(), name: newWhName.trim(),
+      address: newWhAddress.trim() || undefined,
+      description: newWhDesc.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+    const next = { ...state, warehouses: [...(state.warehouses || []), wh] };
+    onStateChange(next); saveState(next);
+    setNewWhName(''); setNewWhAddress(''); setNewWhDesc('');
+  };
+
+  const deleteWarehouse = (id: string) => {
+    const hasStock = (state.warehouseStocks || []).some(ws => ws.warehouseId === id && ws.quantity > 0);
+    if (hasStock) return;
+    const next = {
+      ...state,
+      warehouses: (state.warehouses || []).filter(w => w.id !== id),
+      warehouseStocks: (state.warehouseStocks || []).filter(ws => ws.warehouseId !== id),
+    };
+    onStateChange(next); saveState(next);
+  };
+
   const sections = [
     { id: 'profile', label: 'Профиль', icon: 'User' },
     { id: 'alerts', label: 'Уведомления', icon: 'Bell' },
+    { id: 'warehouses', label: 'Склады', icon: 'Warehouse' },
     { id: 'categories', label: 'Категории', icon: 'Tag' },
     { id: 'locations', label: 'Локации', icon: 'MapPin' },
   ] as const;
@@ -189,6 +219,55 @@ export default function SettingsPage({ state, onStateChange }: Props) {
               <Button onClick={saveProfile} className={saved ? 'bg-success hover:bg-success text-success-foreground' : ''}>
                 {saved ? <><Icon name="Check" size={15} className="mr-1.5" />Сохранено!</> : 'Сохранить'}
               </Button>
+            </div>
+          )}
+
+          {activeSection === 'warehouses' && (
+            <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+              <h2 className="font-semibold text-foreground">Склады</h2>
+              <p className="text-xs text-muted-foreground -mt-2">
+                Остатки товаров учитываются отдельно по каждому складу. При операциях (приход/расход) выбирается конкретный склад.
+              </p>
+
+              {/* Add */}
+              <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                <h3 className="text-sm font-semibold">Добавить склад</h3>
+                <Input placeholder="Название склада" value={newWhName} onChange={e => setNewWhName(e.target.value)} />
+                <Input placeholder="Адрес (необязательно)" value={newWhAddress} onChange={e => setNewWhAddress(e.target.value)} />
+                <Input placeholder="Описание (необязательно)" value={newWhDesc} onChange={e => setNewWhDesc(e.target.value)} />
+                <Button onClick={addWarehouse} disabled={!newWhName.trim()} className="w-full">
+                  <Icon name="Plus" size={14} className="mr-1.5" />Добавить склад
+                </Button>
+              </div>
+
+              {/* List */}
+              <div className="space-y-2">
+                {(state.warehouses || []).map(wh => {
+                  const totalStock = (state.warehouseStocks || [])
+                    .filter(ws => ws.warehouseId === wh.id)
+                    .reduce((s, ws) => s + ws.quantity, 0);
+                  const hasStock = totalStock > 0;
+                  return (
+                    <div key={wh.id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <Icon name="Warehouse" size={16} className="text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold">{wh.name}</div>
+                        {wh.address && <div className="text-xs text-muted-foreground">{wh.address}</div>}
+                        {wh.description && <div className="text-xs text-muted-foreground">{wh.description}</div>}
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">{totalStock} ед.</span>
+                      {!hasStock && (state.warehouses || []).length > 1 && (
+                        <button onClick={() => deleteWarehouse(wh.id)}
+                          className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
+                          <Icon name="Trash2" size={13} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 

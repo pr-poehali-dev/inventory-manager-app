@@ -51,6 +51,29 @@ export type Operation = {
   date: string;
   orderId?: string;
   locationId?: string;
+  warehouseId?: string;       // склад операции
+  scannedCodes?: string[];    // отсканированные штрих-коды в этой операции
+};
+
+// ─── Warehouses (Склады) ──────────────────────────────────────────────────────
+
+export type Warehouse = {
+  id: string;
+  name: string;
+  address?: string;
+  description?: string;
+  createdAt: string;
+};
+
+// ─── Barcodes / QR-codes ──────────────────────────────────────────────────────
+
+export type Barcode = {
+  id: string;
+  itemId: string;
+  code: string;           // сам код (строка)
+  format?: string;        // EAN13, QR_CODE, CODE128, etc.
+  label?: string;         // человекочитаемая метка
+  createdAt: string;
 };
 
 // ─── Location Stocks ──────────────────────────────────────────────────────────
@@ -58,6 +81,14 @@ export type Operation = {
 export type LocationStock = {
   itemId: string;
   locationId: string;
+  quantity: number;
+};
+
+// ─── Warehouse Stocks ─────────────────────────────────────────────────────────
+
+export type WarehouseStock = {
+  itemId: string;
+  warehouseId: string;
   quantity: number;
 };
 
@@ -169,6 +200,9 @@ export type AppState = {
   partners: Partner[];
   receipts: Receipt[];
   techDocs: DocEntry[];
+  warehouses: Warehouse[];
+  warehouseStocks: WarehouseStock[];
+  barcodes: Barcode[];
   darkMode: boolean;
   defaultLowStockThreshold: number;
   currentUser: string;
@@ -188,6 +222,24 @@ const initialState: AppState = {
   taskCounter: 1,
   receipts: [],
   techDocs: [],
+  barcodes: [],
+  warehouses: [
+    { id: 'wh-1', name: 'Главный склад', address: 'ул. Складская, 1', description: 'Основной склад хранения', createdAt: '2024-01-01' },
+    { id: 'wh-2', name: 'Склад №2', address: 'ул. Промышленная, 5', description: 'Дополнительный склад', createdAt: '2024-01-01' },
+  ],
+  warehouseStocks: [
+    { itemId: 'item-1', warehouseId: 'wh-1', quantity: 8 },
+    { itemId: 'item-1', warehouseId: 'wh-2', quantity: 4 },
+    { itemId: 'item-2', warehouseId: 'wh-1', quantity: 3 },
+    { itemId: 'item-3', warehouseId: 'wh-1', quantity: 4 },
+    { itemId: 'item-4', warehouseId: 'wh-1', quantity: 2 },
+    { itemId: 'item-5', warehouseId: 'wh-1', quantity: 60 },
+    { itemId: 'item-5', warehouseId: 'wh-2', quantity: 27 },
+    { itemId: 'item-6', warehouseId: 'wh-1', quantity: 6 },
+    { itemId: 'item-7', warehouseId: 'wh-1', quantity: 8 },
+    { itemId: 'item-8', warehouseId: 'wh-1', quantity: 20 },
+    { itemId: 'item-8', warehouseId: 'wh-2', quantity: 14 },
+  ],
   categories: [
     { id: 'cat-1', name: 'Электроника', color: '#6366f1' },
     { id: 'cat-2', name: 'Офисные принадлежности', color: '#0ea5e9' },
@@ -304,6 +356,10 @@ export function loadState(): AppState {
       if (!p.currentUser)                 p.currentUser = initialState.currentUser;
       if (p.defaultLowStockThreshold === undefined) p.defaultLowStockThreshold = initialState.defaultLowStockThreshold;
       if (typeof p.darkMode !== 'boolean') p.darkMode = false;
+      // New fields guard
+      if (!Array.isArray(p.warehouses))      p.warehouses = initialState.warehouses;
+      if (!Array.isArray(p.warehouseStocks)) p.warehouseStocks = initialState.warehouseStocks;
+      if (!Array.isArray(p.barcodes))        p.barcodes = [];
       return p;
     }
   } catch (e) {
@@ -345,6 +401,43 @@ export function updateLocationStock(state: AppState, itemId: string, locationId:
     next = state.locationStocks;
   }
   return { ...state, locationStocks: next };
+}
+
+export function getWarehouseStock(state: AppState, itemId: string, warehouseId: string): number {
+  return (state.warehouseStocks || []).find(ws => ws.itemId === itemId && ws.warehouseId === warehouseId)?.quantity ?? 0;
+}
+
+export function updateWarehouseStock(state: AppState, itemId: string, warehouseId: string, delta: number): AppState {
+  const stocks = state.warehouseStocks || [];
+  const existing = stocks.find(ws => ws.itemId === itemId && ws.warehouseId === warehouseId);
+  let next: WarehouseStock[];
+  if (existing) {
+    next = stocks.map(ws =>
+      ws.itemId === itemId && ws.warehouseId === warehouseId
+        ? { ...ws, quantity: Math.max(0, ws.quantity + delta) }
+        : ws
+    );
+  } else if (delta > 0) {
+    next = [...stocks, { itemId, warehouseId, quantity: delta }];
+  } else {
+    next = stocks;
+  }
+  // Also update item.quantity = sum across all warehouses
+  const totalQty = next
+    .filter(ws => ws.itemId === itemId)
+    .reduce((s, ws) => s + ws.quantity, 0);
+  const updatedItems = state.items.map(it => it.id === itemId ? { ...it, quantity: totalQty } : it);
+  return { ...state, warehouseStocks: next, items: updatedItems };
+}
+
+export function getItemBarcodes(state: AppState, itemId: string): Barcode[] {
+  return (state.barcodes || []).filter(b => b.itemId === itemId);
+}
+
+export function findItemByBarcode(state: AppState, code: string): Item | undefined {
+  const barcode = (state.barcodes || []).find(b => b.code === code);
+  if (!barcode) return undefined;
+  return state.items.find(it => it.id === barcode.itemId);
 }
 
 export function getOrderStatusLabel(status: OrderStatus): string {
