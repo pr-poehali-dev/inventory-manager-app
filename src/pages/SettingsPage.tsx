@@ -276,8 +276,59 @@ export default function SettingsPage({ state, onStateChange }: Props) {
           )}
 
           {activeSection === 'categories' && (
-            <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
-              <h2 className="font-semibold text-foreground">Категории товаров</h2>
+            <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4 relative overflow-hidden">
+
+              {/* Floating 2D boxes background */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+                {[
+                  { size: 38, x: 8,  y: 12, delay: 0,    dur: 6.2, rot: 15  },
+                  { size: 26, x: 78, y: 8,  delay: 1.1,  dur: 5.4, rot: -20 },
+                  { size: 44, x: 88, y: 55, delay: 0.4,  dur: 7.1, rot: 30  },
+                  { size: 20, x: 55, y: 70, delay: 2.0,  dur: 4.8, rot: -10 },
+                  { size: 32, x: 18, y: 65, delay: 0.8,  dur: 6.6, rot: 22  },
+                  { size: 22, x: 65, y: 18, delay: 1.6,  dur: 5.9, rot: -35 },
+                  { size: 50, x: 42, y: 40, delay: 0.2,  dur: 8.0, rot: 8   },
+                  { size: 18, x: 92, y: 28, delay: 2.5,  dur: 5.1, rot: 45  },
+                  { size: 28, x: 30, y: 85, delay: 1.3,  dur: 6.8, rot: -18 },
+                  { size: 16, x: 72, y: 82, delay: 0.6,  dur: 4.5, rot: 28  },
+                ].map((b, i) => (
+                  <div
+                    key={i}
+                    className="absolute"
+                    style={{
+                      left: `${b.x}%`,
+                      top: `${b.y}%`,
+                      width: b.size,
+                      height: b.size,
+                      animation: `floatBox ${b.dur}s ease-in-out ${b.delay}s infinite`,
+                      rotate: `${b.rot}deg`,
+                    }}
+                  >
+                    {/* Box face */}
+                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width={b.size} height={b.size} style={{ opacity: 0.13 }}>
+                      {/* Front */}
+                      <rect x="8" y="16" width="24" height="20" rx="2" fill="currentColor" className="text-primary" />
+                      {/* Top */}
+                      <path d="M8 16 L20 8 L32 16 L20 24 Z" fill="currentColor" className="text-primary" style={{ opacity: 0.7 }} />
+                      {/* Right side */}
+                      <path d="M32 16 L32 36 L20 32 L20 24 Z" fill="currentColor" className="text-primary" style={{ opacity: 0.5 }} />
+                      {/* Tape line */}
+                      <line x1="8" y1="26" x2="32" y2="26" stroke="white" strokeWidth="1.5" strokeOpacity="0.4" />
+                      <line x1="20" y1="16" x2="20" y2="36" stroke="white" strokeWidth="1.5" strokeOpacity="0.4" />
+                    </svg>
+                  </div>
+                ))}
+              </div>
+
+              <style>{`
+                @keyframes floatBox {
+                  0%   { translate: 0 0px;   }
+                  50%  { translate: 0 -14px; }
+                  100% { translate: 0 0px;   }
+                }
+              `}</style>
+
+              <h2 className="font-semibold text-foreground relative">Категории товаров</h2>
 
               {/* Add new */}
               <div className="p-4 bg-muted/50 rounded-lg space-y-3">
