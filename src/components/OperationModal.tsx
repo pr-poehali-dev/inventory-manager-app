@@ -217,7 +217,7 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
                             ? 'bg-primary/10 border-primary/40 text-primary font-semibold'
                             : 'bg-background border-border text-muted-foreground hover:border-primary/30'}`}
                         onClick={() => setWarehouseId(ws.warehouseId)}>
-                        {ws.warehouse?.name}: <b>{ws.quantity}</b>
+                        {ws.warehouse?.name}
                       </span>
                     ))}
                   </div>

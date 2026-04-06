@@ -5,7 +5,7 @@ import Icon from '@/components/ui/icon';
 import { Item, AppState, saveState, generateId, getItemBarcodes, getWarehouseStock } from '@/data/store';
 import OperationModal from './OperationModal';
 import ScannerModal, { ScannedCode } from './ScannerModal';
-import { AttachmentsTab, TechDocsList } from './ItemAttachmentsTab';
+import { TechDocsList } from './ItemAttachmentsTab';
 import { BarcodesSection } from './ItemBarcodesSection';
 import { ItemHistoryTab } from './ItemHistoryTab';
 
@@ -31,8 +31,6 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   const itemOps = state.operations
     .filter(o => o.itemId === liveItem.id)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const attachments = liveItem.attachments || [];
-
   const isLow = liveItem.quantity <= liveItem.lowStockThreshold;
   const isCritical = liveItem.quantity === 0;
 
@@ -127,7 +125,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   };
 
   const itemDocs = (state.techDocs || []).filter(d => d.itemId === liveItem.id);
-  const totalFilesCount = attachments.length + itemDocs.reduce((s, d) => s + d.attachments.length, 0);
+  const totalFilesCount = itemDocs.reduce((s, d) => s + d.attachments.length, 0);
 
   const tabs: { id: Tab; label: string; icon: string; badge?: number }[] = [
     { id: 'info',      label: 'Инфо',       icon: 'Info' },
@@ -312,8 +310,13 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
 
             {activeTab === 'documents' && (
               <div className="space-y-4">
-                <AttachmentsTab item={liveItem} state={state} onStateChange={onStateChange} />
                 <TechDocsList itemDocs={itemDocs} state={state} />
+                {itemDocs.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
+                    <Icon name="FileText" size={28} className="mb-2 opacity-30" />
+                    <p>Документы добавляются через вкладку <b className="text-foreground">Техник</b></p>
+                  </div>
+                )}
               </div>
             )}
           </div>
