@@ -133,40 +133,28 @@ export type Receipt = {
   totalAmount?: number;
 };
 
-// ─── Technician Tasks ─────────────────────────────────────────────────────────
+// ─── Technician Documents (база данных документов и вложений) ─────────────────
 
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'overdue';
-export type TaskPriority = 'low' | 'normal' | 'high' | 'critical';
-
-export type TaskCheckItem = {
-  id: string;
-  text: string;
-  done: boolean;
-};
-
-export type TaskCustomField = {
+export type DocCustomField = {
   key: string;
   value: string;
 };
 
-export type TechTask = {
+export type DocEntry = {
   id: string;
-  title: string;
-  description?: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  category: string;
-  assignee?: string;
-  locationId?: string;
-  itemId?: string;
-  dueDate?: string;
+  // Привязка к номенклатуре (обязательно)
+  itemId: string;
+  // Доп. поля
+  docNumber?: string;       // номер документа / накладной
+  docDate?: string;         // дата документа
+  docType: string;          // тип: 'Накладная' | 'Акт' | 'Паспорт' | 'Инструкция' | ...
+  supplier?: string;        // поставщик/источник
+  notes?: string;           // примечание
+  customFields: DocCustomField[];
+  attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
-  checklist: TaskCheckItem[];
-  customFields: TaskCustomField[];
-  attachments: Attachment[];
-  progress: number; // 0-100
-  tags: string[];
+  createdBy: string;
 };
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -180,7 +168,7 @@ export type AppState = {
   workOrders: WorkOrder[];
   partners: Partner[];
   receipts: Receipt[];
-  techTasks: TechTask[];
+  techDocs: DocEntry[];
   darkMode: boolean;
   defaultLowStockThreshold: number;
   currentUser: string;
@@ -199,7 +187,7 @@ const initialState: AppState = {
   receiptCounter: 1,
   taskCounter: 1,
   receipts: [],
-  techTasks: [],
+  techDocs: [],
   categories: [
     { id: 'cat-1', name: 'Электроника', color: '#6366f1' },
     { id: 'cat-2', name: 'Офисные принадлежности', color: '#0ea5e9' },
@@ -311,7 +299,7 @@ export function loadState(): AppState {
       // Guard scalars
       if (p.orderCounter === undefined)   p.orderCounter = initialState.orderCounter;
       if (p.receiptCounter === undefined) p.receiptCounter = 1;
-      if (!Array.isArray(p.techTasks))    p.techTasks = [];
+      if (!Array.isArray(p.techDocs))     p.techDocs = [];
       if (p.taskCounter === undefined)    p.taskCounter = 1;
       if (!p.currentUser)                 p.currentUser = initialState.currentUser;
       if (p.defaultLowStockThreshold === undefined) p.defaultLowStockThreshold = initialState.defaultLowStockThreshold;

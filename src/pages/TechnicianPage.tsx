@@ -4,523 +4,331 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState, TechTask, TaskStatus, TaskPriority, TaskCheckItem, TaskCustomField, Attachment, saveState, generateId } from '@/data/store';
+import { AppState, DocEntry, DocCustomField, Attachment, saveState, generateId } from '@/data/store';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DOC_TYPES = ['Накладная', 'Акт', 'Паспорт изделия', 'Инструкция', 'Сертификат', 'Договор', 'Счёт', 'Иное'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getStatusLabel(status: TaskStatus): string {
-  switch (status) {
-    case 'todo':        return 'К выполнению';
-    case 'in_progress': return 'В работе';
-    case 'done':        return 'Готово';
-    case 'overdue':     return 'Просрочено';
-  }
-}
-
-function getStatusColor(status: TaskStatus): string {
-  switch (status) {
-    case 'todo':        return 'bg-muted text-muted-foreground';
-    case 'in_progress': return 'bg-primary/10 text-primary';
-    case 'done':        return 'bg-success/10 text-success';
-    case 'overdue':     return 'bg-destructive/10 text-destructive';
-  }
-}
-
-function getPriorityLabel(priority: TaskPriority): string {
-  switch (priority) {
-    case 'low':      return 'Низкий';
-    case 'normal':   return 'Обычный';
-    case 'high':     return 'Высокий';
-    case 'critical': return 'Критический';
-  }
-}
-
-function getPriorityColor(priority: TaskPriority): string {
-  switch (priority) {
-    case 'low':      return 'bg-muted text-muted-foreground';
-    case 'normal':   return 'bg-primary/10 text-primary';
-    case 'high':     return 'bg-warning/10 text-warning';
-    case 'critical': return 'bg-destructive/10 text-destructive';
-  }
-}
-
-function getPriorityBorder(priority: TaskPriority): string {
-  switch (priority) {
-    case 'low':      return 'bg-muted-foreground/40';
-    case 'normal':   return 'bg-primary';
-    case 'high':     return 'bg-warning';
-    case 'critical': return 'bg-destructive';
-  }
-}
-
-function formatFileSize(bytes: number): string {
+function formatBytes(bytes: number): string {
   if (bytes < 1024) return bytes + ' Б';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
   return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
 }
 
-function getFileIcon(mimeType: string): string {
-  if (mimeType.startsWith('image/')) return 'Image';
-  if (mimeType.includes('pdf')) return 'FileText';
-  if (mimeType.includes('word') || mimeType.includes('document')) return 'FileText';
-  if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'Table';
-  if (mimeType.includes('zip') || mimeType.includes('archive')) return 'Archive';
-  return 'File';
+function formatDate(iso: string): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch { return iso; }
 }
 
-// ─── TaskDetailModal ──────────────────────────────────────────────────────────
+function getFileIcon(mime: string, name: string): { icon: string; color: string } {
+  const ext = name.split('.').pop()?.toLowerCase() || '';
+  if (mime.startsWith('image/'))                            return { icon: 'Image',    color: 'text-blue-500' };
+  if (mime.includes('pdf'))                                 return { icon: 'FileText', color: 'text-red-500' };
+  if (mime.includes('word') || ext === 'docx' || ext === 'doc') return { icon: 'FileText', color: 'text-blue-600' };
+  if (mime.includes('excel') || mime.includes('spreadsheet') || ext === 'xlsx' || ext === 'xls')
+                                                            return { icon: 'Table',    color: 'text-green-600' };
+  if (mime.includes('zip') || mime.includes('rar'))         return { icon: 'Archive',  color: 'text-yellow-600' };
+  return { icon: 'File', color: 'text-muted-foreground' };
+}
 
-type TaskDetailModalProps = {
-  task: TechTask;
+// ─── AttachmentZone ───────────────────────────────────────────────────────────
+
+function AttachmentZone({
+  attachments, onChange,
+}: {
+  attachments: Attachment[];
+  onChange: (next: Attachment[]) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<Attachment | null>(null);
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    const readers = Array.from(files).map(file =>
+      new Promise<Attachment>((resolve, reject) => {
+        if (file.size > 20 * 1024 * 1024) { reject(new Error('Файл слишком большой (макс. 20 МБ)')); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve({
+          id: generateId(), name: file.name, size: file.size,
+          mimeType: file.type || 'application/octet-stream',
+          dataUrl: reader.result as string, uploadedAt: new Date().toISOString(),
+        });
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      })
+    );
+    Promise.allSettled(readers).then(results => {
+      const newAtts = results.filter(r => r.status === 'fulfilled').map(r => (r as PromiseFulfilledResult<Attachment>).value);
+      if (newAtts.length) onChange([...attachments, ...newAtts]);
+      setUploading(false);
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Drop zone */}
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+        onClick={() => fileRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all select-none
+          ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'}`}
+      >
+        <input ref={fileRef} type="file" multiple className="hidden"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.zip,.rar,.txt,.csv"
+          onChange={e => handleFiles(e.target.files)} />
+        {uploading ? (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Icon name="Loader2" size={16} className="animate-spin" />Загрузка...
+          </div>
+        ) : (
+          <>
+            <Icon name="Upload" size={22} className="mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">Перетащите файлы или нажмите</p>
+            <p className="text-xs text-muted-foreground mt-0.5">PDF, Word, Excel, фото, архивы — до 20 МБ</p>
+          </>
+        )}
+      </div>
+
+      {/* File list */}
+      {attachments.length > 0 && (
+        <div className="space-y-1.5">
+          {attachments.map(att => {
+            const { icon, color } = getFileIcon(att.mimeType, att.name);
+            const isImage = att.mimeType.startsWith('image/');
+            return (
+              <div key={att.id}
+                className="flex items-center gap-3 p-2.5 bg-muted/40 rounded-xl border border-border/50 group hover:border-border transition-all">
+                {/* Thumb */}
+                <div className="w-9 h-9 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 overflow-hidden">
+                  {isImage
+                    ? <img src={att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
+                    : <Icon name={icon} size={18} className={color} />
+                  }
+                </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-foreground truncate">{att.name}</div>
+                  <div className="text-xs text-muted-foreground">{formatBytes(att.size)} · {formatDate(att.uploadedAt)}</div>
+                </div>
+                {/* Actions */}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {isImage && (
+                    <button onClick={() => setPreview(att)}
+                      className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground">
+                      <Icon name="Eye" size={13} />
+                    </button>
+                  )}
+                  <a href={att.dataUrl} download={att.name}
+                    className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground">
+                    <Icon name="Download" size={13} />
+                  </a>
+                  <button onClick={() => onChange(attachments.filter(a => a.id !== att.id))}
+                    className="w-7 h-7 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive">
+                    <Icon name="Trash2" size={13} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Image preview modal */}
+      {preview && (
+        <Dialog open onOpenChange={() => setPreview(null)}>
+          <DialogContent className="max-w-2xl p-2">
+            <img src={preview.dataUrl} alt={preview.name} className="w-full rounded-xl object-contain max-h-[80vh]" />
+            <p className="text-center text-sm text-muted-foreground mt-1">{preview.name}</p>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
+// ─── DocDetailModal ───────────────────────────────────────────────────────────
+
+function DocDetailModal({
+  doc, state, onSave, onDelete, onClose,
+}: {
+  doc: DocEntry;
   state: AppState;
-  onClose: () => void;
-  onUpdate: (task: TechTask) => void;
+  onSave: (updated: DocEntry) => void;
   onDelete: (id: string) => void;
-};
+  onClose: () => void;
+}) {
+  const item = state.items.find(i => i.id === doc.itemId);
+  const cat  = item ? state.categories.find(c => c.id === item.categoryId) : null;
 
-function TaskDetailModal({ task, state, onClose, onUpdate, onDelete }: TaskDetailModalProps) {
-  const [activeTab, setActiveTab] = useState<'task' | 'attachments'>('task');
-  const [editTask, setEditTask] = useState<TechTask>({ ...task });
-  const [newCheckText, setNewCheckText] = useState('');
-  const [newFieldKey, setNewFieldKey] = useState('');
-  const [newFieldValue, setNewFieldValue] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [edited, setEdited] = useState<DocEntry>({ ...doc, customFields: [...doc.customFields], attachments: [...doc.attachments] });
+  const [cfKey, setCfKey] = useState('');
+  const [cfVal, setCfVal] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const doneItems = editTask.checklist.filter(c => c.done).length;
-  const totalItems = editTask.checklist.length;
+  const set = (patch: Partial<DocEntry>) => setEdited(prev => ({ ...prev, ...patch }));
 
-  function save(updated: TechTask) {
-    const final = { ...updated, updatedAt: new Date().toISOString() };
-    setEditTask(final);
-    onUpdate(final);
-  }
+  const handleSave = () => {
+    onSave({ ...edited, updatedAt: new Date().toISOString() });
+    onClose();
+  };
 
-  function handleCheckToggle(id: string) {
-    const updated = {
-      ...editTask,
-      checklist: editTask.checklist.map(c => c.id === id ? { ...c, done: !c.done } : c),
-    };
-    save(updated);
-  }
+  const addCf = () => {
+    if (!cfKey.trim()) return;
+    set({ customFields: [...edited.customFields, { key: cfKey.trim(), value: cfVal.trim() }] });
+    setCfKey(''); setCfVal('');
+  };
 
-  function handleAddCheckItem() {
-    const text = newCheckText.trim();
-    if (!text) return;
-    const updated = {
-      ...editTask,
-      checklist: [...editTask.checklist, { id: generateId(), text, done: false }],
-    };
-    setNewCheckText('');
-    save(updated);
-  }
+  const removeCf = (idx: number) => set({ customFields: edited.customFields.filter((_, i) => i !== idx) });
 
-  function handleRemoveCheckItem(id: string) {
-    const updated = {
-      ...editTask,
-      checklist: editTask.checklist.filter(c => c.id !== id),
-    };
-    save(updated);
-  }
-
-  function handleAddCustomField() {
-    const key = newFieldKey.trim();
-    const value = newFieldValue.trim();
-    if (!key) return;
-    const updated = {
-      ...editTask,
-      customFields: [...editTask.customFields, { key, value }],
-    };
-    setNewFieldKey('');
-    setNewFieldValue('');
-    save(updated);
-  }
-
-  function handleRemoveCustomField(index: number) {
-    const updated = {
-      ...editTask,
-      customFields: editTask.customFields.filter((_, i) => i !== index),
-    };
-    save(updated);
-  }
-
-  function handleFieldChange(field: keyof TechTask, value: string | number) {
-    const updated = { ...editTask, [field]: value };
-    save(updated);
-  }
-
-  function handleStatusChange(status: TaskStatus) {
-    save({ ...editTask, status });
-  }
-
-  function handleProgressChange(value: number) {
-    save({ ...editTask, progress: value });
-  }
-
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const fileArr = Array.from(files);
-    let processed = 0;
-    const newAttachments: Attachment[] = [];
-
-    fileArr.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = (ev.target?.result as string) || '';
-        newAttachments.push({
-          id: generateId(),
-          name: file.name,
-          size: file.size,
-          mimeType: file.type,
-          dataUrl,
-          uploadedAt: new Date().toISOString(),
-        });
-        processed++;
-        if (processed === fileArr.length) {
-          const updated = {
-            ...editTask,
-            attachments: [...editTask.attachments, ...newAttachments],
-          };
-          save(updated);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
-
-  function handleRemoveAttachment(id: string) {
-    const updated = {
-      ...editTask,
-      attachments: editTask.attachments.filter(a => a.id !== id),
-    };
-    save(updated);
-  }
-
-  const statusList: TaskStatus[] = ['todo', 'in_progress', 'done', 'overdue'];
+  const updateCf = (idx: number, patch: Partial<DocCustomField>) =>
+    set({ customFields: edited.customFields.map((cf, i) => i === idx ? { ...cf, ...patch } : cf) });
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-modal animate-scale-in p-0">
-        <div className={`h-1.5 w-full rounded-t-lg ${getPriorityBorder(editTask.priority)}`} />
-        <div className="flex flex-col overflow-hidden flex-1 px-6 pb-6 pt-4">
-          <DialogHeader className="mb-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <input
-                  className="text-xl font-bold text-foreground bg-transparent border-none outline-none w-full focus:ring-0 p-0 leading-tight"
-                  value={editTask.title}
-                  onChange={e => setEditTask(prev => ({ ...prev, title: e.target.value }))}
-                  onBlur={() => save(editTask)}
-                />
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(editTask.status)}`}>
-                    {getStatusLabel(editTask.status)}
+      <DialogContent className="max-w-2xl w-full max-h-[92vh] overflow-y-auto animate-scale-in p-0">
+        {/* Top bar with item info */}
+        <div className="sticky top-0 z-10 bg-card border-b border-border px-6 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              {/* Номенклатура */}
+              <div className="flex items-center gap-2 mb-1">
+                {cat && (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                    style={{ backgroundColor: cat.color + '18', color: cat.color }}>
+                    {cat.name}
                   </span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(editTask.priority)}`}>
-                    {getPriorityLabel(editTask.priority)}
-                  </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent text-accent-foreground">
-                    {editTask.category}
-                  </span>
-                </div>
+                )}
+                <span className="text-xs text-muted-foreground">{item?.unit}</span>
               </div>
-              {confirmDelete ? (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-sm text-muted-foreground">Удалить?</span>
-                  <Button size="sm" variant="destructive" onClick={() => onDelete(editTask.id)}>Да</Button>
-                  <Button size="sm" variant="outline" onClick={() => setConfirmDelete(false)}>Нет</Button>
-                </div>
-              ) : (
-                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive flex-shrink-0" onClick={() => setConfirmDelete(true)}>
-                  <Icon name="Trash2" size={16} />
-                </Button>
-              )}
+              <h2 className="font-bold text-lg text-foreground leading-tight">{item?.name || '—'}</h2>
+              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><Icon name="FileText" size={11} />{edited.docType}</span>
+                {edited.docNumber && <span>№ {edited.docNumber}</span>}
+                {edited.docDate && <span>{formatDate(edited.docDate)}</span>}
+                <span className="flex items-center gap-1"><Icon name="Paperclip" size={11} />{edited.attachments.length} файл.</span>
+              </div>
             </div>
-          </DialogHeader>
-
-          {/* Tabs */}
-          <div className="flex gap-1 border-b border-border mb-4">
-            {(['task', 'attachments'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium rounded-t-md transition-colors ${
-                  activeTab === tab
-                    ? 'text-primary border-b-2 border-primary -mb-px'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {tab === 'task' ? (
-                  <span className="flex items-center gap-1.5"><Icon name="ClipboardList" size={14} />Задача</span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    <Icon name="Paperclip" size={14} />
-                    Вложения
-                    {editTask.attachments.length > 0 && (
-                      <span className="ml-1 bg-primary/10 text-primary text-xs rounded-full px-1.5">{editTask.attachments.length}</span>
-                    )}
-                  </span>
-                )}
-              </button>
-            ))}
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+              <Icon name="X" size={15} />
+            </button>
           </div>
+        </div>
 
-          <div className="overflow-y-auto flex-1 space-y-5 pr-1">
-            {activeTab === 'task' && (
-              <>
-                {/* Status buttons */}
-                <div>
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-2 block">Статус</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {statusList.map(s => (
-                      <button
-                        key={s}
-                        onClick={() => handleStatusChange(s)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                          editTask.status === s
-                            ? `${getStatusColor(s)} border-current`
-                            : 'border-border text-muted-foreground hover:border-border hover:bg-muted'
-                        }`}
-                      >
-                        {getStatusLabel(s)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+        <div className="p-6 space-y-6">
+          {/* ─── Основные реквизиты ─────────────────────────────── */}
+          <section>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Реквизиты документа</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Тип документа</Label>
+                <select value={edited.docType} onChange={e => set({ docType: e.target.value })}
+                  className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                  {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Номер документа</Label>
+                <Input value={edited.docNumber || ''} onChange={e => set({ docNumber: e.target.value })}
+                  placeholder="АКТ-0042 / ТН-001..." className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Дата документа</Label>
+                <Input type="date" value={edited.docDate || ''} onChange={e => set({ docDate: e.target.value })}
+                  className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Поставщик / Источник</Label>
+                <Input value={edited.supplier || ''} onChange={e => set({ supplier: e.target.value })}
+                  placeholder="ООО Поставщик..." className="h-9 text-sm" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1.5">
+              <Label className="text-xs">Примечание</Label>
+              <textarea value={edited.notes || ''} onChange={e => set({ notes: e.target.value })}
+                rows={2}
+                placeholder="Комментарий, пометки..."
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none placeholder:text-muted-foreground" />
+            </div>
+          </section>
 
-                {/* Progress slider */}
-                <div>
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-2 flex items-center justify-between">
-                    <span>Прогресс</span>
-                    <span className="text-foreground font-semibold">{editTask.progress}%</span>
-                  </Label>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={editTask.progress}
-                    onChange={e => handleProgressChange(Number(e.target.value))}
-                    className="w-full h-2 appearance-none rounded-full bg-muted cursor-pointer accent-primary"
-                  />
-                  <div className="h-1.5 bg-muted rounded-full mt-1 overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all"
-                      style={{ width: `${editTask.progress}%` }}
-                    />
+          {/* ─── Кастомные поля ─────────────────────────────────── */}
+          <section>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Дополнительные поля</h3>
+            {edited.customFields.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {edited.customFields.map((cf, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input value={cf.key} onChange={e => updateCf(idx, { key: e.target.value })}
+                      placeholder="Поле" className="h-8 text-sm w-36 shrink-0" />
+                    <Input value={cf.value} onChange={e => updateCf(idx, { value: e.target.value })}
+                      placeholder="Значение" className="h-8 text-sm flex-1" />
+                    <button onClick={() => removeCf(idx)}
+                      className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0">
+                      <Icon name="X" size={13} />
+                    </button>
                   </div>
-                </div>
-
-                {/* Meta fields */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Исполнитель</Label>
-                    <Input
-                      value={editTask.assignee || ''}
-                      onChange={e => setEditTask(prev => ({ ...prev, assignee: e.target.value }))}
-                      onBlur={() => save(editTask)}
-                      placeholder="Имя исполнителя"
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Срок выполнения</Label>
-                    <Input
-                      type="date"
-                      value={editTask.dueDate || ''}
-                      onChange={e => handleFieldChange('dueDate', e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Локация</Label>
-                    <select
-                      value={editTask.locationId || ''}
-                      onChange={e => handleFieldChange('locationId', e.target.value)}
-                      className="w-full h-8 text-sm rounded-md border border-input bg-background px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      <option value="">— не указана —</option>
-                      {state.locations.map(loc => (
-                        <option key={loc.id} value={loc.id}>{loc.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Приоритет</Label>
-                    <select
-                      value={editTask.priority}
-                      onChange={e => handleFieldChange('priority', e.target.value as TaskPriority)}
-                      className="w-full h-8 text-sm rounded-md border border-input bg-background px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      <option value="low">Низкий</option>
-                      <option value="normal">Обычный</option>
-                      <option value="high">Высокий</option>
-                      <option value="critical">Критический</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-2 block">Описание</Label>
-                  <textarea
-                    value={editTask.description || ''}
-                    onChange={e => setEditTask(prev => ({ ...prev, description: e.target.value }))}
-                    onBlur={() => save(editTask)}
-                    placeholder="Подробное описание задачи..."
-                    rows={3}
-                    className="w-full text-sm rounded-lg border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                  />
-                </div>
-
-                {/* Checklist */}
-                <div>
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-2 flex items-center justify-between">
-                    <span>Чек-лист</span>
-                    {totalItems > 0 && (
-                      <span className="text-foreground font-semibold">{doneItems}/{totalItems}</span>
-                    )}
-                  </Label>
-                  {totalItems > 0 && (
-                    <div className="h-1 bg-muted rounded-full mb-3 overflow-hidden">
-                      <div
-                        className="h-full bg-success rounded-full transition-all"
-                        style={{ width: `${totalItems > 0 ? (doneItems / totalItems) * 100 : 0}%` }}
-                      />
-                    </div>
-                  )}
-                  <div className="space-y-1.5 mb-2">
-                    {editTask.checklist.map(item => (
-                      <div key={item.id} className="flex items-center gap-2 group py-1 px-2 rounded-lg hover:bg-muted/50 transition-colors">
-                        <button
-                          onClick={() => handleCheckToggle(item.id)}
-                          className={`flex-shrink-0 w-4 h-4 rounded border transition-all flex items-center justify-center ${
-                            item.done
-                              ? 'bg-success border-success text-success-foreground'
-                              : 'border-border hover:border-primary'
-                          }`}
-                        >
-                          {item.done && <Icon name="Check" size={10} />}
-                        </button>
-                        <span className={`flex-1 text-sm ${item.done ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                          {item.text}
-                        </span>
-                        <button
-                          onClick={() => handleRemoveCheckItem(item.id)}
-                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-0.5"
-                        >
-                          <Icon name="X" size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newCheckText}
-                      onChange={e => setNewCheckText(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleAddCheckItem(); }}
-                      placeholder="Добавить пункт..."
-                      className="h-8 text-sm flex-1"
-                    />
-                    <Button size="sm" variant="outline" onClick={handleAddCheckItem} className="h-8 px-3">
-                      <Icon name="Plus" size={14} />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Custom fields */}
-                <div>
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-2 block">Дополнительные поля</Label>
-                  {editTask.customFields.length > 0 && (
-                    <div className="space-y-1.5 mb-2">
-                      {editTask.customFields.map((cf, i) => (
-                        <div key={i} className="flex items-center gap-2 group px-2 py-1.5 rounded-lg bg-muted/40">
-                          <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0 truncate">{cf.key}</span>
-                          <span className="flex-1 text-sm text-foreground truncate">{cf.value}</span>
-                          <button
-                            onClick={() => handleRemoveCustomField(i)}
-                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-0.5"
-                          >
-                            <Icon name="X" size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <Input
-                      value={newFieldKey}
-                      onChange={e => setNewFieldKey(e.target.value)}
-                      placeholder="Поле"
-                      className="h-8 text-sm w-28"
-                    />
-                    <Input
-                      value={newFieldValue}
-                      onChange={e => setNewFieldValue(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleAddCustomField(); }}
-                      placeholder="Значение"
-                      className="h-8 text-sm flex-1"
-                    />
-                    <Button size="sm" variant="outline" onClick={handleAddCustomField} className="h-8 px-3">
-                      <Icon name="Plus" size={14} />
-                    </Button>
-                  </div>
-                </div>
-              </>
+                ))}
+              </div>
             )}
+            <div className="flex items-center gap-2">
+              <Input value={cfKey} onChange={e => setCfKey(e.target.value)} placeholder="Название поля"
+                className="h-8 text-sm w-36 shrink-0" onKeyDown={e => e.key === 'Enter' && addCf()} />
+              <Input value={cfVal} onChange={e => setCfVal(e.target.value)} placeholder="Значение"
+                className="h-8 text-sm flex-1" onKeyDown={e => e.key === 'Enter' && addCf()} />
+              <button onClick={addCf}
+                className="w-8 h-8 rounded-lg border border-dashed border-border hover:border-primary hover:bg-primary/5 flex items-center justify-center text-muted-foreground hover:text-primary transition-all shrink-0">
+                <Icon name="Plus" size={14} />
+              </button>
+            </div>
+          </section>
 
-            {activeTab === 'attachments' && (
-              <>
-                <div
-                  className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Icon name="Upload" size={28} className="mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Нажмите или перетащите файлы сюда</p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">Любые форматы файлов</p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={handleFileUpload}
-                  />
-                </div>
+          {/* ─── Вложения ─────────────────────────────────────────── */}
+          <section>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Вложения
+              {edited.attachments.length > 0 && (
+                <span className="ml-2 text-primary font-bold normal-case">{edited.attachments.length}</span>
+              )}
+            </h3>
+            <AttachmentZone
+              attachments={edited.attachments}
+              onChange={atts => set({ attachments: atts })}
+            />
+          </section>
 
-                {editTask.attachments.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground text-sm">
-                    <Icon name="Paperclip" size={24} className="mx-auto mb-2 opacity-40" />
-                    Вложений нет
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {editTask.attachments.map(att => (
-                      <div key={att.id} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30 group hover:bg-muted/60 transition-colors">
-                        {att.mimeType.startsWith('image/') && att.dataUrl ? (
-                          <img src={att.dataUrl} alt={att.name} className="w-10 h-10 rounded object-cover flex-shrink-0 border border-border" />
-                        ) : (
-                          <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                            <Icon name={getFileIcon(att.mimeType)} size={20} className="text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{att.name}</p>
-                          <p className="text-xs text-muted-foreground">{formatFileSize(att.size)}</p>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveAttachment(att.id)}
-                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-1.5 rounded-md hover:bg-destructive/10"
-                        >
-                          <Icon name="Trash2" size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
+          {/* ─── Footer ──────────────────────────────────────────── */}
+          <div className="flex items-center justify-between pt-2 border-t border-border">
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-destructive">Удалить запись?</span>
+                <Button variant="destructive" size="sm" onClick={() => { onDelete(doc.id); onClose(); }}>
+                  Да, удалить
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>Отмена</Button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors">
+                <Icon name="Trash2" size={13} />Удалить запись
+              </button>
             )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onClose}>Отмена</Button>
+              <Button onClick={handleSave} className="font-semibold">
+                <Icon name="Save" size={14} className="mr-1.5" />Сохранить
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -528,297 +336,285 @@ function TaskDetailModal({ task, state, onClose, onUpdate, onDelete }: TaskDetai
   );
 }
 
-// ─── NewTaskModal ─────────────────────────────────────────────────────────────
+// ─── NewDocModal ──────────────────────────────────────────────────────────────
 
-type NewTaskModalProps = {
+function NewDocModal({
+  state, onSave, onClose,
+}: {
   state: AppState;
+  onSave: (doc: DocEntry) => void;
   onClose: () => void;
-  onCreate: (task: TechTask) => void;
-};
+}) {
+  const [itemId, setItemId]     = useState('');
+  const [itemSearch, setItemSearch] = useState('');
+  const [docType, setDocType]   = useState(DOC_TYPES[0]);
+  const [docNumber, setDocNumber] = useState('');
+  const [docDate, setDocDate]   = useState('');
+  const [supplier, setSupplier] = useState('');
+  const [notes, setNotes]       = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [customFields, setCustomFields] = useState<DocCustomField[]>([]);
+  const [cfKey, setCfKey]       = useState('');
+  const [cfVal, setCfVal]       = useState('');
+  const [error, setError]       = useState('');
 
-function NewTaskModal({ state, onClose, onCreate }: NewTaskModalProps) {
-  const existingCategories = useMemo(() => {
-    const cats = new Set<string>();
-    state.techTasks.forEach(t => cats.add(t.category));
-    ['Обслуживание', 'Ремонт', 'Инвентаризация', 'Уборка', 'Проверка'].forEach(c => cats.add(c));
-    return Array.from(cats).filter(Boolean);
-  }, [state.techTasks]);
+  const filteredItems = useMemo(() => {
+    if (!itemSearch.trim()) return state.items.slice(0, 30);
+    const q = itemSearch.toLowerCase();
+    return state.items.filter(i => i.name.toLowerCase().includes(q) || i.description?.toLowerCase().includes(q)).slice(0, 20);
+  }, [state.items, itemSearch]);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState(existingCategories[0] || 'Обслуживание');
-  const [customCategory, setCustomCategory] = useState('');
-  const [priority, setPriority] = useState<TaskPriority>('normal');
-  const [status, setStatus] = useState<TaskStatus>('todo');
-  const [assignee, setAssignee] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [locationId, setLocationId] = useState('');
-  const [checkItems, setCheckItems] = useState<string[]>(['']);
-  const [customFields, setCustomFields] = useState<TaskCustomField[]>([]);
-  const [cfKey, setCfKey] = useState('');
-  const [cfValue, setCfValue] = useState('');
-  const [errors, setErrors] = useState<{ title?: string }>({});
+  const selectedItem = itemId ? state.items.find(i => i.id === itemId) : null;
 
-  function handleAddCheckItem() {
-    setCheckItems(prev => [...prev, '']);
-  }
+  const addCf = () => {
+    if (!cfKey.trim()) return;
+    setCustomFields(prev => [...prev, { key: cfKey.trim(), value: cfVal.trim() }]);
+    setCfKey(''); setCfVal('');
+  };
 
-  function handleRemoveCheckItem(idx: number) {
-    setCheckItems(prev => prev.filter((_, i) => i !== idx));
-  }
-
-  function handleCheckItemChange(idx: number, val: string) {
-    setCheckItems(prev => prev.map((v, i) => i === idx ? val : v));
-  }
-
-  function handleAddCustomField() {
-    const key = cfKey.trim();
-    if (!key) return;
-    setCustomFields(prev => [...prev, { key, value: cfValue.trim() }]);
-    setCfKey('');
-    setCfValue('');
-  }
-
-  function handleRemoveCustomField(idx: number) {
-    setCustomFields(prev => prev.filter((_, i) => i !== idx));
-  }
-
-  function handleSubmit() {
-    const trimTitle = title.trim();
-    if (!trimTitle) {
-      setErrors({ title: 'Введите название задачи' });
-      return;
-    }
-    const finalCategory = category === '__custom__' ? customCategory.trim() || 'Без категории' : category;
-    const checklist: TaskCheckItem[] = checkItems
-      .map(text => text.trim())
-      .filter(text => text.length > 0)
-      .map(text => ({ id: generateId(), text, done: false }));
-
-    const now = new Date().toISOString();
-    const newTask: TechTask = {
-      id: generateId(),
-      title: trimTitle,
-      description: description.trim() || undefined,
-      status,
-      priority,
-      category: finalCategory,
-      assignee: assignee.trim() || undefined,
-      dueDate: dueDate || undefined,
-      locationId: locationId || undefined,
-      createdAt: now,
-      updatedAt: now,
-      checklist,
-      customFields,
-      attachments: [],
-      progress: 0,
-      tags: [],
+  const handleCreate = () => {
+    if (!itemId) { setError('Выберите позицию номенклатуры'); return; }
+    const doc: DocEntry = {
+      id: generateId(), itemId, docType, docNumber: docNumber || undefined,
+      docDate: docDate || undefined, supplier: supplier || undefined,
+      notes: notes || undefined, customFields, attachments,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      createdBy: state.currentUser,
     };
-    onCreate(newTask);
-  }
+    onSave(doc); onClose();
+  };
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-modal animate-scale-in p-0">
-        <div className={`h-1.5 w-full rounded-t-lg ${getPriorityBorder(priority)}`} />
-        <div className="flex flex-col overflow-hidden flex-1 px-6 pb-6 pt-4">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="text-lg font-bold text-foreground">Новая задача</DialogTitle>
-          </DialogHeader>
-
-          <div className="overflow-y-auto flex-1 space-y-4 pr-1">
-            {/* Title */}
-            <div>
-              <Label className="text-sm font-medium mb-1.5 block">
-                Название <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={title}
-                onChange={e => { setTitle(e.target.value); if (errors.title) setErrors({}); }}
-                placeholder="Что нужно сделать?"
-                className={errors.title ? 'border-destructive' : ''}
-                autoFocus
-              />
-              {errors.title && <p className="text-xs text-destructive mt-1">{errors.title}</p>}
+      <DialogContent className="max-w-lg w-full max-h-[92vh] overflow-y-auto animate-scale-in p-0">
+        <DialogHeader className="px-6 py-4 border-b border-border">
+          <DialogTitle className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
+              <Icon name="FilePlus" size={16} />
             </div>
+            Новая запись документа
+          </DialogTitle>
+        </DialogHeader>
 
-            {/* Description */}
-            <div>
-              <Label className="text-sm font-medium mb-1.5 block">Описание</Label>
-              <textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Подробности задачи..."
-                rows={3}
-                className="w-full text-sm rounded-lg border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-              />
-            </div>
-
-            {/* Category */}
-            <div>
-              <Label className="text-sm font-medium mb-1.5 block">Категория</Label>
-              <select
-                value={category}
-                onChange={e => setCategory(e.target.value)}
-                className="w-full h-9 text-sm rounded-md border border-input bg-background px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                {existingCategories.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-                <option value="__custom__">+ Новая категория...</option>
-              </select>
-              {category === '__custom__' && (
-                <Input
-                  value={customCategory}
-                  onChange={e => setCustomCategory(e.target.value)}
-                  placeholder="Название категории"
-                  className="mt-2 text-sm"
-                />
-              )}
-            </div>
-
-            {/* Priority & Status */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">Приоритет</Label>
-                <select
-                  value={priority}
-                  onChange={e => setPriority(e.target.value as TaskPriority)}
-                  className="w-full h-9 text-sm rounded-md border border-input bg-background px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="low">Низкий</option>
-                  <option value="normal">Обычный</option>
-                  <option value="high">Высокий</option>
-                  <option value="critical">Критический</option>
-                </select>
-              </div>
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">Статус</Label>
-                <select
-                  value={status}
-                  onChange={e => setStatus(e.target.value as TaskStatus)}
-                  className="w-full h-9 text-sm rounded-md border border-input bg-background px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="todo">К выполнению</option>
-                  <option value="in_progress">В работе</option>
-                  <option value="done">Готово</option>
-                  <option value="overdue">Просрочено</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Assignee & Due date */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">Исполнитель</Label>
-                <Input
-                  value={assignee}
-                  onChange={e => setAssignee(e.target.value)}
-                  placeholder="Имя исполнителя"
-                  className="text-sm h-9"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">Срок выполнения</Label>
-                <Input
-                  type="date"
-                  value={dueDate}
-                  onChange={e => setDueDate(e.target.value)}
-                  className="text-sm h-9"
-                />
-              </div>
-            </div>
-
-            {/* Location */}
-            <div>
-              <Label className="text-sm font-medium mb-1.5 block">Локация</Label>
-              <select
-                value={locationId}
-                onChange={e => setLocationId(e.target.value)}
-                className="w-full h-9 text-sm rounded-md border border-input bg-background px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="">— не указана —</option>
-                {state.locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Checklist */}
-            <div>
-              <Label className="text-sm font-medium mb-1.5 flex items-center justify-between">
-                <span>Чек-лист</span>
-                <button onClick={handleAddCheckItem} className="text-xs text-primary hover:underline flex items-center gap-1">
-                  <Icon name="Plus" size={12} /> Добавить пункт
-                </button>
-              </Label>
-              <div className="space-y-1.5">
-                {checkItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded border border-border flex-shrink-0" />
-                    <Input
-                      value={item}
-                      onChange={e => handleCheckItemChange(idx, e.target.value)}
-                      placeholder={`Пункт ${idx + 1}`}
-                      className="text-sm h-8 flex-1"
-                    />
-                    {checkItems.length > 1 && (
-                      <button onClick={() => handleRemoveCheckItem(idx)} className="text-muted-foreground hover:text-destructive p-1">
-                        <Icon name="X" size={12} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom fields */}
-            <div>
-              <Label className="text-sm font-medium mb-1.5 block">Дополнительные поля</Label>
-              {customFields.length > 0 && (
-                <div className="space-y-1.5 mb-2">
-                  {customFields.map((cf, i) => (
-                    <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-muted/40 group">
-                      <span className="text-xs font-medium text-muted-foreground w-24 flex-shrink-0 truncate">{cf.key}</span>
-                      <span className="flex-1 text-sm text-foreground truncate">{cf.value}</span>
-                      <button onClick={() => handleRemoveCustomField(i)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-0.5">
-                        <Icon name="X" size={12} />
-                      </button>
-                    </div>
-                  ))}
+        <div className="p-6 space-y-5">
+          {/* Step 1: выбор позиции */}
+          <section>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              Позиция номенклатуры <span className="text-destructive">*</span>
+            </h3>
+            {selectedItem ? (
+              <div className="flex items-center gap-3 p-3 bg-accent/50 border border-primary/20 rounded-xl">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Icon name="Package" size={16} className="text-primary" />
                 </div>
-              )}
-              <div className="flex gap-2">
-                <Input
-                  value={cfKey}
-                  onChange={e => setCfKey(e.target.value)}
-                  placeholder="Поле"
-                  className="h-8 text-sm w-28"
-                />
-                <Input
-                  value={cfValue}
-                  onChange={e => setCfValue(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddCustomField(); }}
-                  placeholder="Значение"
-                  className="h-8 text-sm flex-1"
-                />
-                <Button size="sm" variant="outline" onClick={handleAddCustomField} className="h-8 px-3">
-                  <Icon name="Plus" size={14} />
-                </Button>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm text-foreground truncate">{selectedItem.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {state.categories.find(c => c.id === selectedItem.categoryId)?.name || '—'} · {selectedItem.quantity} {selectedItem.unit}
+                  </div>
+                </div>
+                <button onClick={() => { setItemId(''); setItemSearch(''); }}
+                  className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground">
+                  <Icon name="X" size={13} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={itemSearch} onChange={e => setItemSearch(e.target.value)} autoFocus
+                    placeholder="Поиск по названию..."
+                    className="pl-9 h-9 text-sm" />
+                </div>
+                {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+                <div className="mt-2 border border-border rounded-xl overflow-hidden max-h-52 overflow-y-auto">
+                  {filteredItems.length === 0
+                    ? <p className="text-sm text-muted-foreground text-center py-6">Ничего не найдено</p>
+                    : filteredItems.map(item => {
+                      const cat = state.categories.find(c => c.id === item.categoryId);
+                      return (
+                        <button key={item.id} onClick={() => { setItemId(item.id); setError(''); }}
+                          className="w-full text-left flex items-center gap-3 px-3 py-2.5 hover:bg-muted border-b border-border/40 last:border-0 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-foreground truncate">{item.name}</div>
+                            {cat && <div className="text-xs" style={{ color: cat.color }}>{cat.name}</div>}
+                          </div>
+                          <div className="text-xs text-muted-foreground shrink-0">{item.quantity} {item.unit}</div>
+                        </button>
+                      );
+                    })}
+                </div>
+              </>
+            )}
+          </section>
+
+          {/* Step 2: реквизиты */}
+          <section>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Реквизиты</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Тип документа</Label>
+                <select value={docType} onChange={e => setDocType(e.target.value)}
+                  className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                  {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Номер документа</Label>
+                <Input value={docNumber} onChange={e => setDocNumber(e.target.value)}
+                  placeholder="№ накладной / акта..." className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Дата</Label>
+                <Input type="date" value={docDate} onChange={e => setDocDate(e.target.value)} className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Поставщик / Источник</Label>
+                <Input value={supplier} onChange={e => setSupplier(e.target.value)}
+                  placeholder="Компания..." className="h-9 text-sm" />
               </div>
             </div>
+            <div className="mt-3 space-y-1.5">
+              <Label className="text-xs">Примечание</Label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                placeholder="Дополнительная информация..."
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none placeholder:text-muted-foreground" />
+            </div>
+          </section>
+
+          {/* Доп. поля */}
+          {customFields.length > 0 && (
+            <div className="space-y-2">
+              {customFields.map((cf, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground w-28 shrink-0 truncate">{cf.key}:</span>
+                  <span className="flex-1">{cf.value}</span>
+                  <button onClick={() => setCustomFields(prev => prev.filter((_, i) => i !== idx))}
+                    className="text-muted-foreground hover:text-destructive"><Icon name="X" size={12} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Input value={cfKey} onChange={e => setCfKey(e.target.value)} placeholder="+ доп. поле"
+              className="h-8 text-xs w-32 shrink-0" onKeyDown={e => e.key === 'Enter' && addCf()} />
+            <Input value={cfVal} onChange={e => setCfVal(e.target.value)} placeholder="значение"
+              className="h-8 text-xs flex-1" onKeyDown={e => e.key === 'Enter' && addCf()} />
+            <button onClick={addCf}
+              className="w-8 h-8 rounded-lg border border-dashed border-border hover:border-primary flex items-center justify-center text-muted-foreground hover:text-primary">
+              <Icon name="Plus" size={13} />
+            </button>
           </div>
 
-          <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border">
-            <Button variant="outline" onClick={onClose}>Отмена</Button>
-            <Button onClick={handleSubmit}>
-              <Icon name="Plus" size={16} className="mr-1.5" />
-              Создать задачу
+          {/* Вложения */}
+          <section>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Вложения</h3>
+            <AttachmentZone attachments={attachments} onChange={setAttachments} />
+          </section>
+
+          <div className="flex gap-2 pt-2 border-t border-border">
+            <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
+            <Button onClick={handleCreate} className="flex-1 font-semibold">
+              <Icon name="FilePlus" size={14} className="mr-1.5" />Создать запись
             </Button>
           </div>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── DocCard ──────────────────────────────────────────────────────────────────
+
+function DocCard({ doc, state, onClick }: { doc: DocEntry; state: AppState; onClick: () => void }) {
+  const item = state.items.find(i => i.id === doc.itemId);
+  const cat  = item ? state.categories.find(c => c.id === item.categoryId) : null;
+  const attCount = doc.attachments.length;
+  const hasImages = doc.attachments.some(a => a.mimeType.startsWith('image/'));
+  const firstImage = doc.attachments.find(a => a.mimeType.startsWith('image/'));
+
+  return (
+    <button onClick={onClick}
+      className="w-full text-left bg-card border border-border rounded-2xl shadow-card hover:shadow-md hover:border-primary/30 transition-all group animate-fade-in overflow-hidden">
+      {/* Image strip */}
+      {hasImages && firstImage && (
+        <div className="w-full h-28 overflow-hidden bg-muted">
+          <img src={firstImage.dataUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        </div>
+      )}
+
+      <div className="p-4">
+        {/* Category + type */}
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          {cat && (
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: cat.color + '18', color: cat.color }}>
+              {cat.name}
+            </span>
+          )}
+          <span className="text-[11px] text-muted-foreground font-medium px-2 py-0.5 rounded-full bg-muted">
+            {doc.docType}
+          </span>
+        </div>
+
+        {/* Item name */}
+        <div className="font-bold text-sm text-foreground leading-snug mb-1 group-hover:text-primary transition-colors">
+          {item?.name || '—'}
+        </div>
+
+        {/* Doc number + date */}
+        {(doc.docNumber || doc.docDate) && (
+          <div className="text-xs text-muted-foreground mb-2">
+            {doc.docNumber && <span>№ {doc.docNumber}</span>}
+            {doc.docNumber && doc.docDate && <span> · </span>}
+            {doc.docDate && <span>{formatDate(doc.docDate)}</span>}
+          </div>
+        )}
+
+        {/* Supplier */}
+        {doc.supplier && (
+          <div className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+            <Icon name="Building2" size={11} />{doc.supplier}
+          </div>
+        )}
+
+        {/* Custom fields preview */}
+        {doc.customFields.length > 0 && (
+          <div className="space-y-0.5 mb-2">
+            {doc.customFields.slice(0, 2).map((cf, i) => (
+              <div key={i} className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <span className="font-medium text-foreground">{cf.key}:</span>
+                <span className="truncate">{cf.value}</span>
+              </div>
+            ))}
+            {doc.customFields.length > 2 && (
+              <div className="text-xs text-muted-foreground">+{doc.customFields.length - 2} поля</div>
+            )}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {attCount > 0 ? (
+              <span className="flex items-center gap-1 text-primary font-medium">
+                <Icon name="Paperclip" size={11} />{attCount} файл.
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <Icon name="Paperclip" size={11} />Нет файлов
+              </span>
+            )}
+            {doc.customFields.length > 0 && (
+              <span className="flex items-center gap-1">
+                <Icon name="Tag" size={11} />{doc.customFields.length} доп.
+              </span>
+            )}
+          </div>
+          <span className="text-[11px] text-muted-foreground">{formatDate(doc.createdAt)}</span>
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -829,412 +625,245 @@ type Props = {
   onStateChange: (s: AppState) => void;
 };
 
-const STATUS_TABS: { value: TaskStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'Все' },
-  { value: 'todo', label: 'К выполнению' },
-  { value: 'in_progress', label: 'В работе' },
-  { value: 'done', label: 'Готово' },
-  { value: 'overdue', label: 'Просрочено' },
-];
-
 export default function TechnicianPage({ state, onStateChange }: Props) {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
-  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [showNewModal, setShowNewModal] = useState(false);
+  const docs = state.techDocs || [];
 
-  const tasks = state.techTasks || [];
+  const [search,      setSearch]      = useState('');
+  const [typeFilter,  setTypeFilter]  = useState('all');
+  const [catFilter,   setCatFilter]   = useState('all');
+  const [itemFilter,  setItemFilter]  = useState('all');
+  const [selectedId,  setSelectedId]  = useState<string | null>(null);
+  const [showNew,     setShowNew]     = useState(false);
+  const [viewMode,    setViewMode]    = useState<'grid' | 'list'>('grid');
 
-  const categories = useMemo(() => {
-    const cats = new Set<string>();
-    tasks.forEach(t => cats.add(t.category));
-    return Array.from(cats).filter(Boolean).sort();
-  }, [tasks]);
+  const selectedDoc = docs.find(d => d.id === selectedId) || null;
+
+  const usedTypes = useMemo(() => [...new Set(docs.map(d => d.docType))].sort(), [docs]);
 
   const filtered = useMemo(() => {
-    let list = [...tasks];
+    let list = [...docs];
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter(t =>
-        t.title.toLowerCase().includes(q) ||
-        t.description?.toLowerCase().includes(q) ||
-        t.category.toLowerCase().includes(q) ||
-        t.assignee?.toLowerCase().includes(q)
-      );
+      list = list.filter(d => {
+        const item = state.items.find(i => i.id === d.itemId);
+        return (
+          item?.name.toLowerCase().includes(q) ||
+          d.docNumber?.toLowerCase().includes(q) ||
+          d.supplier?.toLowerCase().includes(q) ||
+          d.notes?.toLowerCase().includes(q) ||
+          d.docType.toLowerCase().includes(q) ||
+          d.customFields.some(cf => cf.key.toLowerCase().includes(q) || cf.value.toLowerCase().includes(q))
+        );
+      });
     }
-    if (statusFilter !== 'all') list = list.filter(t => t.status === statusFilter);
-    if (priorityFilter !== 'all') list = list.filter(t => t.priority === priorityFilter);
-    if (categoryFilter !== 'all') list = list.filter(t => t.category === categoryFilter);
-    list.sort((a, b) => {
-      const priorityOrder: Record<TaskPriority, number> = { critical: 0, high: 1, normal: 2, low: 3 };
-      return priorityOrder[a.priority] - priorityOrder[b.priority] || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (typeFilter !== 'all') list = list.filter(d => d.docType === typeFilter);
+    if (catFilter  !== 'all') list = list.filter(d => {
+      const item = state.items.find(i => i.id === d.itemId);
+      return item?.categoryId === catFilter;
     });
-    return list;
-  }, [tasks, search, statusFilter, priorityFilter, categoryFilter]);
+    if (itemFilter !== 'all') list = list.filter(d => d.itemId === itemFilter);
+    return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [docs, search, typeFilter, catFilter, itemFilter, state.items]);
 
-  const stats = useMemo(() => ({
-    total: tasks.length,
-    inProgress: tasks.filter(t => t.status === 'in_progress').length,
-    done: tasks.filter(t => t.status === 'done').length,
-    overdue: tasks.filter(t => t.status === 'overdue').length,
-  }), [tasks]);
+  const totalAttachments = docs.reduce((s, d) => s + d.attachments.length, 0);
+  const totalItems = new Set(docs.map(d => d.itemId)).size;
 
-  const overallProgress = useMemo(() => {
-    if (tasks.length === 0) return 0;
-    return Math.round(tasks.reduce((acc, t) => acc + t.progress, 0) / tasks.length);
-  }, [tasks]);
+  const saveDoc = (doc: DocEntry) => {
+    const next = {
+      ...state,
+      techDocs: docs.some(d => d.id === doc.id)
+        ? docs.map(d => d.id === doc.id ? doc : d)
+        : [...docs, doc],
+    };
+    onStateChange(next); saveState(next);
+  };
 
-  const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) || null : null;
+  const deleteDoc = (id: string) => {
+    const next = { ...state, techDocs: docs.filter(d => d.id !== id) };
+    onStateChange(next); saveState(next);
+  };
 
-  function updateTask(updated: TechTask) {
-    const newTasks = tasks.map(t => t.id === updated.id ? updated : t);
-    const newState = { ...state, techTasks: newTasks };
-    saveState(newState);
-    onStateChange(newState);
-  }
-
-  function deleteTask(id: string) {
-    const newTasks = tasks.filter(t => t.id !== id);
-    const newState = { ...state, techTasks: newTasks };
-    saveState(newState);
-    onStateChange(newState);
-    setSelectedTaskId(null);
-  }
-
-  function createTask(task: TechTask) {
-    const newState = { ...state, techTasks: [...tasks, task] };
-    saveState(newState);
-    onStateChange(newState);
-    setShowNewModal(false);
-  }
+  const activeFilters = [search, typeFilter !== 'all', catFilter !== 'all', itemFilter !== 'all'].filter(Boolean).length;
 
   return (
-    <div className="space-y-5 pb-20 md:pb-0 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-5 pb-24 md:pb-0">
+      {/* ─── Header ───────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Техник склада</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Управление задачами и обслуживанием</p>
+          <h1 className="text-2xl font-bold text-foreground">База документов</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Техническая документация и вложения по номенклатуре
+          </p>
         </div>
-        <Button onClick={() => setShowNewModal(true)} className="flex items-center gap-2">
-          <Icon name="Plus" size={16} />
-          Новая задача
+        <Button onClick={() => setShowNew(true)} className="font-semibold gap-2 shrink-0">
+          <Icon name="FilePlus" size={16} />
+          Добавить документ
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-card border border-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Всего</span>
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-              <Icon name="ClipboardList" size={16} className="text-muted-foreground" />
+      {/* ─── Stats row ────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Записей',    value: docs.length,       icon: 'FileText',  color: 'text-primary'     },
+          { label: 'Позиций',    value: totalItems,         icon: 'Package',   color: 'text-success'     },
+          { label: 'Файлов',     value: totalAttachments,   icon: 'Paperclip', color: 'text-warning'     },
+        ].map(s => (
+          <div key={s.label} className="bg-card border border-border rounded-2xl p-4 shadow-card flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0 ${s.color}`}>
+              <Icon name={s.icon} size={20} />
+            </div>
+            <div>
+              <div className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</div>
+              <div className="text-xs text-muted-foreground">{s.label}</div>
             </div>
           </div>
-          <p className="text-3xl font-bold text-foreground">{stats.total}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">задач</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">В работе</span>
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Icon name="Loader2" size={16} className="text-primary" />
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-primary">{stats.inProgress}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">активных</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Готово</span>
-            <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
-              <Icon name="CheckCircle2" size={16} className="text-success" />
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-success">{stats.done}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">выполнено</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Просрочено</span>
-            <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-              <Icon name="AlertCircle" size={16} className="text-destructive" />
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-destructive">{stats.overdue}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">нарушение сроков</p>
-        </div>
+        ))}
       </div>
 
-      {/* Overall progress */}
-      {tasks.length > 0 && (
-        <div className="bg-card border border-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-foreground">Общий прогресс выполнения</span>
-            <span className="text-sm font-bold text-primary">{overallProgress}%</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-500"
-              style={{ width: `${overallProgress}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1.5">
-            {stats.done} из {stats.total} задач завершено
-          </p>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="space-y-3">
-        {/* Search */}
-        <div className="relative">
-          <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск задач..."
-            className="pl-9"
-          />
+      {/* ─── Filters ──────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-44">
+          <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Поиск по товару, документу, поставщику..."
+            className="pl-9 h-9 text-sm" />
+          {search && (
+            <button onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <Icon name="X" size={13} />
+            </button>
+          )}
         </div>
 
-        {/* Status tabs */}
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
-          {STATUS_TABS.map(tab => (
-            <button
-              key={tab.value}
-              onClick={() => setStatusFilter(tab.value)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                statusFilter === tab.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
-              }`}
-            >
-              {tab.label}
-              {tab.value !== 'all' && (
-                <span className={`ml-1.5 text-xs rounded-full px-1.5 ${
-                  statusFilter === tab.value
-                    ? 'bg-primary-foreground/20 text-primary-foreground'
-                    : 'bg-background text-muted-foreground'
-                }`}>
-                  {tasks.filter(t => t.status === tab.value).length}
-                </span>
-              )}
+        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+          className="h-9 px-3 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="all">Все типы</option>
+          {usedTypes.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+
+        <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
+          className="h-9 px-3 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="all">Все категории</option>
+          {state.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+
+        <select value={itemFilter} onChange={e => setItemFilter(e.target.value)}
+          className="h-9 px-3 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring max-w-48">
+          <option value="all">Все позиции</option>
+          {state.items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+        </select>
+
+        {activeFilters > 0 && (
+          <button onClick={() => { setSearch(''); setTypeFilter('all'); setCatFilter('all'); setItemFilter('all'); }}
+            className="h-9 px-3 text-sm rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1.5 transition-colors">
+            <Icon name="X" size={13} />Сбросить
+          </button>
+        )}
+
+        {/* View toggle */}
+        <div className="flex p-0.5 bg-muted rounded-lg ml-auto">
+          {(['grid', 'list'] as const).map(v => (
+            <button key={v} onClick={() => setViewMode(v)}
+              className={`w-8 h-8 rounded-md flex items-center justify-center transition-all
+                ${viewMode === v ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+              <Icon name={v === 'grid' ? 'LayoutGrid' : 'List'} size={14} />
             </button>
           ))}
         </div>
-
-        {/* Priority & Category filters */}
-        <div className="flex gap-2 flex-wrap">
-          <select
-            value={priorityFilter}
-            onChange={e => setPriorityFilter(e.target.value as TaskPriority | 'all')}
-            className="h-8 text-sm rounded-md border border-input bg-background px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="all">Все приоритеты</option>
-            <option value="critical">Критический</option>
-            <option value="high">Высокий</option>
-            <option value="normal">Обычный</option>
-            <option value="low">Низкий</option>
-          </select>
-          {categories.length > 0 && (
-            <select
-              value={categoryFilter}
-              onChange={e => setCategoryFilter(e.target.value)}
-              className="h-8 text-sm rounded-md border border-input bg-background px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option value="all">Все категории</option>
-              {categories.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          )}
-          {(priorityFilter !== 'all' || categoryFilter !== 'all' || search.trim()) && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => { setPriorityFilter('all'); setCategoryFilter('all'); setSearch(''); }}
-              className="h-8 text-muted-foreground hover:text-foreground"
-            >
-              <Icon name="X" size={14} className="mr-1" />
-              Сбросить
-            </Button>
-          )}
-        </div>
       </div>
 
-      {/* Task list */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-            <Icon name="ClipboardList" size={28} className="text-muted-foreground" />
+      {/* ─── Empty state ──────────────────────────────────────────── */}
+      {docs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
+          <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center mb-5">
+            <Icon name="FolderOpen" size={36} className="text-muted-foreground" />
           </div>
-          <p className="text-foreground font-medium">
-            {tasks.length === 0 ? 'Задач пока нет' : 'Нет задач по выбранным фильтрам'}
+          <h3 className="text-lg font-bold mb-2">База документов пуста</h3>
+          <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+            Прикрепляйте накладные, акты, паспорта изделий, инструкции и фото к каждой позиции номенклатуры
           </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {tasks.length === 0
-              ? 'Создайте первую задачу нажав "+ Новая задача"'
-              : 'Попробуйте изменить фильтры или поисковый запрос'}
-          </p>
-          {tasks.length === 0 && (
-            <Button className="mt-4" onClick={() => setShowNewModal(true)}>
-              <Icon name="Plus" size={16} className="mr-1.5" />
-              Создать задачу
-            </Button>
-          )}
+          <Button onClick={() => setShowNew(true)} className="font-semibold gap-2">
+            <Icon name="FilePlus" size={16} />
+            Добавить первый документ
+          </Button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+          <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-3">
+            <Icon name="SearchX" size={24} className="text-muted-foreground" />
+          </div>
+          <p className="font-medium">Ничего не найдено</p>
+          <p className="text-sm text-muted-foreground mt-1">Попробуйте изменить фильтры</p>
+        </div>
+      ) : viewMode === 'grid' ? (
+        /* ─── Grid view ─────────────────────────────────────────── */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.map(doc => (
+            <DocCard key={doc.id} doc={doc} state={state} onClick={() => setSelectedId(doc.id)} />
+          ))}
         </div>
       ) : (
-        <div className="grid gap-3">
-          {filtered.map(task => {
-            const doneChecks = task.checklist.filter(c => c.done).length;
-            const totalChecks = task.checklist.length;
-            const checkProgress = totalChecks > 0 ? (doneChecks / totalChecks) * 100 : 0;
-            const locationName = task.locationId
-              ? state.locations.find(l => l.id === task.locationId)?.name
-              : null;
-
-            return (
-              <div
-                key={task.id}
-                onClick={() => setSelectedTaskId(task.id)}
-                className="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all cursor-pointer group overflow-hidden animate-fade-in"
-              >
-                <div className="flex">
-                  {/* Priority stripe */}
-                  <div className={`w-1 flex-shrink-0 ${getPriorityBorder(task.priority)}`} />
-
-                  <div className="flex-1 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
-                            {getStatusLabel(task.status)}
-                          </span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent text-accent-foreground">
-                            {task.category}
-                          </span>
-                          {task.priority === 'critical' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
-                              <Icon name="Zap" size={10} />
-                              Критично
-                            </span>
-                          )}
-                        </div>
-
-                        <h3 className="font-semibold text-foreground text-base leading-tight group-hover:text-primary transition-colors truncate">
-                          {task.title}
-                        </h3>
-
-                        {task.description && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{task.description}</p>
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-muted-foreground">
-                          {task.assignee && (
-                            <span className="flex items-center gap-1">
-                              <Icon name="User" size={12} />
-                              {task.assignee}
-                            </span>
-                          )}
-                          {task.dueDate && (
-                            <span className={`flex items-center gap-1 ${
-                              task.status !== 'done' && new Date(task.dueDate) < new Date()
-                                ? 'text-destructive font-medium'
-                                : ''
-                            }`}>
-                              <Icon name="Calendar" size={12} />
-                              {new Date(task.dueDate).toLocaleDateString('ru-RU')}
-                            </span>
-                          )}
-                          {locationName && (
-                            <span className="flex items-center gap-1">
-                              <Icon name="MapPin" size={12} />
-                              {locationName}
-                            </span>
-                          )}
-                          {task.attachments.length > 0 && (
-                            <span className="flex items-center gap-1">
-                              <Icon name="Paperclip" size={12} />
-                              {task.attachments.length}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                        <span className={`text-xs font-bold ${
-                          task.progress === 100
-                            ? 'text-success'
-                            : task.progress > 0
-                            ? 'text-primary'
-                            : 'text-muted-foreground'
-                        }`}>
-                          {task.progress}%
-                        </span>
-                        <Icon
-                          name="ChevronRight"
-                          size={16}
-                          className="text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Progress bar */}
-                    {(task.progress > 0 || totalChecks > 0) && (
-                      <div className="mt-3">
-                        {totalChecks > 0 ? (
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Icon name="CheckSquare" size={10} />
-                                {doneChecks}/{totalChecks} пунктов
-                              </span>
-                            </div>
-                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-success rounded-full transition-all"
-                                style={{ width: `${checkProgress}%` }}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full transition-all"
-                              style={{ width: `${task.progress}%` }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        /* ─── List view ─────────────────────────────────────────── */
+        <div className="bg-card border border-border rounded-2xl shadow-card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/40">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Позиция</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Тип</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Номер</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Дата</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Поставщик</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Файлы</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(doc => {
+                const item = state.items.find(i => i.id === doc.itemId);
+                const cat  = item ? state.categories.find(c => c.id === item.categoryId) : null;
+                return (
+                  <tr key={doc.id} onClick={() => setSelectedId(doc.id)}
+                    className="border-b border-border/50 hover:bg-muted/30 cursor-pointer transition-colors group animate-fade-in">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-foreground group-hover:text-primary transition-colors">{item?.name || '—'}</div>
+                      {cat && <div className="text-[11px] mt-0.5" style={{ color: cat.color }}>{cat.name}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{doc.docType}</span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{doc.docNumber || '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{doc.docDate ? formatDate(doc.docDate) : '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs truncate max-w-[140px]">{doc.supplier || '—'}</td>
+                    <td className="px-4 py-3 text-center">
+                      {doc.attachments.length > 0 ? (
+                        <span className="text-xs font-semibold text-primary">{doc.attachments.length}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Modals */}
-      {selectedTask && (
-        <TaskDetailModal
-          key={selectedTask.id}
-          task={selectedTask}
+      {/* ─── Modals ───────────────────────────────────────────────── */}
+      {selectedDoc && (
+        <DocDetailModal
+          key={selectedDoc.id}
+          doc={selectedDoc}
           state={state}
-          onClose={() => setSelectedTaskId(null)}
-          onUpdate={updateTask}
-          onDelete={deleteTask}
+          onSave={saveDoc}
+          onDelete={deleteDoc}
+          onClose={() => setSelectedId(null)}
         />
       )}
-
-      {showNewModal && (
-        <NewTaskModal
+      {showNew && (
+        <NewDocModal
           state={state}
-          onClose={() => setShowNewModal(false)}
-          onCreate={createTask}
+          onSave={saveDoc}
+          onClose={() => setShowNew(false)}
         />
       )}
     </div>
