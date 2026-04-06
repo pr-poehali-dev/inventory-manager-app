@@ -5,7 +5,7 @@ import Icon from '@/components/ui/icon';
 import { Item, AppState, Attachment, saveState, generateId } from '@/data/store';
 import OperationModal from './OperationModal';
 
-type Tab = 'info' | 'history' | 'attachments' | 'documents';
+type Tab = 'info' | 'history' | 'documents';
 
 type Props = {
   item: Item | null;
@@ -247,13 +247,12 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   };
 
   const itemDocs = (state.techDocs || []).filter(d => d.itemId === liveItem.id);
-  const itemDocsAttCount = itemDocs.reduce((s, d) => s + d.attachments.length, 0);
+  const totalFilesCount = attachments.length + itemDocs.reduce((s, d) => s + d.attachments.length, 0);
 
   const tabs: { id: Tab; label: string; icon: string; badge?: number }[] = [
-    { id: 'info',       label: 'Инфо',      icon: 'Info' },
-    { id: 'history',    label: 'История',    icon: 'History',   badge: itemOps.length || undefined },
-    { id: 'documents',  label: 'Документы',  icon: 'FileText',  badge: itemDocs.length || undefined },
-    { id: 'attachments',label: 'Файлы',      icon: 'Paperclip', badge: attachments.length || undefined },
+    { id: 'info',      label: 'Инфо',       icon: 'Info' },
+    { id: 'history',   label: 'История',     icon: 'History',  badge: itemOps.length || undefined },
+    { id: 'documents', label: 'Документы',   icon: 'Paperclip', badge: totalFilesCount || undefined },
   ];
 
   return (
@@ -406,55 +405,42 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
             )}
 
             {activeTab === 'documents' && (
-              <div className="space-y-3">
-                {itemDocs.length === 0 ? (
-                  <div className="text-center py-10 text-sm text-muted-foreground">
-                    <Icon name="FolderOpen" size={28} className="mx-auto mb-2 opacity-40" />
-                    <p className="font-medium text-foreground mb-1">Документов нет</p>
-                    <p>Добавьте накладные, акты и паспорта<br/>во вкладке «Техник»</p>
-                  </div>
-                ) : (
-                  <>
-                    {itemDocsAttCount > 0 && (
-                      <div className="text-xs text-muted-foreground px-0.5">
-                        {itemDocs.length} {itemDocs.length === 1 ? 'запись' : 'записей'} · {itemDocsAttCount} {itemDocsAttCount === 1 ? 'файл' : 'файлов'}
-                      </div>
-                    )}
+              <div className="space-y-4">
+                {/* ─── Прямые вложения товара ─── */}
+                <AttachmentsTab item={liveItem} state={state} onStateChange={onStateChange} />
+
+                {/* ─── Документы из базы техника ─── */}
+                {itemDocs.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-xs text-muted-foreground font-medium px-2 shrink-0">
+                        Из базы документов ({itemDocs.length})
+                      </span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
                     {itemDocs.map(doc => {
-                      const hasAtts = doc.attachments.length > 0;
                       const firstImg = doc.attachments.find(a => a.mimeType.startsWith('image/'));
                       return (
                         <div key={doc.id} className="border border-border rounded-xl overflow-hidden bg-card">
-                          {/* Doc header */}
                           <div className="flex items-start gap-3 p-3">
-                            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                               {firstImg
-                                ? <img src={firstImg.dataUrl} alt="" className="w-full h-full object-cover rounded-lg" />
-                                : <Icon name="FileText" size={16} className="text-muted-foreground" />
-                              }
+                                ? <img src={firstImg.dataUrl} alt="" className="w-full h-full object-cover" />
+                                : <Icon name="FileText" size={16} className="text-muted-foreground" />}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                                  {doc.docType}
-                                </span>
-                                {doc.docNumber && (
-                                  <span className="text-xs text-muted-foreground">№ {doc.docNumber}</span>
-                                )}
-                                {doc.docDate && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {new Date(doc.docDate).toLocaleDateString('ru-RU')}
-                                  </span>
-                                )}
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{doc.docType}</span>
+                                {doc.docNumber && <span className="text-xs text-muted-foreground">№ {doc.docNumber}</span>}
+                                {doc.docDate && <span className="text-xs text-muted-foreground">{new Date(doc.docDate).toLocaleDateString('ru-RU')}</span>}
                               </div>
                               {doc.supplier && (
                                 <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                                   <Icon name="Building2" size={10} />{doc.supplier}
                                 </div>
                               )}
-                              {doc.notes && (
-                                <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{doc.notes}</div>
-                              )}
+                              {doc.notes && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{doc.notes}</div>}
                               {doc.customFields.length > 0 && (
                                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
                                   {doc.customFields.map((cf, i) => (
@@ -466,30 +452,25 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                               )}
                             </div>
                           </div>
-                          {/* Attachments */}
-                          {hasAtts && (
+                          {doc.attachments.length > 0 && (
                             <div className="border-t border-border/50 px-3 py-2 space-y-1.5">
                               {doc.attachments.map(att => {
                                 const isImg = att.mimeType.startsWith('image/');
                                 const ext = att.name.split('.').pop()?.toLowerCase() || '';
-                                let iconName = 'File';
-                                let iconColor = 'text-muted-foreground';
-                                if (isImg)                                             { iconName = 'Image';    iconColor = 'text-blue-500'; }
-                                else if (att.mimeType.includes('pdf'))                 { iconName = 'FileText'; iconColor = 'text-red-500'; }
+                                let iconName = 'File'; let iconColor = 'text-muted-foreground';
+                                if (isImg) { iconName = 'Image'; iconColor = 'text-blue-500'; }
+                                else if (att.mimeType.includes('pdf')) { iconName = 'FileText'; iconColor = 'text-red-500'; }
                                 else if (att.mimeType.includes('word') || ext === 'docx' || ext === 'doc') { iconName = 'FileText'; iconColor = 'text-blue-600'; }
-                                else if (att.mimeType.includes('excel') || ext === 'xlsx' || ext === 'xls') { iconName = 'Table';    iconColor = 'text-green-600'; }
+                                else if (att.mimeType.includes('excel') || ext === 'xlsx' || ext === 'xls') { iconName = 'Table'; iconColor = 'text-green-600'; }
                                 return (
                                   <div key={att.id} className="flex items-center gap-2.5 group">
                                     <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden">
-                                      {isImg
-                                        ? <img src={att.dataUrl} alt="" className="w-full h-full object-cover" />
-                                        : <Icon name={iconName} size={14} className={iconColor} />
-                                      }
+                                      {isImg ? <img src={att.dataUrl} alt="" className="w-full h-full object-cover" /> : <Icon name={iconName} size={14} className={iconColor} />}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <div className="text-xs font-medium text-foreground truncate">{att.name}</div>
                                       <div className="text-[11px] text-muted-foreground">
-                                        {att.size < 1024 ? att.size + ' Б' : att.size < 1024 * 1024 ? (att.size / 1024).toFixed(0) + ' КБ' : (att.size / 1024 / 1024).toFixed(1) + ' МБ'}
+                                        {att.size < 1024 ? att.size + ' Б' : att.size < 1048576 ? (att.size / 1024).toFixed(0) + ' КБ' : (att.size / 1048576).toFixed(1) + ' МБ'}
                                       </div>
                                     </div>
                                     <a href={att.dataUrl} download={att.name}
@@ -504,13 +485,9 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                         </div>
                       );
                     })}
-                  </>
+                  </div>
                 )}
               </div>
-            )}
-
-            {activeTab === 'attachments' && (
-              <AttachmentsTab item={liveItem} state={state} onStateChange={onStateChange} />
             )}
           </div>
         </DialogContent>
