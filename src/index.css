@@ -152,3 +152,19 @@
     transform: translateY(0);
   }
 }
+
+@media print {
+  body > * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: fixed;
+    inset: 0;
+    padding: 20px;
+    background: white;
+  }
+}
