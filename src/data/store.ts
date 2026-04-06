@@ -259,22 +259,35 @@ export function loadState(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const p = JSON.parse(raw) as AppState;
-      if (!p.locationStocks) p.locationStocks = initialState.locationStocks;
-      if (!p.workOrders) p.workOrders = initialState.workOrders;
-      if (!p.partners) p.partners = initialState.partners;
-      if (p.orderCounter === undefined) p.orderCounter = initialState.orderCounter;
-      if (!p.receipts) p.receipts = [];
+      // Guard all arrays — in case of old schema or corrupted storage
+      if (!Array.isArray(p.items))          p.items = initialState.items;
+      if (!Array.isArray(p.categories))     p.categories = initialState.categories;
+      if (!Array.isArray(p.locations))      p.locations = initialState.locations;
+      if (!Array.isArray(p.operations))     p.operations = [];
+      if (!Array.isArray(p.locationStocks)) p.locationStocks = initialState.locationStocks;
+      if (!Array.isArray(p.workOrders))     p.workOrders = [];
+      if (!Array.isArray(p.partners))       p.partners = initialState.partners;
+      if (!Array.isArray(p.receipts))       p.receipts = [];
+      // Guard scalars
+      if (p.orderCounter === undefined)   p.orderCounter = initialState.orderCounter;
       if (p.receiptCounter === undefined) p.receiptCounter = 1;
+      if (!p.currentUser)                 p.currentUser = initialState.currentUser;
+      if (p.defaultLowStockThreshold === undefined) p.defaultLowStockThreshold = initialState.defaultLowStockThreshold;
+      if (typeof p.darkMode !== 'boolean') p.darkMode = false;
       return p;
     }
   } catch (e) {
-    console.warn('Failed to load state', e);
+    console.warn('Failed to load state, using defaults:', e);
   }
   return initialState;
 }
 
 export function saveState(state: AppState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.warn('Failed to save state (storage may be full):', e);
+  }
 }
 
 export function generateId(): string {

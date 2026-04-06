@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import Icon from '@/components/ui/icon';
-import { AppState } from '@/data/store';
+import { AppState, Receipt } from '@/data/store';
 
 type Props = {
   state: AppState;
@@ -13,21 +13,29 @@ export default function HistoryPage({ state }: Props) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [tab, setTab] = useState<'ops' | 'receipts'>('ops');
+
+  // Pre-build item map for O(1) lookup instead of nested finds
+  const itemMap = useMemo(() => new Map(state.items.map(i => [i.id, i])), [state.items]);
+  const categoryMap = useMemo(() => new Map(state.categories.map(c => [c.id, c])), [state.categories]);
 
   const enriched = useMemo(() => {
-    return state.operations
-      .map(op => ({
-        ...op,
-        item: state.items.find(i => i.id === op.itemId),
-        category: state.items.find(i => i.id === op.itemId)
-          ? state.categories.find(c => c.id === state.items.find(i => i.id === op.itemId)!.categoryId)
-          : undefined,
-      }))
+    return (state.operations || [])
+      .map(op => {
+        const item = itemMap.get(op.itemId);
+        const category = item ? categoryMap.get(item.categoryId) : undefined;
+        return { ...op, item, category };
+      })
       .filter(op => {
         if (typeFilter !== 'all' && op.type !== typeFilter) return false;
         if (search.trim()) {
           const q = search.toLowerCase();
-          if (!op.item?.name.toLowerCase().includes(q) && !op.comment?.toLowerCase().includes(q) && !op.from?.toLowerCase().includes(q) && !op.to?.toLowerCase().includes(q)) return false;
+          if (
+            !op.item?.name.toLowerCase().includes(q) &&
+            !op.comment?.toLowerCase().includes(q) &&
+            !op.from?.toLowerCase().includes(q) &&
+            !op.to?.toLowerCase().includes(q)
+          ) return false;
         }
         if (categoryFilter !== 'all' && op.item?.categoryId !== categoryFilter) return false;
         const opDate = new Date(op.date);
@@ -36,7 +44,12 @@ export default function HistoryPage({ state }: Props) {
         return true;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [state, search, typeFilter, dateFrom, dateTo, categoryFilter]);
+  }, [state.operations, itemMap, categoryMap, search, typeFilter, dateFrom, dateTo, categoryFilter]);
+
+  const receipts: Receipt[] = useMemo(() =>
+    [...(state.receipts || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [state.receipts]
+  );
 
   const totalIn = enriched.filter(o => o.type === 'in').reduce((s, o) => s + o.quantity, 0);
   const totalOut = enriched.filter(o => o.type === 'out').reduce((s, o) => s + o.quantity, 0);
@@ -51,16 +64,36 @@ export default function HistoryPage({ state }: Props) {
     <div className="space-y-5 pb-20 md:pb-0">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">История операций</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{state.operations.length} операций всего</p>
+          <h1 className="text-2xl font-bold text-foreground">История</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {(state.operations || []).length} операций · {(state.receipts || []).length} оприходований
+          </p>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+        <button onClick={() => setTab('ops')}
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all
+            ${tab === 'ops' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+          <Icon name="ClipboardList" size={14} />
+          Операции
+          <span className="ml-1 text-xs text-muted-foreground">({(state.operations || []).length})</span>
+        </button>
+        <button onClick={() => setTab('receipts')}
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all
+            ${tab === 'receipts' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+          <Icon name="PackagePlus" size={14} />
+          Оприходование
+          <span className="ml-1 text-xs text-muted-foreground">({(state.receipts || []).length})</span>
+        </button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-card rounded-xl border border-border p-4 shadow-card">
-          <div className="text-2xl font-bold text-foreground tabular-nums">{enriched.length}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Всего операций</div>
+          <div className="text-2xl font-bold text-foreground tabular-nums">{tab === 'ops' ? enriched.length : receipts.length}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{tab === 'ops' ? 'Всего операций' : 'Документов'}</div>
         </div>
         <div className="bg-card rounded-xl border border-border p-4 shadow-card">
           <div className="text-2xl font-bold text-success tabular-nums">+{totalIn}</div>
@@ -121,16 +154,85 @@ export default function HistoryPage({ state }: Props) {
         </div>
       </div>
 
-      {/* Table / list */}
-      {enriched.length === 0 ? (
+      {/* Receipts tab */}
+      {tab === 'receipts' && (
+        receipts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+              <Icon name="PackagePlus" size={28} className="text-muted-foreground" />
+            </div>
+            <h3 className="text-base font-semibold mb-1">Оприходований нет</h3>
+            <p className="text-sm text-muted-foreground">Создайте первое оприходование во вкладке «Оприходование»</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {receipts.map((r, idx) => {
+              const totalQty = r.lines.reduce((s, l) => s + l.qty, 0);
+              const totalAmt = r.totalAmount || r.lines.reduce((s, l) => s + (l.price || 0) * l.qty, 0);
+              const newCount = r.lines.filter(l => l.isNew).length;
+              return (
+                <div key={r.id} className="bg-card rounded-xl border border-border p-4 shadow-card animate-fade-in" style={{ animationDelay: `${idx * 20}ms` }}>
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-success/12 text-success flex items-center justify-center shrink-0">
+                      <Icon name="FileText" size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm">{r.number}</span>
+                        {newCount > 0 && (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/12 text-primary">+{newCount} новых</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                        <Icon name="Truck" size={10} />
+                        <span className="font-medium text-foreground">{r.supplierName || '—'}</span>
+                        <span>·</span>
+                        <span>{new Date(r.date).toLocaleDateString('ru-RU')}</span>
+                      </div>
+                      {r.customFields.length > 0 && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                          {r.customFields.slice(0, 3).map((f, i) => (
+                            <span key={i} className="text-[11px] text-muted-foreground">
+                              {f.key}: <b className="text-foreground">{f.value || '—'}</b>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                        <span>{r.lines.length} поз.</span>
+                        <span className="text-success font-medium">+{totalQty} ед.</span>
+                        {totalAmt > 0 && <span>{totalAmt.toLocaleString('ru-RU')} ₽</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* Table / list (ops tab) */}
+      {tab === 'ops' && enriched.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
           <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <Icon name="ClipboardList" size={28} className="text-muted-foreground" />
           </div>
-          <h3 className="text-base font-semibold mb-1">Операций не найдено</h3>
-          <p className="text-sm text-muted-foreground">Попробуйте изменить фильтры</p>
+          <h3 className="text-base font-semibold mb-1">
+            {(state.operations || []).length === 0 ? 'История пуста' : 'Операций не найдено'}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {(state.operations || []).length === 0
+              ? 'Операции появятся здесь после оприходования и выдачи товаров'
+              : 'Попробуйте изменить или сбросить фильтры'}
+          </p>
+          {activeFilters > 0 && (
+            <button onClick={resetFilters} className="mt-3 px-4 py-2 rounded-lg border border-border text-sm hover:bg-muted transition-colors">
+              Сбросить фильтры
+            </button>
+          )}
         </div>
-      ) : (
+      ) : tab === 'ops' && (
         <>
           {/* Desktop table */}
           <div className="hidden md:block bg-card rounded-xl border border-border shadow-card overflow-hidden">
@@ -218,3 +320,4 @@ export default function HistoryPage({ state }: Props) {
     </div>
   );
 }
+

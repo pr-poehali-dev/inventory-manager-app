@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import Icon from '@/components/ui/icon';
 import Autocomplete, { AutocompleteOption } from '@/components/Autocomplete';
 import {
-  AppState, saveState, generateId,
+  AppState, Item, saveState, generateId,
   WorkOrder, OrderItem, OrderStatus, Partner,
   getOrderStatusLabel, getOrderStatusColor,
   getLocationStock, updateLocationStock, Operation,
@@ -573,7 +573,7 @@ function QRScanModal({ order, state, onStateChange, onClose }: {
   onStateChange: (s: AppState) => void; onClose: () => void;
 }) {
   const [manualInput, setManualInput] = useState('');
-  const [foundItem, setFoundItem] = useState<{ item: import('@/data/store').Item; locationId?: string } | null>(null);
+  const [foundItem, setFoundItem] = useState<{ item: Item; locationId?: string } | null>(null);
   const [qty, setQty] = useState('1');
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [step, setStep] = useState<'scan' | 'confirm'>('scan');
@@ -651,7 +651,7 @@ function QRScanModal({ order, state, onStateChange, onClose }: {
   };
 
   // Auto-select location from QR if provided
-  const handleFoundItem = (item: import('@/data/store').Item, locId?: string) => {
+  const handleFoundItem = (item: Item, locId?: string) => {
     setFoundItem({ item, locationId: locId });
     if (locId) setSelectedLocationId(locId);
     else {
