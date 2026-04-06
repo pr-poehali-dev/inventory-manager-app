@@ -76,29 +76,51 @@ function AddItemToLocationModal({
   onClose: () => void;
 }) {
   const location = state.locations.find(l => l.id === locationId);
+  const warehouseId = location?.warehouseId;
+
   const [itemId, setItemId] = useState('');
   const [qty, setQty] = useState('1');
   const [search, setSearch] = useState('');
 
-  const filteredItems = state.items.filter(i =>
-    !search.trim() || i.name.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 20);
+  // Только товары с остатком на этом складе
+  const warehouseItems = useMemo(() => {
+    const whStocks = (state.warehouseStocks || []).filter(ws =>
+      ws.warehouseId === warehouseId && ws.quantity > 0
+    );
+    return whStocks
+      .map(ws => ({
+        ...ws,
+        item: state.items.find(i => i.id === ws.itemId),
+      }))
+      .filter(ws => ws.item)
+      .filter(ws => !search.trim() || ws.item!.name.toLowerCase().includes(search.toLowerCase()))
+      .slice(0, 30);
+  }, [state.warehouseStocks, state.items, warehouseId, search]);
 
   const selectedItem = itemId ? state.items.find(i => i.id === itemId) : null;
-  const currentStock = itemId ? (state.locationStocks || []).find(ls => ls.itemId === itemId && ls.locationId === locationId)?.quantity || 0 : 0;
+  // Остаток этого товара на складе (warehouseStock)
+  const whAvailable = itemId
+    ? (state.warehouseStocks || []).find(ws => ws.itemId === itemId && ws.warehouseId === warehouseId)?.quantity || 0
+    : 0;
+  // Уже лежит на этом стеллаже
+  const alreadyHere = itemId
+    ? (state.locationStocks || []).find(ls => ls.itemId === itemId && ls.locationId === locationId)?.quantity || 0
+    : 0;
+  // Свободно (не распределено по стеллажам этого склада)
+  const distributedOnShelf = itemId
+    ? (state.locationStocks || [])
+        .filter(ls => ls.itemId === itemId)
+        .reduce((s, ls) => s + ls.quantity, 0)
+    : 0;
+  const freeToPlace = Math.max(0, whAvailable - distributedOnShelf + alreadyHere);
+
+  const qtyNum = parseInt(qty) || 0;
+  const isInvalid = !itemId || qtyNum <= 0 || qtyNum > freeToPlace;
 
   const handleAdd = () => {
-    if (!itemId || (parseInt(qty) || 0) <= 0) return;
-    const amount = parseInt(qty);
-    let next = updateLocationStock(state, itemId, locationId, amount);
-    next = { ...next, items: next.items.map(i => i.id === itemId ? { ...i, quantity: i.quantity + amount } : i) };
-    const op: Operation = {
-      id: generateId(), itemId, type: 'in', quantity: amount,
-      comment: `Добавлено на ${location?.name || 'локацию'}`,
-      to: location?.name, performedBy: next.currentUser,
-      date: new Date().toISOString(), locationId,
-    };
-    next = { ...next, operations: [op, ...next.operations] };
+    if (isInvalid) return;
+    // Только перераспределяем locationStock — warehouseStock и item.quantity НЕ меняем
+    const next = updateLocationStock(state, itemId, locationId, qtyNum);
     onStateChange(next); saveState(next); onClose();
   };
 
@@ -107,71 +129,106 @@ function AddItemToLocationModal({
       <DialogContent className="max-w-sm animate-scale-in">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Icon name="PackagePlus" size={16} className="text-primary" />
-            Добавить товар на {location?.name}
+            <Icon name="MapPin" size={16} className="text-primary" />
+            Разместить товар: {location?.name}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 pt-2">
-          <div className="space-y-1.5">
-            <Label>Поиск товара</Label>
-            <Input
-              value={search}
-              onChange={e => { setSearch(e.target.value); setItemId(''); }}
-              placeholder="Начните вводить название..."
-              autoFocus
-            />
-          </div>
-          {search.trim() && (
-            <div className="border border-border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-              {filteredItems.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Товары не найдены</p>
-              ) : filteredItems.map(item => {
-                const cat = state.categories.find(c => c.id === item.categoryId);
-                const locStock = (state.locationStocks || []).find(ls => ls.itemId === item.id && ls.locationId === locationId)?.quantity || 0;
-                return (
-                  <button key={item.id} onClick={() => { setItemId(item.id); setSearch(item.name); }}
-                    className={`w-full text-left flex items-center justify-between px-3 py-2.5 text-sm transition-colors border-b border-border/50 last:border-0
-                      ${itemId === item.id ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'}`}>
-                    <div>
-                      <div className="font-medium">{item.name}</div>
-                      {cat && <div className="text-xs" style={{ color: cat.color }}>{cat.name}</div>}
-                    </div>
-                    <div className="text-right shrink-0 ml-2">
-                      <div className="text-xs text-muted-foreground">Склад: {item.quantity} {item.unit}</div>
-                      {locStock > 0 && <div className="text-xs text-primary">Здесь: {locStock}</div>}
-                    </div>
-                  </button>
-                );
-              })}
+          {!warehouseId ? (
+            <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning flex items-center gap-2">
+              <Icon name="AlertTriangle" size={14} />
+              Стеллаж не привязан к складу. Отредактируйте локацию.
             </div>
-          )}
-          {selectedItem && (
-            <div className="p-3 bg-muted/50 rounded-lg text-sm">
-              <div className="font-medium">{selectedItem.name}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                На складе: {selectedItem.quantity} {selectedItem.unit}
-                {currentStock > 0 && ` · Уже здесь: ${currentStock}`}
+          ) : warehouseItems.length === 0 && !search.trim() ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              <Icon name="Package" size={24} className="mx-auto mb-2 opacity-40" />
+              На этом складе нет товаров для размещения
+            </div>
+          ) : (<>
+            <div className="space-y-1.5">
+              <Label>Товар со склада</Label>
+              <Input
+                value={search}
+                onChange={e => { setSearch(e.target.value); setItemId(''); }}
+                placeholder="Начните вводить название..."
+                autoFocus
+              />
+            </div>
+
+            {(search.trim() || warehouseItems.length > 0) && (
+              <div className="border border-border rounded-xl overflow-hidden max-h-52 overflow-y-auto">
+                {warehouseItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Не найдено</p>
+                ) : warehouseItems.map(ws => {
+                  const cat = state.categories.find(c => c.id === ws.item!.categoryId);
+                  const onShelf = (state.locationStocks || []).find(ls => ls.itemId === ws.itemId && ls.locationId === locationId)?.quantity || 0;
+                  const distributed = (state.locationStocks || []).filter(ls => ls.itemId === ws.itemId).reduce((s, ls) => s + ls.quantity, 0);
+                  const free = Math.max(0, ws.quantity - distributed + onShelf);
+                  return (
+                    <button key={ws.itemId}
+                      onClick={() => { setItemId(ws.itemId); setSearch(ws.item!.name); setQty('1'); }}
+                      disabled={free <= 0}
+                      className={`w-full text-left flex items-center justify-between px-3 py-2.5 text-sm transition-colors border-b border-border/50 last:border-0
+                        ${itemId === ws.itemId ? 'bg-accent' : free <= 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-muted'}`}>
+                      <div>
+                        <div className="font-medium">{ws.item!.name}</div>
+                        {cat && <div className="text-xs" style={{ color: cat.color }}>{cat.name}</div>}
+                      </div>
+                      <div className="text-right shrink-0 ml-2">
+                        <div className={`text-xs font-semibold ${free <= 0 ? 'text-destructive' : 'text-foreground'}`}>
+                          {free > 0 ? `свободно: ${free}` : 'всё размещено'}
+                        </div>
+                        {onShelf > 0 && <div className="text-xs text-primary">здесь: {onShelf}</div>}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-          )}
-          <div className="space-y-1.5">
-            <Label>Количество</Label>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setQty(String(Math.max(1, (parseInt(qty)||0) - 1)))}
-                className="w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center">
-                <Icon name="Minus" size={13} />
-              </button>
-              <Input type="number" min="1" value={qty} onChange={e => setQty(e.target.value)} className="text-center font-bold" />
-              <button type="button" onClick={() => setQty(String((parseInt(qty)||0) + 1))}
-                className="w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center">
-                <Icon name="Plus" size={13} />
-              </button>
-            </div>
-          </div>
+            )}
+
+            {selectedItem && (
+              <div className="p-3 bg-muted/50 rounded-xl text-sm space-y-1">
+                <div className="font-semibold">{selectedItem.name}</div>
+                <div className="flex gap-3 text-xs text-muted-foreground">
+                  <span>На складе: <b className="text-foreground">{whAvailable} {selectedItem.unit}</b></span>
+                  <span>Свободно для размещения: <b className={freeToPlace <= 0 ? 'text-destructive' : 'text-success'}>{freeToPlace}</b></span>
+                </div>
+                {alreadyHere > 0 && <div className="text-xs text-primary">Уже на этом стеллаже: {alreadyHere} {selectedItem.unit}</div>}
+              </div>
+            )}
+
+            {itemId && (
+              <div className="space-y-1.5">
+                <Label>Количество (из {freeToPlace} {selectedItem?.unit} свободных)</Label>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setQty(String(Math.max(1, qtyNum - 1)))}
+                    className="w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center">
+                    <Icon name="Minus" size={13} />
+                  </button>
+                  <Input type="number" min="1" max={freeToPlace} value={qty}
+                    onChange={e => setQty(e.target.value)} className="text-center font-bold" />
+                  <button type="button" onClick={() => setQty(String(Math.min(freeToPlace, qtyNum + 1)))}
+                    className="w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted flex items-center justify-center">
+                    <Icon name="Plus" size={13} />
+                  </button>
+                </div>
+                <button onClick={() => setQty(String(freeToPlace))} className="text-xs text-primary hover:underline">
+                  Всё ({freeToPlace} {selectedItem?.unit})
+                </button>
+                {qtyNum > freeToPlace && (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <Icon name="AlertCircle" size={11} />Превышает доступное количество
+                  </p>
+                )}
+              </div>
+            )}
+          </>)}
+
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
-            <Button onClick={handleAdd} disabled={!itemId || (parseInt(qty)||0) <= 0} className="flex-1 bg-success hover:bg-success/90 text-success-foreground font-semibold">
-              <Icon name="PackagePlus" size={14} className="mr-1.5" />Добавить
+            <Button onClick={handleAdd} disabled={isInvalid || !warehouseId}
+              className="flex-1 bg-success hover:bg-success/90 text-success-foreground font-semibold">
+              <Icon name="MapPin" size={14} className="mr-1.5" />Разместить
             </Button>
           </div>
         </div>
