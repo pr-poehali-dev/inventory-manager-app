@@ -182,25 +182,27 @@ function AddItemToLocationModal({
 
 // ─── Add Location Modal ───────────────────────────────────────────────────────
 function AddLocationModal({
-  state, onStateChange, onClose, editLocation,
+  state, onStateChange, onClose, editLocation, activeWarehouseId,
 }: {
   state: AppState;
   onStateChange: (s: AppState) => void;
   onClose: () => void;
   editLocation?: Location;
+  activeWarehouseId?: string;
 }) {
   const [name, setName] = useState(editLocation?.name || '');
   const [description, setDescription] = useState(editLocation?.description || '');
   const [parentId, setParentId] = useState(editLocation?.parentId || '');
+  const [warehouseId, setWarehouseId] = useState(editLocation?.warehouseId || activeWarehouseId || (state.warehouses?.[0]?.id || ''));
 
   const handleSave = () => {
     if (!name.trim()) return;
-    if (editLocation) {
+    if (editLocation && editLocation.id) {
       const next = {
         ...state,
         locations: state.locations.map(l =>
           l.id === editLocation.id
-            ? { ...l, name: name.trim(), description: description.trim() || undefined, parentId: parentId || undefined }
+            ? { ...l, name: name.trim(), description: description.trim() || undefined, parentId: parentId || undefined, warehouseId: warehouseId || undefined }
             : l
         ),
       };
@@ -211,6 +213,7 @@ function AddLocationModal({
         name: name.trim(),
         description: description.trim() || undefined,
         parentId: parentId || undefined,
+        warehouseId: warehouseId || undefined,
       };
       const next = { ...state, locations: [...state.locations, newLoc] };
       onStateChange(next); saveState(next);
@@ -218,7 +221,7 @@ function AddLocationModal({
     onClose();
   };
 
-  const topLevel = state.locations.filter(l => !l.parentId);
+  const topLevel = state.locations.filter(l => !l.parentId && (!l.warehouseId || l.warehouseId === warehouseId));
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -235,6 +238,16 @@ function AddLocationModal({
             <Label>Описание</Label>
             <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Ряд 1, левая сторона..." />
           </div>
+          {/* Warehouse selector */}
+          {(state.warehouses || []).length > 1 && (
+            <div className="space-y-1.5">
+              <Label>Склад *</Label>
+              <select value={warehouseId} onChange={e => { setWarehouseId(e.target.value); setParentId(''); }}
+                className="w-full h-9 px-3 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                {(state.warehouses || []).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>Родительская локация</Label>
             <select value={parentId} onChange={e => setParentId(e.target.value)}
@@ -832,13 +845,25 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
   const selectedLocation = selectedLocationId ? state.locations.find(l => l.id === selectedLocationId) : null;
   const selectedItem = selectedItemId ? state.items.find(i => i.id === selectedItemId) || null : null;
 
-  // Stats
-  const totalLocations = state.locations.length;
-  const occupiedLocations = state.locations.filter(loc =>
+  // Stats — for active warehouse only
+  const whLocations = state.locations.filter(l => !l.warehouseId || l.warehouseId === activeWarehouseId);
+  const totalLocations = whLocations.length;
+  const occupiedLocations = whLocations.filter(loc =>
     (state.locationStocks || []).some(ls => ls.locationId === loc.id && ls.quantity > 0)
   ).length;
-  const lowItems = state.items.filter(i => i.quantity > 0 && i.quantity <= i.lowStockThreshold).length;
-  const criticalItems = state.items.filter(i => i.quantity === 0).length;
+  // Items with stock in this warehouse
+  const whItemIds = new Set(
+    (state.warehouseStocks || []).filter(ws => ws.warehouseId === activeWarehouseId && ws.quantity > 0).map(ws => ws.itemId)
+  );
+  const whItems = state.items.filter(i => whItemIds.has(i.id));
+  const lowItems = whItems.filter(i => {
+    const qty = (state.warehouseStocks || []).find(ws => ws.warehouseId === activeWarehouseId && ws.itemId === i.id)?.quantity ?? i.quantity;
+    return qty > 0 && qty <= i.lowStockThreshold;
+  }).length;
+  const criticalItems = whItems.filter(i => {
+    const qty = (state.warehouseStocks || []).find(ws => ws.warehouseId === activeWarehouseId && ws.itemId === i.id)?.quantity ?? i.quantity;
+    return qty === 0;
+  }).length;
 
   // Color map for locations
   const locationColors = useMemo(() => {
@@ -912,8 +937,8 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
     saveLayout(newLayout);
   };
 
-  // Top-level locations (shelving units/zones)
-  const topLocations = state.locations.filter(l => !l.parentId);
+  // Top-level locations — only for active warehouse
+  const topLocations = state.locations.filter(l => !l.parentId && (!l.warehouseId || l.warehouseId === activeWarehouseId));
   const childLocations = (parentId: string) => state.locations.filter(l => l.parentId === parentId);
 
   return (
@@ -923,7 +948,7 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
         <div>
           <h1 className="text-2xl font-bold text-foreground">Карта складов</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {warehouses.length} склада · {totalLocations} локаций · {occupiedLocations} занято
+            {warehouses.length} склад{warehouses.length !== 1 ? 'а' : ''} · {totalLocations} локаций на этом складе
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -1093,7 +1118,7 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
                       {/* Add child location button */}
                       <button
                         onClick={() => {
-                          setEditLocation({ id: '', name: '', parentId: topLoc.id });
+                          setEditLocation({ id: '', name: '', parentId: topLoc.id, warehouseId: activeWarehouseId });
                           setShowAddLocation(true);
                         }}
                         className="rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/30 transition-all flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground hover:text-foreground"
@@ -1211,6 +1236,7 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
           onStateChange={onStateChange}
           onClose={() => { setShowAddLocation(false); setEditLocation(undefined); }}
           editLocation={editLocation?.id ? editLocation : undefined}
+          activeWarehouseId={activeWarehouseId}
         />
       )}
 

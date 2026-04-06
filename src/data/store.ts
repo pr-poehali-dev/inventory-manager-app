@@ -12,6 +12,7 @@ export type Location = {
   name: string;
   parentId?: string;
   description?: string;
+  warehouseId?: string;   // к какому складу принадлежит стеллаж/полка
 };
 
 export type Attachment = {
@@ -248,12 +249,12 @@ const initialState: AppState = {
     { id: 'cat-5', name: 'Упаковка', color: '#8b5cf6' },
   ],
   locations: [
-    { id: 'loc-1', name: 'Стеллаж А', description: 'Главный склад, ряд A' },
-    { id: 'loc-2', name: 'Стеллаж Б', description: 'Главный склад, ряд Б' },
-    { id: 'loc-3', name: 'Стеллаж В', description: 'Дополнительный склад' },
-    { id: 'loc-4', name: 'Полка А-1', parentId: 'loc-1', description: 'Стеллаж А, полка 1' },
-    { id: 'loc-5', name: 'Полка А-2', parentId: 'loc-1', description: 'Стеллаж А, полка 2' },
-    { id: 'loc-6', name: 'Полка Б-1', parentId: 'loc-2', description: 'Стеллаж Б, полка 1' },
+    { id: 'loc-1', name: 'Стеллаж А', description: 'Главный склад, ряд A', warehouseId: 'wh-1' },
+    { id: 'loc-2', name: 'Стеллаж Б', description: 'Главный склад, ряд Б', warehouseId: 'wh-1' },
+    { id: 'loc-3', name: 'Стеллаж В', description: 'Дополнительный склад', warehouseId: 'wh-2' },
+    { id: 'loc-4', name: 'Полка А-1', parentId: 'loc-1', description: 'Стеллаж А, полка 1', warehouseId: 'wh-1' },
+    { id: 'loc-5', name: 'Полка А-2', parentId: 'loc-1', description: 'Стеллаж А, полка 2', warehouseId: 'wh-1' },
+    { id: 'loc-6', name: 'Полка Б-1', parentId: 'loc-2', description: 'Стеллаж Б, полка 1', warehouseId: 'wh-1' },
   ],
   items: [
     { id: 'item-1', name: 'Ноутбук Lenovo ThinkPad', categoryId: 'cat-1', locationId: 'loc-4', description: 'Рабочие ноутбуки для офиса', unit: 'шт', quantity: 12, lowStockThreshold: 3, imageUrl: '', createdAt: '2024-01-10' },
@@ -360,6 +361,11 @@ export function loadState(): AppState {
       if (!Array.isArray(p.warehouses))      p.warehouses = initialState.warehouses;
       if (!Array.isArray(p.warehouseStocks)) p.warehouseStocks = initialState.warehouseStocks;
       if (!Array.isArray(p.barcodes))        p.barcodes = [];
+      // Migrate: assign warehouseId to existing locations that don't have it
+      if (Array.isArray(p.locations) && Array.isArray(p.warehouses) && p.warehouses.length > 0) {
+        const defaultWhId = p.warehouses[0].id;
+        p.locations = p.locations.map(l => l.warehouseId ? l : { ...l, warehouseId: defaultWhId });
+      }
       return p;
     }
   } catch (e) {

@@ -58,11 +58,15 @@ export default function SettingsPage({ state, onStateChange }: Props) {
 
   const addLocation = () => {
     if (!newLocName.trim()) return;
+    // Find parent's warehouseId if parentId is set, else use first warehouse
+    const parentLoc = newLocParent ? state.locations.find(l => l.id === newLocParent) : null;
+    const defaultWhId = (state.warehouses || [])[0]?.id;
     const loc: Location = {
       id: generateId(),
       name: newLocName.trim(),
       description: newLocDesc || undefined,
       parentId: newLocParent || undefined,
+      warehouseId: parentLoc?.warehouseId || defaultWhId,
     };
     const next = { ...state, locations: [...state.locations, loc] };
     onStateChange(next);
