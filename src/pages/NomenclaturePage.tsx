@@ -290,12 +290,16 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th className="text-left px-4 py-3 w-8 text-xs text-muted-foreground/50">#</th>
-                  {([['name','Наименование'],['category','Категория'],['location','Локация'],['quantity','Остаток']] as [SortField,string][]).map(([f,l]) => (
+                  {([['name','Наименование'],['category','Категория'],['location','Локация']] as [SortField,string][]).map(([f,l]) => (
                     <th key={f} onClick={() => handleSort(f)}
-                      className={`px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:text-foreground select-none ${f === 'quantity' ? 'text-right' : 'text-left'}`}>
-                      <span className={`flex items-center ${f === 'quantity' ? 'justify-end' : ''}`}>{l}<SortIcon field={f} /></span>
+                      className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:text-foreground select-none text-left">
+                      <span className="flex items-center">{l}<SortIcon field={f} /></span>
                     </th>
                   ))}
+                  <th onClick={() => handleSort('quantity')}
+                    className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:text-foreground select-none text-right">
+                    <span className="flex items-center justify-end">Остаток<SortIcon field="quantity" /></span>
+                  </th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Порог</th>
                   <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Статус</th>
                   <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -333,22 +337,28 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                       <td className="px-4 py-3">
                         <div className="text-sm text-muted-foreground">{loc?.name || '—'}</div>
                       </td>
-                      {/* Остаток итого + разбивка по складам */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="text-right">
+                      {/* Остаток: склады столбиком + итог */}
+                      <td className="px-4 py-3 text-right">
+                        {whStocks.length > 0 ? (
+                          <div className="inline-flex flex-col items-end gap-0.5">
+                            {whStocks.map(ws => (
+                              <div key={ws.warehouseId} className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+                                <span className="truncate max-w-[90px]">{ws.wh!.name}</span>
+                                <span className="font-semibold text-foreground tabular-nums w-8 text-right">{ws.quantity}</span>
+                              </div>
+                            ))}
+                            <div className="flex items-center justify-end gap-1.5 pt-0.5 mt-0.5 border-t border-border w-full">
+                              <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Итого</span>
+                              <span className={`font-bold tabular-nums text-sm w-8 text-right ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
+                                {item.quantity}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{item.unit}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
                             <span className={`font-bold tabular-nums text-base ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>{item.quantity}</span>
                             <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
-                          </div>
-                        </div>
-                        {whStocks.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1 justify-end">
-                            {whStocks.map(ws => (
-                              <span key={ws.warehouseId}
-                                className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/8 border border-primary/20 text-primary font-medium whitespace-nowrap">
-                                {ws.wh!.name}: {ws.quantity}
-                              </span>
-                            ))}
                           </div>
                         )}
                       </td>
@@ -406,19 +416,29 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                         {attCount > 0 && <span className="text-xs text-primary flex items-center gap-0.5"><Icon name="Paperclip" size={10} />{attCount} файл.</span>}
                       </div>
                       {whStocks.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
+                        <div className="mt-1.5 space-y-0.5">
                           {whStocks.map(ws => (
-                            <span key={ws.warehouseId}
-                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/8 border border-primary/20 text-primary font-medium">
-                              {ws.wh!.name}: {ws.quantity} {item.unit}
-                            </span>
+                            <div key={ws.warehouseId} className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Icon name="Warehouse" size={10} />{ws.wh!.name}
+                              </span>
+                              <span className="font-semibold text-foreground tabular-nums">{ws.quantity} {item.unit}</span>
+                            </div>
                           ))}
+                          <div className="flex items-center justify-between text-xs pt-0.5 mt-0.5 border-t border-border">
+                            <span className="text-muted-foreground uppercase tracking-wide" style={{ fontSize: '10px' }}>Итого</span>
+                            <span className={`font-bold tabular-nums ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
+                              {item.quantity} {item.unit}
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
-                    <div className={`text-lg font-bold tabular-nums shrink-0 ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
-                      {item.quantity} <span className="text-xs font-normal text-muted-foreground">{item.unit}</span>
-                    </div>
+                    {whStocks.length === 0 && (
+                      <div className={`text-lg font-bold tabular-nums shrink-0 ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
+                        {item.quantity} <span className="text-xs font-normal text-muted-foreground">{item.unit}</span>
+                      </div>
+                    )}
                   </div>
                 </button>
               );
