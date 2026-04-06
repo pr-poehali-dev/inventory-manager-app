@@ -162,7 +162,48 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
       )}
 
       {/* Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 pb-24 xl:pb-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 pb-24 xl:pb-6 relative">
+        {/* Floating boxes — catalog only */}
+        {activePage === 'catalog' && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+            {([
+              { s: 56, x: 4,  y: 4,  d: 0,   dr: 7.0, r: 18  },
+              { s: 32, x: 80, y: 3,  d: 1.2, dr: 5.8, r: -22 },
+              { s: 68, x: 88, y: 45, d: 0.5, dr: 8.2, r: 32  },
+              { s: 24, x: 50, y: 72, d: 2.1, dr: 5.0, r: -12 },
+              { s: 42, x: 14, y: 58, d: 0.9, dr: 7.4, r: 25  },
+              { s: 28, x: 66, y: 14, d: 1.7, dr: 6.1, r: -38 },
+              { s: 76, x: 36, y: 30, d: 0.3, dr: 9.0, r: 10  },
+              { s: 22, x: 92, y: 22, d: 2.6, dr: 5.3, r: 48  },
+              { s: 36, x: 24, y: 82, d: 1.4, dr: 7.6, r: -20 },
+              { s: 20, x: 74, y: 80, d: 0.7, dr: 4.7, r: 30  },
+              { s: 46, x: 54, y: 42, d: 1.9, dr: 6.5, r: -5  },
+              { s: 30, x: 2,  y: 42, d: 0.1, dr: 8.8, r: 42  },
+            ] as {s:number;x:number;y:number;d:number;dr:number;r:number}[]).map((b, i) => (
+              <div key={i} style={{
+                position: 'absolute',
+                left: `${b.x}%`, top: `${b.y}%`,
+                width: b.s, height: b.s,
+                animation: `catalogFloat ${b.dr}s ease-in-out ${b.d}s infinite`,
+                rotate: `${b.r}deg`,
+              }}>
+                <svg viewBox="0 0 40 40" fill="none" width={b.s} height={b.s} style={{ opacity: 0.18 }}>
+                  <rect x="8" y="18" width="24" height="18" rx="2" fill="#6366f1"/>
+                  <path d="M8 18 L20 10 L32 18 L20 26 Z" fill="#818cf8"/>
+                  <path d="M32 18 L32 36 L20 32 L20 26 Z" fill="#4338ca"/>
+                  <line x1="8"  y1="27" x2="32" y2="27" stroke="white" strokeWidth="1.5" strokeOpacity="0.45"/>
+                  <line x1="20" y1="18" x2="20" y2="36" stroke="white" strokeWidth="1.5" strokeOpacity="0.45"/>
+                </svg>
+              </div>
+            ))}
+            <style>{`
+              @keyframes catalogFloat {
+                0%,100% { translate: 0 0px;   }
+                50%     { translate: 0 -18px; }
+              }
+            `}</style>
+          </div>
+        )}
         {children}
       </main>
 
