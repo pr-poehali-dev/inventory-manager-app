@@ -118,6 +118,12 @@ export function ReceiptConfirmPage({
     lastCodeRef.current = code;
     lastCodeTimeRef.current = now;
 
+    const alreadyScanned = (liveReceipt.scanHistory || []).some(e => e.code === code);
+    if (alreadyScanned) {
+      showNotif('error', `Код «${code.slice(0, 20)}» уже был отсканирован`);
+      return;
+    }
+
     const result = findLineByCode(liveReceipt, code, state);
 
     if (!result.ok) {
@@ -172,6 +178,12 @@ export function ReceiptConfirmPage({
     if (code === lineLastCodeRef.current && now - lineLastCodeTimeRef.current < 2000) return;
     lineLastCodeRef.current = code;
     lineLastCodeTimeRef.current = now;
+
+    const alreadyScanned = (liveReceipt.scanHistory || []).some(e => e.code === code);
+    if (alreadyScanned) {
+      showNotif('error', `Код «${code.slice(0, 20)}» уже был отсканирован`);
+      return;
+    }
 
     const targetLine = liveReceipt.lines.find(l => l.id === lineId);
     if (!targetLine) return;
