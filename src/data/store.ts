@@ -136,15 +136,32 @@ export type WorkOrder = {
 
 // ─── Receipts (Оприходование) ─────────────────────────────────────────────────
 
+export type ReceiptStatus =
+  | 'draft'            // Черновик
+  | 'pending'          // Заявка на сборку (этап 1 завершён, ждёт подтверждения)
+  | 'confirming'       // В процессе подтверждения (этап 2 начат)
+  | 'posted';          // Оприходовано (товары на складе)
+
 export type ReceiptLine = {
   id: string;
-  itemId: string;          // existing or newly created
-  itemName: string;        // display name (for new items before creation)
-  qty: number;
+  itemId: string;
+  itemName: string;
+  qty: number;             // плановое кол-во (из заявки)
+  confirmedQty: number;    // фактически принятое кол-во (после сканирования)
   locationId: string;
   price?: number;
   unit: string;
-  isNew?: boolean;         // true = item was created during this receipt
+  isNew?: boolean;
+};
+
+export type ScanEvent = {
+  id: string;
+  code: string;
+  itemId: string;
+  lineId: string;
+  scannedAt: string;
+  scannedBy: string;
+  method: 'camera' | 'manual';
 };
 
 export type ReceiptCustomField = {
@@ -154,15 +171,19 @@ export type ReceiptCustomField = {
 
 export type Receipt = {
   id: string;
-  number: string;           // document number / номер документа
+  number: string;
+  status: ReceiptStatus;
   supplierId?: string;
   supplierName: string;
+  warehouseId?: string;
   date: string;
   createdBy: string;
   lines: ReceiptLine[];
-  customFields: ReceiptCustomField[];  // дополнительные поля документа
+  customFields: ReceiptCustomField[];
   comment?: string;
   totalAmount?: number;
+  scanHistory: ScanEvent[];   // история сканирований
+  postedAt?: string;          // дата проведения
 };
 
 // ─── Technician Documents (база данных документов и вложений) ─────────────────
@@ -365,6 +386,18 @@ export function loadState(): AppState {
       if (Array.isArray(p.locations) && Array.isArray(p.warehouses) && p.warehouses.length > 0) {
         const defaultWhId = p.warehouses[0].id;
         p.locations = p.locations.map(l => l.warehouseId ? l : { ...l, warehouseId: defaultWhId });
+      }
+      // Migrate receipts: add status, scanHistory, confirmedQty if missing
+      if (Array.isArray(p.receipts)) {
+        p.receipts = p.receipts.map(r => ({
+          ...r,
+          status: r.status || 'posted',
+          scanHistory: r.scanHistory || [],
+          lines: (r.lines || []).map((l: ReceiptLine) => ({
+            ...l,
+            confirmedQty: l.confirmedQty !== undefined ? l.confirmedQty : l.qty,
+          })),
+        }));
       }
       return p;
     }
