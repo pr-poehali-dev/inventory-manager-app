@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "GET state (empty or existing)",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST state",
+      "method": "POST",
+      "path": "/",
+      "body": { "data": { "test": true } },
+      "expectedStatus": 200,
+      "expectedBody": { "ok": true },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

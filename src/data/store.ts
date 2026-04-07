@@ -355,52 +355,79 @@ const initialState: AppState = {
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'stockbase_v3';
+const STATE_API = 'https://functions.poehali.dev/dee3fe46-2ea8-40b0-81ea-2fe56b57a873';
+
+/** Загрузить состояние с сервера. Возвращает null если сервер вернул пустое. */
+export async function loadStateFromServer(): Promise<{ state: AppState; updatedAt: string } | null> {
+  try {
+    const res = await fetch(STATE_API);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json.data) return null;
+    return { state: guardState(json.data), updatedAt: json.updatedAt };
+  } catch {
+    return null;
+  }
+}
+
+/** Сохранить состояние на сервер (fire-and-forget). Возвращает новый updatedAt. */
+export async function saveStateToServer(state: AppState): Promise<string | null> {
+  try {
+    const res = await fetch(STATE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: state }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.updatedAt ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Применить guard-проверки к загруженному состоянию. */
+function guardState(p: AppState): AppState {
+  if (!Array.isArray(p.items))          p.items = initialState.items;
+  if (!Array.isArray(p.categories))     p.categories = initialState.categories;
+  if (!Array.isArray(p.locations))      p.locations = initialState.locations;
+  if (!Array.isArray(p.operations))     p.operations = [];
+  if (!Array.isArray(p.locationStocks)) p.locationStocks = initialState.locationStocks;
+  if (!Array.isArray(p.workOrders))     p.workOrders = [];
+  if (!Array.isArray(p.partners))       p.partners = initialState.partners;
+  if (!Array.isArray(p.receipts))       p.receipts = [];
+  if (p.orderCounter === undefined)     p.orderCounter = initialState.orderCounter;
+  if (p.receiptCounter === undefined)   p.receiptCounter = 1;
+  if (!Array.isArray(p.techDocs))       p.techDocs = [];
+  if (p.taskCounter === undefined)      p.taskCounter = 1;
+  if (!p.currentUser)                   p.currentUser = initialState.currentUser;
+  if (p.defaultLowStockThreshold === undefined) p.defaultLowStockThreshold = initialState.defaultLowStockThreshold;
+  if (typeof p.darkMode !== 'boolean')  p.darkMode = false;
+  if (!Array.isArray(p.warehouses))     p.warehouses = initialState.warehouses;
+  if (!Array.isArray(p.warehouseStocks)) p.warehouseStocks = initialState.warehouseStocks;
+  if (!Array.isArray(p.barcodes))       p.barcodes = [];
+  if (Array.isArray(p.locations) && Array.isArray(p.warehouses) && p.warehouses.length > 0) {
+    const defaultWhId = p.warehouses[0].id;
+    p.locations = p.locations.map(l => l.warehouseId ? l : { ...l, warehouseId: defaultWhId });
+  }
+  if (Array.isArray(p.receipts)) {
+    p.receipts = p.receipts.map(r => ({
+      ...r,
+      status: r.status || 'posted',
+      scanHistory: r.scanHistory || [],
+      lines: (r.lines || []).map((l: ReceiptLine) => ({
+        ...l,
+        confirmedQty: l.confirmedQty !== undefined ? l.confirmedQty : l.qty,
+      })),
+    }));
+  }
+  return p;
+}
 
 export function loadState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const p = JSON.parse(raw) as AppState;
-      // Guard all arrays — in case of old schema or corrupted storage
-      if (!Array.isArray(p.items))          p.items = initialState.items;
-      if (!Array.isArray(p.categories))     p.categories = initialState.categories;
-      if (!Array.isArray(p.locations))      p.locations = initialState.locations;
-      if (!Array.isArray(p.operations))     p.operations = [];
-      if (!Array.isArray(p.locationStocks)) p.locationStocks = initialState.locationStocks;
-      if (!Array.isArray(p.workOrders))     p.workOrders = [];
-      if (!Array.isArray(p.partners))       p.partners = initialState.partners;
-      if (!Array.isArray(p.receipts))       p.receipts = [];
-      // Guard scalars
-      if (p.orderCounter === undefined)   p.orderCounter = initialState.orderCounter;
-      if (p.receiptCounter === undefined) p.receiptCounter = 1;
-      if (!Array.isArray(p.techDocs))     p.techDocs = [];
-      if (p.taskCounter === undefined)    p.taskCounter = 1;
-      if (!p.currentUser)                 p.currentUser = initialState.currentUser;
-      if (p.defaultLowStockThreshold === undefined) p.defaultLowStockThreshold = initialState.defaultLowStockThreshold;
-      if (typeof p.darkMode !== 'boolean') p.darkMode = false;
-      // New fields guard
-      if (!Array.isArray(p.warehouses))      p.warehouses = initialState.warehouses;
-      if (!Array.isArray(p.warehouseStocks)) p.warehouseStocks = initialState.warehouseStocks;
-      if (!Array.isArray(p.barcodes))        p.barcodes = [];
-      // Migrate: assign warehouseId to existing locations that don't have it
-      if (Array.isArray(p.locations) && Array.isArray(p.warehouses) && p.warehouses.length > 0) {
-        const defaultWhId = p.warehouses[0].id;
-        p.locations = p.locations.map(l => l.warehouseId ? l : { ...l, warehouseId: defaultWhId });
-      }
-      // Migrate receipts: add status, scanHistory, confirmedQty if missing
-      if (Array.isArray(p.receipts)) {
-        p.receipts = p.receipts.map(r => ({
-          ...r,
-          status: r.status || 'posted',
-          scanHistory: r.scanHistory || [],
-          lines: (r.lines || []).map((l: ReceiptLine) => ({
-            ...l,
-            confirmedQty: l.confirmedQty !== undefined ? l.confirmedQty : l.qty,
-          })),
-        }));
-      }
-      return p;
-    }
+    if (raw) return guardState(JSON.parse(raw) as AppState);
   } catch (e) {
     console.warn('Failed to load state, using defaults:', e);
   }
@@ -413,6 +440,7 @@ export function saveState(state: AppState): void {
   } catch (e) {
     console.warn('Failed to save state (storage may be full):', e);
   }
+  saveStateToServer(state);
 }
 
 export function generateId(): string {

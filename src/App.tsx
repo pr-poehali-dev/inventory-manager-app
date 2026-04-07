@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { AppState, loadState } from '@/data/store';
+import { AppState, loadState, saveState, loadStateFromServer } from '@/data/store';
 import Layout, { Page } from '@/components/Layout';
 import CatalogPage from '@/pages/CatalogPage';
 import NomenclaturePage from '@/pages/NomenclaturePage';
@@ -12,6 +12,8 @@ import ReceiptsPage from '@/pages/ReceiptsPage';
 import TechnicianPage from '@/pages/TechnicianPage';
 import HistoryPage from '@/pages/HistoryPage';
 import SettingsPage from '@/pages/SettingsPage';
+
+const POLL_INTERVAL = 5000;
 
 function parseQRParams() {
   const params = new URLSearchParams(window.location.search);
@@ -30,6 +32,11 @@ export default function App() {
   const [qrLocationId, setQrLocationId] = useState<string | null>(null);
   const [qrOrderId, setQrOrderId] = useState<string | null>(null);
 
+  // Храним последний известный updatedAt с сервера чтобы не перезаписывать свежие локальные изменения
+  const serverUpdatedAtRef = useRef<string | null>(null);
+  // Время последнего локального изменения (saveState)
+  const lastLocalSaveRef = useRef<number>(0);
+
   useEffect(() => {
     if (state.darkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
@@ -43,6 +50,42 @@ export default function App() {
     if (itemId || locationId || orderId) {
       window.history.replaceState({}, '', window.location.pathname);
     }
+  }, []);
+
+  // Загрузка с сервера при старте — перезаписываем localStorage данные если сервер новее
+  useEffect(() => {
+    loadStateFromServer().then(result => {
+      if (!result) return;
+      serverUpdatedAtRef.current = result.updatedAt;
+      setState(result.state);
+      saveState(result.state);
+    });
+  }, []);
+
+  // Polling — каждые 5 сек проверяем updatedAt на сервере
+  const poll = useCallback(async () => {
+    // Не перезаписываем если только что было локальное изменение (< 3 сек назад)
+    if (Date.now() - lastLocalSaveRef.current < 3000) return;
+
+    const result = await loadStateFromServer();
+    if (!result) return;
+    // Обновляем только если сервер вернул новую версию
+    if (result.updatedAt !== serverUpdatedAtRef.current) {
+      serverUpdatedAtRef.current = result.updatedAt;
+      setState(result.state);
+      saveState(result.state);
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(poll, POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, [poll]);
+
+  // Перехватываем onStateChange чтобы отметить время локального изменения
+  const handleStateChange = useCallback((s: AppState) => {
+    lastLocalSaveRef.current = Date.now();
+    setState(s);
   }, []);
 
   // Handle QR scan results from Layout's scanner
@@ -64,20 +107,20 @@ export default function App() {
       <Toaster position="top-right" />
       <Layout
         state={state}
-        onStateChange={setState}
+        onStateChange={handleStateChange}
         activePage={page}
         onPageChange={handlePageChange}
         onQRResult={handleQRResult}
       >
-        {page === 'catalog'      && <CatalogPage state={state} onStateChange={setState} initialItemId={qrItemId} />}
-        {page === 'nomenclature' && <NomenclaturePage state={state} onStateChange={setState} />}
-        {page === 'assembly'     && <AssemblyPage state={state} onStateChange={setState} initialOrderId={qrOrderId} />}
-        {page === 'warehouse'    && <WarehouseMapPage state={state} onStateChange={setState} initialLocationId={qrLocationId} />}
-        {page === 'receipts'     && <ReceiptsPage state={state} onStateChange={setState} />}
-        {page === 'technician'   && <TechnicianPage state={state} onStateChange={setState} />}
-        {page === 'partners'     && <PartnersPage state={state} onStateChange={setState} />}
+        {page === 'catalog'      && <CatalogPage state={state} onStateChange={handleStateChange} initialItemId={qrItemId} />}
+        {page === 'nomenclature' && <NomenclaturePage state={state} onStateChange={handleStateChange} />}
+        {page === 'assembly'     && <AssemblyPage state={state} onStateChange={handleStateChange} initialOrderId={qrOrderId} />}
+        {page === 'warehouse'    && <WarehouseMapPage state={state} onStateChange={handleStateChange} initialLocationId={qrLocationId} />}
+        {page === 'receipts'     && <ReceiptsPage state={state} onStateChange={handleStateChange} />}
+        {page === 'technician'   && <TechnicianPage state={state} onStateChange={handleStateChange} />}
+        {page === 'partners'     && <PartnersPage state={state} onStateChange={handleStateChange} />}
         {page === 'history'      && <HistoryPage state={state} />}
-        {page === 'settings'     && <SettingsPage state={state} onStateChange={setState} />}
+        {page === 'settings'     && <SettingsPage state={state} onStateChange={handleStateChange} />}
       </Layout>
     </TooltipProvider>
   );
