@@ -45,6 +45,12 @@ export function ReceiptConfirmPage({
   const [showHistory, setShowHistory] = useState(false);
   const [posting, setPosting] = useState(false);
 
+  // per-line inline scanner state
+  const [activeLineId, setActiveLineId] = useState<string | null>(null);
+  const [lineCameraActive, setLineCameraActive] = useState(false);
+  const [lineCameraError, setLineCameraError] = useState('');
+  const [lineManualCode, setLineManualCode] = useState('');
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<BarcodeDetector | null>(null);
@@ -53,6 +59,15 @@ export function ReceiptConfirmPage({
   const lastCodeTimeRef = useRef<number>(0);
   const manualInputRef = useRef<HTMLInputElement>(null);
   const notifTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // per-line camera refs
+  const lineVideoRef = useRef<HTMLVideoElement>(null);
+  const lineStreamRef = useRef<MediaStream | null>(null);
+  const lineDetectorRef = useRef<BarcodeDetector | null>(null);
+  const lineAnimFrameRef = useRef<number>(0);
+  const lineLastCodeRef = useRef<string>('');
+  const lineLastCodeTimeRef = useRef<number>(0);
+  const lineManualInputRef = useRef<HTMLInputElement>(null);
 
   // Получаем актуальный документ из state
   const liveReceipt = state.receipts.find(r => r.id === receipt.id) || receipt;
@@ -72,7 +87,24 @@ export function ReceiptConfirmPage({
     setCameraActive(false);
   }, []);
 
+  const stopLineCamera = useCallback(() => {
+    cancelAnimationFrame(lineAnimFrameRef.current);
+    if (lineStreamRef.current) {
+      lineStreamRef.current.getTracks().forEach(t => t.stop());
+      lineStreamRef.current = null;
+    }
+    setLineCameraActive(false);
+  }, []);
+
   useEffect(() => () => { stopCamera(); }, [stopCamera]);
+  useEffect(() => () => { stopLineCamera(); }, [stopLineCamera]);
+
+  // закрыть inline-панель при смене активной строки
+  useEffect(() => {
+    stopLineCamera();
+    setLineManualCode('');
+    setLineCameraError('');
+  }, [activeLineId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showNotif = (type: NotifType, msg: string, itemName?: string) => {
     if (notifTimeoutRef.current) clearTimeout(notifTimeoutRef.current);
@@ -134,6 +166,61 @@ export function ReceiptConfirmPage({
     }
   }, [liveReceipt, state, onStateChange, totalQty]);
 
+  // processCode для inline-сканера конкретной строки
+  const processLineCode = useCallback((code: string, method: 'camera' | 'manual', lineId: string) => {
+    const now = Date.now();
+    if (code === lineLastCodeRef.current && now - lineLastCodeTimeRef.current < 2000) return;
+    lineLastCodeRef.current = code;
+    lineLastCodeTimeRef.current = now;
+
+    const targetLine = liveReceipt.lines.find(l => l.id === lineId);
+    if (!targetLine) return;
+
+    if (targetLine.confirmedQty >= targetLine.qty) {
+      showNotif('error', `«${targetLine.itemName}» уже принят полностью (${targetLine.qty} ${targetLine.unit})`);
+      return;
+    }
+
+    const item = state.items.find(i => i.id === targetLine.itemId);
+
+    const scanEvent: ScanEvent = {
+      id: generateId(),
+      code,
+      itemId: targetLine.itemId,
+      lineId: targetLine.id,
+      scannedAt: new Date().toISOString(),
+      scannedBy: state.currentUser,
+      method,
+    };
+
+    const updatedLines = liveReceipt.lines.map(l =>
+      l.id === lineId ? { ...l, confirmedQty: (l.confirmedQty || 0) + 1 } : l
+    );
+
+    const updatedReceipt: Receipt = {
+      ...liveReceipt,
+      status: 'confirming',
+      lines: updatedLines,
+      scanHistory: [...(liveReceipt.scanHistory || []), scanEvent],
+    };
+
+    const next: AppState = {
+      ...state,
+      receipts: state.receipts.map(r => r.id === liveReceipt.id ? updatedReceipt : r),
+    };
+
+    onStateChange(next);
+    saveState(next);
+
+    const lineConfirmed = updatedLines.find(l => l.id === lineId)?.confirmedQty || 0;
+    showNotif('success', `+1 принято (${lineConfirmed}/${targetLine.qty} ${targetLine.unit})`, item?.name || targetLine.itemName);
+
+    const newConfirmed = updatedLines.reduce((s, l) => s + (l.confirmedQty || 0), 0);
+    if (newConfirmed >= totalQty) {
+      setTimeout(() => setNotif(null), 100);
+    }
+  }, [liveReceipt, state, onStateChange, totalQty]);
+
   const startCamera = async () => {
     setCameraError('');
     if (typeof BarcodeDetector === 'undefined') {
@@ -173,12 +260,59 @@ export function ReceiptConfirmPage({
     }
   };
 
+  const startLineCamera = async (lineId: string) => {
+    setLineCameraError('');
+    if (typeof BarcodeDetector === 'undefined') {
+      setLineCameraError('Браузер не поддерживает сканер. Введите код вручную.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      lineStreamRef.current = stream;
+      if (lineVideoRef.current) {
+        lineVideoRef.current.srcObject = stream;
+        await lineVideoRef.current.play();
+      }
+      const formats = ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'data_matrix', 'upc_a', 'upc_e', 'itf'];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      lineDetectorRef.current = new (BarcodeDetector as any)({ formats });
+      setLineCameraActive(true);
+
+      const scan = async () => {
+        if (!lineVideoRef.current || !lineDetectorRef.current) return;
+        if (lineVideoRef.current.readyState === lineVideoRef.current.HAVE_ENOUGH_DATA) {
+          try {
+            const barcodes = await lineDetectorRef.current.detect(lineVideoRef.current);
+            for (const b of barcodes) {
+              if (b.rawValue) processLineCode(b.rawValue, 'camera', lineId);
+            }
+          } catch { /* ignore */ }
+        }
+        lineAnimFrameRef.current = requestAnimationFrame(scan);
+      };
+      lineAnimFrameRef.current = requestAnimationFrame(scan);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setLineCameraError(msg.includes('Permission') ? 'Нет доступа к камере. Разрешите в настройках браузера.' : 'Не удалось открыть камеру: ' + msg);
+    }
+  };
+
   const handleManualAdd = () => {
     const code = manualCode.trim();
     if (!code) return;
     processCode(code, 'manual');
     setManualCode('');
     manualInputRef.current?.focus();
+  };
+
+  const handleLineManualAdd = (lineId: string) => {
+    const code = lineManualCode.trim();
+    if (!code) return;
+    processLineCode(code, 'manual', lineId);
+    setLineManualCode('');
+    lineManualInputRef.current?.focus();
   };
 
   const handleManualQty = (lineId: string, delta: number) => {
@@ -314,9 +448,7 @@ export function ReceiptConfirmPage({
         <div className={`mx-4 rounded-2xl p-4 flex items-center gap-3 transition-all ${
           isSuccess ? 'bg-success text-success-foreground' : 'bg-destructive text-destructive-foreground'
         }`}>
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-            isSuccess ? 'bg-white/20' : 'bg-white/20'
-          }`}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-white/20">
             <Icon name={isSuccess ? 'CheckCircle2' : 'XCircle'} size={22} />
           </div>
           <div className="flex-1 min-w-0">
@@ -328,7 +460,7 @@ export function ReceiptConfirmPage({
         </div>
       )}
 
-      {/* Camera / Scanner block */}
+      {/* Global Camera / Scanner block */}
       <div className="px-4 pt-3 space-y-3">
         <div className={`relative rounded-2xl overflow-hidden bg-black transition-all ${
           isSuccess ? 'ring-4 ring-success' : isError ? 'ring-4 ring-destructive' : ''
@@ -384,7 +516,7 @@ export function ReceiptConfirmPage({
           )}
         </div>
 
-        {/* Manual input */}
+        {/* Global manual input */}
         <div className="flex gap-2">
           <Input
             ref={manualInputRef}
@@ -430,68 +562,157 @@ export function ReceiptConfirmPage({
           const confirmed = line.confirmedQty || 0;
           const done = confirmed >= line.qty;
           const partial = confirmed > 0 && !done;
+          const isActive = activeLineId === line.id;
 
           return (
             <div
               key={line.id}
-              className={`rounded-xl border p-3 transition-all ${
+              className={`rounded-xl border transition-all ${
                 done ? 'border-success/40 bg-success/8' :
                 partial ? 'border-amber-500/40 bg-amber-500/8' :
                 'border-border bg-card'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                  done ? 'bg-success/20 text-success' :
-                  partial ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400' :
-                  'bg-muted text-muted-foreground'
-                }`}>
-                  <Icon name={done ? 'CheckCircle2' : partial ? 'Clock' : 'Package'} size={16} />
-                </div>
+              <div className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    done ? 'bg-success/20 text-success' :
+                    partial ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400' :
+                    'bg-muted text-muted-foreground'
+                  }`}>
+                    <Icon name={done ? 'CheckCircle2' : partial ? 'Clock' : 'Package'} size={16} />
+                  </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm truncate">{item?.name || line.itemName}</div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    {loc && <span className="flex items-center gap-0.5"><Icon name="MapPin" size={9} />{loc.name}</span>}
-                    {line.isNew && <span className="text-primary font-medium">Новый</span>}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate">{item?.name || line.itemName}</div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                      {loc && <span className="flex items-center gap-0.5"><Icon name="MapPin" size={9} />{loc.name}</span>}
+                      {line.isNew && <span className="text-primary font-medium">Новый</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Manual qty controls */}
+                    <button
+                      onClick={() => handleManualQty(line.id, -1)}
+                      disabled={confirmed <= 0}
+                      className="w-7 h-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
+                    >
+                      <Icon name="Minus" size={12} />
+                    </button>
+
+                    <div className="text-center min-w-[52px]">
+                      <span className={`text-base font-bold tabular-nums ${done ? 'text-success' : partial ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
+                        {confirmed}
+                      </span>
+                      <span className="text-muted-foreground text-sm">/{line.qty}</span>
+                      <div className="text-[10px] text-muted-foreground">{line.unit}</div>
+                    </div>
+
+                    <button
+                      onClick={() => handleManualQty(line.id, +1)}
+                      disabled={confirmed >= line.qty}
+                      className="w-7 h-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
+                    >
+                      <Icon name="Plus" size={12} />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Manual qty controls */}
-                  <button
-                    onClick={() => handleManualQty(line.id, -1)}
-                    disabled={confirmed <= 0}
-                    className="w-7 h-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
-                  >
-                    <Icon name="Minus" size={12} />
-                  </button>
-
-                  <div className="text-center min-w-[52px]">
-                    <span className={`text-base font-bold tabular-nums ${done ? 'text-success' : partial ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
-                      {confirmed}
-                    </span>
-                    <span className="text-muted-foreground text-sm">/{line.qty}</span>
-                    <div className="text-[10px] text-muted-foreground">{line.unit}</div>
+                {/* Mini progress bar */}
+                {!done && line.qty > 1 && (
+                  <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 rounded-full transition-all"
+                      style={{ width: `${Math.round((confirmed / line.qty) * 100)}%` }}
+                    />
                   </div>
+                )}
 
+                {/* Toggle scan panel button */}
+                {!done && (
                   <button
-                    onClick={() => handleManualQty(line.id, +1)}
-                    disabled={confirmed >= line.qty}
-                    className="w-7 h-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
+                    onClick={() => setActiveLineId(isActive ? null : line.id)}
+                    className={`mt-2 w-full flex items-center justify-center gap-2 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                      isActive
+                        ? 'border-primary/40 bg-primary/8 text-primary'
+                        : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
                   >
-                    <Icon name="Plus" size={12} />
+                    <Icon name={isActive ? 'ChevronUp' : 'ScanLine'} size={13} />
+                    {isActive ? 'Скрыть сканер' : 'Сканировать / ввести код'}
                   </button>
-                </div>
+                )}
               </div>
 
-              {/* Mini progress bar */}
-              {!done && line.qty > 1 && (
-                <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-amber-500 rounded-full transition-all"
-                    style={{ width: `${Math.round((confirmed / line.qty) * 100)}%` }}
-                  />
+              {/* Inline scan panel */}
+              {isActive && !done && (
+                <div className="border-t border-border px-3 pb-3 pt-2 space-y-2">
+                  {/* Inline camera */}
+                  <div className={`relative rounded-xl overflow-hidden bg-black ${
+                    lineCameraActive ? '' : 'min-h-[80px]'
+                  }`} style={{ aspectRatio: lineCameraActive ? '16/9' : 'auto' }}>
+                    <video
+                      ref={lineVideoRef}
+                      className="w-full h-full object-cover"
+                      playsInline muted
+                      style={{ display: lineCameraActive ? 'block' : 'none' }}
+                    />
+                    {!lineCameraActive && (
+                      <div className="flex flex-col items-center justify-center py-4 gap-2">
+                        {lineCameraError ? (
+                          <p className="text-xs text-red-400 text-center px-4">{lineCameraError}</p>
+                        ) : null}
+                        <Button
+                          onClick={() => startLineCamera(line.id)}
+                          size="sm"
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
+                        >
+                          <Icon name="Camera" size={14} />
+                          Включить камеру
+                        </Button>
+                      </div>
+                    )}
+                    {lineCameraActive && (
+                      <>
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div className="absolute inset-[15%] border-2 border-white/50 rounded-xl" />
+                          <div className="absolute top-[15%] left-[15%] w-6 h-6 border-primary rounded-tl-xl" style={{ borderTopWidth: 3, borderLeftWidth: 3 }} />
+                          <div className="absolute top-[15%] right-[15%] w-6 h-6 border-primary rounded-tr-xl" style={{ borderTopWidth: 3, borderRightWidth: 3 }} />
+                          <div className="absolute bottom-[15%] left-[15%] w-6 h-6 border-primary rounded-bl-xl" style={{ borderBottomWidth: 3, borderLeftWidth: 3 }} />
+                          <div className="absolute bottom-[15%] right-[15%] w-6 h-6 border-primary rounded-br-xl" style={{ borderBottomWidth: 3, borderRightWidth: 3 }} />
+                        </div>
+                        <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+                          <button
+                            onClick={stopLineCamera}
+                            className="px-3 py-1.5 bg-black/60 text-white text-xs rounded-xl flex items-center gap-1.5 hover:bg-black/80"
+                          >
+                            <Icon name="CameraOff" size={12} />Выключить
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Inline manual input */}
+                  <div className="flex gap-2">
+                    <Input
+                      ref={lineManualInputRef}
+                      value={lineManualCode}
+                      onChange={e => setLineManualCode(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleLineManualAdd(line.id); }}
+                      placeholder="Ввести код товара..."
+                      className="h-10 text-sm"
+                    />
+                    <Button
+                      onClick={() => handleLineManualAdd(line.id)}
+                      disabled={!lineManualCode.trim()}
+                      variant="outline"
+                      className="h-10 px-3 shrink-0"
+                    >
+                      <Icon name="Plus" size={16} />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
