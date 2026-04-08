@@ -357,6 +357,18 @@ const initialState: AppState = {
 const STORAGE_KEY = 'stockbase_v3';
 const STATE_API = 'https://functions.poehali.dev/dee3fe46-2ea8-40b0-81ea-2fe56b57a873';
 
+/** Только проверить updatedAt на сервере (лёгкий запрос, ~100 байт). */
+export async function checkServerUpdatedAt(): Promise<string | null> {
+  try {
+    const res = await fetch(`${STATE_API}?check=1`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.updatedAt ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Загрузить состояние с сервера. Возвращает null если сервер вернул пустое. */
 export async function loadStateFromServer(): Promise<{ state: AppState; updatedAt: string } | null> {
   try {

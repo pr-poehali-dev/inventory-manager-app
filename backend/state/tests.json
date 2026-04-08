@@ -1,9 +1,17 @@
 {
   "tests": [
     {
-      "name": "GET state (empty or existing)",
+      "name": "GET state (full)",
       "method": "GET",
       "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET state check-only",
+      "method": "GET",
+      "path": "/?check=1",
       "expectedStatus": 200,
       "expectedBody": {},
       "bodyMatcher": "partial"

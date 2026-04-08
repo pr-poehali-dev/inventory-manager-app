@@ -106,6 +106,69 @@ function NewItemModal({ state, onStateChange, onClose }: {
   );
 }
 
+function DeleteItemModal({ item, state, onStateChange, onClose }: {
+  item: Item; state: AppState; onStateChange: (s: AppState) => void; onClose: () => void;
+}) {
+  const usedInOrders = state.workOrders.filter(o =>
+    ['active', 'draft', 'pending_stock'].includes(o.status) &&
+    o.items.some(oi => oi.itemId === item.id)
+  );
+
+  const handleDelete = () => {
+    const next: AppState = {
+      ...state,
+      items: state.items.filter(i => i.id !== item.id),
+      operations: state.operations.filter(op => op.itemId !== item.id),
+      locationStocks: state.locationStocks.filter(ls => ls.itemId !== item.id),
+      warehouseStocks: (state.warehouseStocks || []).filter(ws => ws.itemId !== item.id),
+      barcodes: (state.barcodes || []).filter(b => b.itemId !== item.id),
+      techDocs: (state.techDocs || []).filter(d => d.itemId !== item.id),
+      workOrders: state.workOrders.map(o => ({
+        ...o,
+        items: o.items.filter(oi => oi.itemId !== item.id),
+      })),
+    };
+    onStateChange(next); saveState(next); onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-sm animate-scale-in">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
+              <Icon name="Trash2" size={16} />
+            </div>
+            Удалить номенклатуру?
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-1">
+          <p className="text-sm text-muted-foreground">
+            <b className="text-foreground">«{item.name}»</b> будет удалён вместе с историей операций, остатками и вложениями. Это действие необратимо.
+          </p>
+          {usedInOrders.length > 0 && (
+            <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm space-y-1">
+              <div className="flex items-center gap-2 font-semibold text-warning">
+                <Icon name="AlertTriangle" size={14} />
+                Используется в активных заявках
+              </div>
+              {usedInOrders.map(o => (
+                <div key={o.id} className="text-xs text-muted-foreground pl-5">{o.number} — {o.title}</div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
+            <Button onClick={handleDelete} className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold">
+              <Icon name="Trash2" size={14} className="mr-1.5" />Удалить
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 type Props = {
   state: AppState;
   onStateChange: (s: AppState) => void;
@@ -123,6 +186,7 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [showNewItem, setShowNewItem] = useState(false);
+  const [deleteItem, setDeleteItem] = useState<Item | null>(null);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -320,6 +384,7 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                     <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       <Icon name="Paperclip" size={12} className="mx-auto" />
                     </th>
+                    <th className="w-10 px-2 py-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -383,6 +448,14 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                             <span className="text-muted-foreground/30">—</span>
                           )}
                         </td>
+                        <td className="px-2 py-3 text-center" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => setDeleteItem(item)}
+                            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Icon name="Trash2" size={13} />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -407,42 +480,50 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
                 .map(ws => ({ ...ws, wh: (state.warehouses || []).find(w => w.id === ws.warehouseId) }))
                 .filter(ws => ws.wh);
               return (
-                <button key={item.id} onClick={() => setSelectedItemId(item.id)}
-                  className="w-full text-left bg-card rounded-xl border border-border p-3.5 shadow-card hover:border-primary/30 transition-all animate-fade-in"
+                <div key={item.id}
+                  className="bg-card rounded-xl border border-border shadow-card hover:border-primary/30 transition-all animate-fade-in flex items-stretch"
                   style={{ animationDelay: `${idx * 20}ms` }}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm text-foreground">{item.name}</div>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {cat && <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: cat.color + '18', color: cat.color }}>{cat.name}</span>}
-                        {attCount > 0 && <span className="text-xs text-primary flex items-center gap-0.5"><Icon name="Paperclip" size={10} />{attCount} файл.</span>}
-                      </div>
-                      {whStocks.length > 0 && (
-                        <div className="mt-1.5 space-y-0.5">
-                          {whStocks.map(ws => (
-                            <div key={ws.warehouseId} className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Icon name="Warehouse" size={10} />{ws.wh!.name}
+                  <button onClick={() => setSelectedItemId(item.id)} className="flex-1 text-left p-3.5 min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-foreground">{item.name}</div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {cat && <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: cat.color + '18', color: cat.color }}>{cat.name}</span>}
+                          {attCount > 0 && <span className="text-xs text-primary flex items-center gap-0.5"><Icon name="Paperclip" size={10} />{attCount} файл.</span>}
+                        </div>
+                        {whStocks.length > 0 && (
+                          <div className="mt-1.5 space-y-0.5">
+                            {whStocks.map(ws => (
+                              <div key={ws.warehouseId} className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Icon name="Warehouse" size={10} />{ws.wh!.name}
+                                </span>
+                                <span className="font-semibold text-foreground tabular-nums">{ws.quantity} {item.unit}</span>
+                              </div>
+                            ))}
+                            <div className="flex items-center justify-between text-xs pt-0.5 mt-0.5 border-t border-border">
+                              <span className="text-muted-foreground uppercase tracking-wide" style={{ fontSize: '10px' }}>Итого</span>
+                              <span className={`font-bold tabular-nums ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
+                                {item.quantity} {item.unit}
                               </span>
-                              <span className="font-semibold text-foreground tabular-nums">{ws.quantity} {item.unit}</span>
                             </div>
-                          ))}
-                          <div className="flex items-center justify-between text-xs pt-0.5 mt-0.5 border-t border-border">
-                            <span className="text-muted-foreground uppercase tracking-wide" style={{ fontSize: '10px' }}>Итого</span>
-                            <span className={`font-bold tabular-nums ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
-                              {item.quantity} {item.unit}
-                            </span>
                           </div>
+                        )}
+                      </div>
+                      {whStocks.length === 0 && (
+                        <div className={`text-lg font-bold tabular-nums shrink-0 ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
+                          {item.quantity} <span className="text-xs font-normal text-muted-foreground">{item.unit}</span>
                         </div>
                       )}
                     </div>
-                    {whStocks.length === 0 && (
-                      <div className={`text-lg font-bold tabular-nums shrink-0 ${isZero ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
-                        {item.quantity} <span className="text-xs font-normal text-muted-foreground">{item.unit}</span>
-                      </div>
-                    )}
-                  </div>
-                </button>
+                  </button>
+                  <button
+                    onClick={() => setDeleteItem(item)}
+                    className="px-3 flex items-center justify-center text-muted-foreground/30 hover:text-destructive hover:bg-destructive/8 border-l border-border/50 rounded-r-xl transition-colors shrink-0"
+                  >
+                    <Icon name="Trash2" size={15} />
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -451,6 +532,7 @@ export default function NomenclaturePage({ state, onStateChange }: Props) {
 
       <ItemDetailModal item={selectedItem} state={state} onStateChange={onStateChange} onClose={() => setSelectedItemId(null)} />
       {showNewItem && <NewItemModal state={state} onStateChange={onStateChange} onClose={() => setShowNewItem(false)} />}
+      {deleteItem && <DeleteItemModal item={deleteItem} state={state} onStateChange={onStateChange} onClose={() => setDeleteItem(null)} />}
     </div>
   );
 }

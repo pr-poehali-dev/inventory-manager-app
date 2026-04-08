@@ -32,7 +32,25 @@ def handler(event: dict, context) -> dict:
     method = event.get("httpMethod", "GET")
 
     if method == "GET":
+        params = event.get("queryStringParameters") or {}
+        check_only = params.get("check") == "1"
+
         conn = get_conn()
+        if check_only:
+            rows = conn.run(f"SELECT updated_at FROM {SCHEMA}.app_state WHERE id = 1")
+            conn.close()
+            if not rows:
+                return {
+                    "statusCode": 200,
+                    "headers": {**CORS, "Content-Type": "application/json"},
+                    "body": json.dumps({"updatedAt": None}),
+                }
+            return {
+                "statusCode": 200,
+                "headers": {**CORS, "Content-Type": "application/json"},
+                "body": json.dumps({"updatedAt": rows[0][0].isoformat()}),
+            }
+
         rows = conn.run(f"SELECT data, updated_at FROM {SCHEMA}.app_state WHERE id = 1")
         conn.close()
 
