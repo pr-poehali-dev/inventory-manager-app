@@ -8,6 +8,8 @@ import { TechDocsList } from './ItemAttachmentsTab';
 import { BarcodesSection } from './ItemBarcodesSection';
 import { ItemHistoryTab } from './ItemHistoryTab';
 
+import { loadBoard, BoardNode, BoardConnection } from '@/pages/technician/BoardView';
+
 type Tab = 'info' | 'history' | 'documents';
 
 type Props = {
@@ -226,6 +228,59 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                 <div className="pt-1">
                   <BarcodesSection item={liveItem} state={state} onStateChange={onStateChange} />
                 </div>
+
+                {/* Board connections */}
+                {(() => {
+                  const bd = loadBoard();
+                  const myNode = bd.nodes.find(n => n.type === 'item' && n.refId === liveItem.id);
+                  if (!myNode) return null;
+                  const linked = bd.connections
+                    .filter(c => c.fromId === myNode.id || c.toId === myNode.id)
+                    .map(c => {
+                      const otherId = c.fromId === myNode.id ? c.toId : c.fromId;
+                      const other = bd.nodes.find(n => n.id === otherId);
+                      return { conn: c, other };
+                    })
+                    .filter(l => l.other);
+                  if (linked.length === 0) return null;
+
+                  const resolveNode = (node: BoardNode) => {
+                    if (node.type === 'item') {
+                      const it = state.items.find(i => i.id === node.refId);
+                      return { title: it?.name || 'Удалено', icon: 'Package', color: state.categories.find(c => c.id === it?.categoryId)?.color || '#6366f1' };
+                    }
+                    if (node.type === 'doc') {
+                      const doc = (state.techDocs || []).find(d => d.id === node.refId);
+                      return { title: doc ? `${doc.docType} ${doc.docNumber || ''}`.trim() : 'Удалено', icon: 'FileText', color: '#f59e0b' };
+                    }
+                    if (node.type === 'file') return { title: node.fileName || 'Файл', icon: 'File', color: '#0ea5e9' };
+                    return { title: 'Заметка', icon: 'StickyNote', color: '#ec4899' };
+                  };
+
+                  return (
+                    <div className="pt-3 space-y-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                        <Icon name="Cable" size={12} />Связи на доске ({linked.length})
+                      </div>
+                      <div className="space-y-1">
+                        {linked.map(({ conn, other }) => {
+                          if (!other) return null;
+                          const nd = resolveNode(other);
+                          return (
+                            <div key={conn.id} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40 border border-border/50">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: conn.color || '#6366f1' }} />
+                              <div className="w-5 h-5 rounded flex items-center justify-center shrink-0" style={{ backgroundColor: nd.color + '20', color: nd.color }}>
+                                <Icon name={nd.icon} size={11} />
+                              </div>
+                              <span className="text-xs font-medium truncate flex-1">{nd.title}</span>
+                              {conn.label && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">{conn.label}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
