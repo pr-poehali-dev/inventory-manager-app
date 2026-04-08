@@ -53,7 +53,12 @@ export default function SettingsPage({ state, onStateChange }: Props) {
   };
 
   const deleteCategory = (id: string) => {
-    const next = { ...state, categories: state.categories.filter(c => c.id !== id) };
+    const fallback = state.categories.find(c => c.id !== id)?.id || '';
+    const next = {
+      ...state,
+      categories: state.categories.filter(c => c.id !== id),
+      items: state.items.map(i => i.categoryId === id ? { ...i, categoryId: fallback } : i),
+    };
     onStateChange(next);
     saveState(next);
   };
@@ -79,7 +84,15 @@ export default function SettingsPage({ state, onStateChange }: Props) {
   };
 
   const deleteLocation = (id: string) => {
-    const next = { ...state, locations: state.locations.filter(l => l.id !== id) };
+    const fallback = state.locations.find(l => l.id !== id)?.id || '';
+    const children = state.locations.filter(l => l.parentId === id);
+    const idsToRemove = [id, ...children.map(c => c.id)];
+    const next = {
+      ...state,
+      locations: state.locations.filter(l => !idsToRemove.includes(l.id)),
+      items: state.items.map(i => idsToRemove.includes(i.locationId) ? { ...i, locationId: fallback } : i),
+      locationStocks: state.locationStocks.filter(ls => !idsToRemove.includes(ls.locationId)),
+    };
     onStateChange(next);
     saveState(next);
   };
@@ -98,12 +111,12 @@ export default function SettingsPage({ state, onStateChange }: Props) {
   };
 
   const deleteWarehouse = (id: string) => {
-    const hasStock = (state.warehouseStocks || []).some(ws => ws.warehouseId === id && ws.quantity > 0);
-    if (hasStock) return;
+    const fallbackWh = (state.warehouses || []).find(w => w.id !== id)?.id;
     const next = {
       ...state,
       warehouses: (state.warehouses || []).filter(w => w.id !== id),
       warehouseStocks: (state.warehouseStocks || []).filter(ws => ws.warehouseId !== id),
+      locations: state.locations.map(l => l.warehouseId === id ? { ...l, warehouseId: fallbackWh } : l),
     };
     onStateChange(next); saveState(next);
   };

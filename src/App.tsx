@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { AppState, loadState, saveState, loadStateFromServer, checkServerUpdatedAt } from '@/data/store';
+import { AppState, loadState, saveLocal, loadStateFromServer, checkServerUpdatedAt } from '@/data/store';
 import Layout, { Page } from '@/components/Layout';
 import CatalogPage from '@/pages/CatalogPage';
 import NomenclaturePage from '@/pages/NomenclaturePage';
@@ -58,26 +58,23 @@ export default function App() {
       if (!result) return;
       serverUpdatedAtRef.current = result.updatedAt;
       setState(result.state);
-      saveState(result.state);
+      saveLocal(result.state);
     });
   }, []);
 
   // Двухфазный polling: сначала лёгкий check (~100б), полный load только при изменении
   const poll = useCallback(async () => {
-    // Не перезаписываем если только что было локальное изменение (< 3 сек назад)
     if (Date.now() - lastLocalSaveRef.current < 3000) return;
 
-    // Фаза 1: только timestamp (экономим трафик при большом числе устройств)
     const remoteTs = await checkServerUpdatedAt();
     if (!remoteTs) return;
-    if (remoteTs === serverUpdatedAtRef.current) return; // нет изменений
+    if (remoteTs === serverUpdatedAtRef.current) return;
 
-    // Фаза 2: изменения есть — загружаем полный state
     const result = await loadStateFromServer();
     if (!result) return;
     serverUpdatedAtRef.current = result.updatedAt;
     setState(result.state);
-    saveState(result.state);
+    saveLocal(result.state);
   }, []);
 
   useEffect(() => {

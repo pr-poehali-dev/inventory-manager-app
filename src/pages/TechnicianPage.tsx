@@ -6,6 +6,7 @@ import { AppState, DocEntry, saveState } from '@/data/store';
 import { DocCard } from './technician/DocCard';
 import { DocDetailModal, NewDocModal } from './technician/DocModals';
 import { formatDate } from './technician/technicianUtils';
+import BoardView from './technician/BoardView';
 
 type Props = {
   state: AppState;
@@ -22,6 +23,7 @@ export default function TechnicianPage({ state, onStateChange }: Props) {
   const [selectedId,  setSelectedId]  = useState<string | null>(null);
   const [showNew,     setShowNew]     = useState(false);
   const [viewMode,    setViewMode]    = useState<'grid' | 'list'>('grid');
+  const [pageMode,    setPageMode]    = useState<'docs' | 'board'>('docs');
 
   const selectedDoc = docs.find(d => d.id === selectedId) || null;
 
@@ -77,17 +79,42 @@ export default function TechnicianPage({ state, onStateChange }: Props) {
       {/* ─── Header ───────────────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">База документов</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {pageMode === 'docs' ? 'База документов' : 'Доска связей'}
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Техническая документация и вложения по номенклатуре
+            {pageMode === 'docs'
+              ? 'Техническая документация и вложения по номенклатуре'
+              : 'Визуальная карта связей между позициями и документами'}
           </p>
         </div>
-        <Button onClick={() => setShowNew(true)} className="font-semibold gap-2 shrink-0">
-          <Icon name="FilePlus" size={16} />
-          Добавить документ
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex p-0.5 bg-muted rounded-lg">
+            <button onClick={() => setPageMode('docs')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                ${pageMode === 'docs' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+              <Icon name="FileText" size={13} />Документы
+            </button>
+            <button onClick={() => setPageMode('board')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                ${pageMode === 'board' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+              <Icon name="Cable" size={13} />Доска
+            </button>
+          </div>
+          {pageMode === 'docs' && (
+            <Button onClick={() => setShowNew(true)} className="font-semibold gap-2 shrink-0">
+              <Icon name="FilePlus" size={16} />
+              Добавить документ
+            </Button>
+          )}
+        </div>
       </div>
 
+      {pageMode === 'board' && (
+        <BoardView state={state} onStateChange={onStateChange} />
+      )}
+
+      {pageMode === 'docs' && <>
       {/* ─── Stats row ────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
         {[
@@ -252,6 +279,7 @@ export default function TechnicianPage({ state, onStateChange }: Props) {
           onClose={() => setShowNew(false)}
         />
       )}
+      </>}
     </div>
   );
 }

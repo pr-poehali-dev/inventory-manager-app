@@ -446,12 +446,17 @@ export function loadState(): AppState {
   return initialState;
 }
 
-export function saveState(state: AppState): void {
+/** Сохранить только в localStorage (без пуша на сервер — для polling). */
+export function saveLocal(state: AppState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) {
     console.warn('Failed to save state (storage may be full):', e);
   }
+}
+
+export function saveState(state: AppState): void {
+  saveLocal(state);
   saveStateToServer(state);
 }
 
