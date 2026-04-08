@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { AppState, saveState, Category, Location, Warehouse, generateId } from '@/data/store';
 
@@ -18,6 +19,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
   const [userName, setUserName] = useState(state.currentUser);
   const [threshold, setThreshold] = useState(String(state.defaultLowStockThreshold));
   const [saved, setSaved] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ label: string; onConfirm: () => void } | null>(null);
 
   // Category add
   const [newCatName, setNewCatName] = useState('');
@@ -262,8 +264,8 @@ export default function SettingsPage({ state, onStateChange }: Props) {
                         {wh.description && <div className="text-xs text-muted-foreground">{wh.description}</div>}
                       </div>
                       <span className="text-xs text-muted-foreground shrink-0">{totalStock} ед.</span>
-                      {!hasStock && (state.warehouses || []).length > 1 && (
-                        <button onClick={() => deleteWarehouse(wh.id)}
+                      {(state.warehouses || []).length > 1 && (
+                        <button onClick={() => setDeleteConfirm({ label: `склад «${wh.name}»`, onConfirm: () => deleteWarehouse(wh.id) })}
                           className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
                           <Icon name="Trash2" size={13} />
                         </button>
@@ -361,14 +363,12 @@ export default function SettingsPage({ state, onStateChange }: Props) {
                       <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
                       <span className="flex-1 text-sm font-medium">{cat.name}</span>
                       <span className="text-xs text-muted-foreground">{count} товаров</span>
-                      {count === 0 && (
-                        <button
-                          onClick={() => deleteCategory(cat.id)}
-                          className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors"
-                        >
-                          <Icon name="Trash2" size={13} />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setDeleteConfirm({ label: `категорию «${cat.name}»`, onConfirm: () => deleteCategory(cat.id) })}
+                        className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors"
+                      >
+                        <Icon name="Trash2" size={13} />
+                      </button>
                     </div>
                   );
                 })}
@@ -417,11 +417,9 @@ export default function SettingsPage({ state, onStateChange }: Props) {
                           {loc.description && <div className="text-xs text-muted-foreground">{loc.description}</div>}
                         </div>
                         <span className="text-xs text-muted-foreground">{locItemCount} тов.</span>
-                        {locItemCount === 0 && children.length === 0 && (
-                          <button onClick={() => deleteLocation(loc.id)} className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
-                            <Icon name="Trash2" size={13} />
-                          </button>
-                        )}
+                        <button onClick={() => setDeleteConfirm({ label: `локацию «${loc.name}»`, onConfirm: () => deleteLocation(loc.id) })} className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
+                          <Icon name="Trash2" size={13} />
+                        </button>
                       </div>
                       {children.map(child => {
                         const childCount = state.items.filter(i => i.locationId === child.id).length;
@@ -433,11 +431,9 @@ export default function SettingsPage({ state, onStateChange }: Props) {
                               {child.description && <div className="text-xs text-muted-foreground">{child.description}</div>}
                             </div>
                             <span className="text-xs text-muted-foreground">{childCount} тов.</span>
-                            {childCount === 0 && (
-                              <button onClick={() => deleteLocation(child.id)} className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
-                                <Icon name="Trash2" size={13} />
-                              </button>
-                            )}
+                            <button onClick={() => setDeleteConfirm({ label: `локацию «${child.name}»`, onConfirm: () => deleteLocation(child.id) })} className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
+                              <Icon name="Trash2" size={13} />
+                            </button>
                           </div>
                         );
                       })}
@@ -449,6 +445,33 @@ export default function SettingsPage({ state, onStateChange }: Props) {
           )}
         </div>
       </div>
+
+      {deleteConfirm && (
+        <Dialog open onOpenChange={() => setDeleteConfirm(null)}>
+          <DialogContent className="max-w-sm animate-scale-in">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
+                  <Icon name="Trash2" size={16} />
+                </div>
+                Удалить?
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">
+                Удалить <b className="text-foreground">{deleteConfirm.label}</b>? Это действие нельзя отменить.
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setDeleteConfirm(null)} className="flex-1">Отмена</Button>
+                <Button onClick={() => { deleteConfirm.onConfirm(); setDeleteConfirm(null); }}
+                  className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold">
+                  <Icon name="Trash2" size={14} className="mr-1.5" />Удалить
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

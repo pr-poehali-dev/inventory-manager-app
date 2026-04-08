@@ -163,43 +163,97 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
 
       {/* Content */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 pb-24 xl:pb-6 relative">
-        {/* Floating boxes — catalog only */}
+        {/* Floating objects — catalog only */}
         {activePage === 'catalog' && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
             {([
-              { s: 56, x: 4,  y: 4,  d: 0,   dr: 7.0, r: 18  },
-              { s: 32, x: 80, y: 3,  d: 1.2, dr: 5.8, r: -22 },
-              { s: 68, x: 88, y: 45, d: 0.5, dr: 8.2, r: 32  },
-              { s: 24, x: 50, y: 72, d: 2.1, dr: 5.0, r: -12 },
-              { s: 42, x: 14, y: 58, d: 0.9, dr: 7.4, r: 25  },
-              { s: 28, x: 66, y: 14, d: 1.7, dr: 6.1, r: -38 },
-              { s: 76, x: 36, y: 30, d: 0.3, dr: 9.0, r: 10  },
-              { s: 22, x: 92, y: 22, d: 2.6, dr: 5.3, r: 48  },
-              { s: 36, x: 24, y: 82, d: 1.4, dr: 7.6, r: -20 },
-              { s: 20, x: 74, y: 80, d: 0.7, dr: 4.7, r: 30  },
-              { s: 46, x: 54, y: 42, d: 1.9, dr: 6.5, r: -5  },
-              { s: 30, x: 2,  y: 42, d: 0.1, dr: 8.8, r: 42  },
-            ] as {s:number;x:number;y:number;d:number;dr:number;r:number}[]).map((b, i) => (
-              <div key={i} style={{
-                position: 'absolute',
-                left: `${b.x}%`, top: `${b.y}%`,
-                width: b.s, height: b.s,
-                animation: `catalogFloat ${b.dr}s ease-in-out ${b.d}s infinite`,
-                rotate: `${b.r}deg`,
-              }}>
-                <svg viewBox="0 0 40 40" fill="none" width={b.s} height={b.s} style={{ opacity: 0.18 }}>
-                  <rect x="8" y="18" width="24" height="18" rx="2" fill="#6366f1"/>
-                  <path d="M8 18 L20 10 L32 18 L20 26 Z" fill="#818cf8"/>
-                  <path d="M32 18 L32 36 L20 32 L20 26 Z" fill="#4338ca"/>
-                  <line x1="8"  y1="27" x2="32" y2="27" stroke="white" strokeWidth="1.5" strokeOpacity="0.45"/>
-                  <line x1="20" y1="18" x2="20" y2="36" stroke="white" strokeWidth="1.5" strokeOpacity="0.45"/>
-                </svg>
-              </div>
-            ))}
+              { s: 90,  x: 2,   y: 3,   d: 0,   dr: 7.0, r: 14,  t: 'box'      },
+              { s: 54,  x: 79,  y: 2,   d: 1.2, dr: 5.8, r: -18, t: 'box'      },
+              { s: 110, x: 87,  y: 42,  d: 0.5, dr: 8.2, r: 28,  t: 'box'      },
+              { s: 46,  x: 48,  y: 70,  d: 2.1, dr: 5.0, r: -10, t: 'box'      },
+              { s: 72,  x: 12,  y: 55,  d: 0.9, dr: 7.4, r: 22,  t: 'box'      },
+              { s: 50,  x: 64,  y: 12,  d: 1.7, dr: 6.1, r: -32, t: 'box'      },
+              { s: 120, x: 34,  y: 26,  d: 0.3, dr: 9.0, r: 8,   t: 'box'      },
+              { s: 40,  x: 91,  y: 20,  d: 2.6, dr: 5.3, r: 44,  t: 'box'      },
+              { s: 62,  x: 22,  y: 78,  d: 1.4, dr: 7.6, r: -16, t: 'box'      },
+              { s: 38,  x: 73,  y: 78,  d: 0.7, dr: 4.7, r: 26,  t: 'box'      },
+              { s: 78,  x: 52,  y: 38,  d: 1.9, dr: 6.5, r: -4,  t: 'box'      },
+              { s: 52,  x: 1,   y: 40,  d: 0.1, dr: 8.8, r: 38,  t: 'box'      },
+              { s: 64,  x: 43,  y: 88,  d: 0.6, dr: 7.2, r: 16,  t: 'shelf'    },
+              { s: 48,  x: 6,   y: 20,  d: 1.5, dr: 6.0, r: -8,  t: 'shelf'    },
+              { s: 56,  x: 58,  y: 60,  d: 2.3, dr: 8.5, r: 5,   t: 'barcode'  },
+              { s: 44,  x: 17,  y: 8,   d: 0.8, dr: 5.5, r: -25, t: 'barcode'  },
+              { s: 50,  x: 95,  y: 60,  d: 1.1, dr: 7.8, r: 20,  t: 'arrow'    },
+              { s: 40,  x: 30,  y: 48,  d: 2.8, dr: 6.3, r: -40, t: 'arrow'    },
+              { s: 58,  x: 68,  y: 86,  d: 0.4, dr: 9.2, r: 12,  t: 'tag'      },
+              { s: 42,  x: 8,   y: 88,  d: 1.8, dr: 5.2, r: -30, t: 'tag'      },
+            ] as {s:number;x:number;y:number;d:number;dr:number;r:number;t:string}[]).map((b, i) => {
+              const op = 0.13;
+              let svgContent: React.ReactNode;
+              if (b.t === 'box') {
+                svgContent = <>
+                  <rect x="4" y="17" width="32" height="21" rx="2" fill="#6366f1"/>
+                  <path d="M4 17 L20 8 L36 17 L20 26 Z" fill="#818cf8"/>
+                  <path d="M36 17 L36 38 L20 32 L20 26 Z" fill="#4338ca"/>
+                  <line x1="4"  y1="27.5" x2="36" y2="27.5" stroke="white" strokeWidth="1.5" strokeOpacity="0.4"/>
+                  <line x1="20" y1="17"   x2="20" y2="38"   stroke="white" strokeWidth="1.5" strokeOpacity="0.4"/>
+                </>;
+              } else if (b.t === 'shelf') {
+                svgContent = <>
+                  <rect x="2"  y="32" width="36" height="4" rx="1" fill="#6366f1"/>
+                  <rect x="2"  y="18" width="36" height="4" rx="1" fill="#6366f1"/>
+                  <rect x="2"  y="4"  width="36" height="4" rx="1" fill="#6366f1"/>
+                  <rect x="2"  y="4"  width="3"  height="32" rx="1" fill="#4338ca"/>
+                  <rect x="35" y="4"  width="3"  height="32" rx="1" fill="#4338ca"/>
+                  <rect x="8"  y="22" width="8"  height="10" rx="1" fill="#818cf8"/>
+                  <rect x="20" y="22" width="6"  height="10" rx="1" fill="#818cf8"/>
+                  <rect x="10" y="8"  width="10" height="10" rx="1" fill="#818cf8"/>
+                </>;
+              } else if (b.t === 'barcode') {
+                svgContent = <>
+                  <rect x="2"  y="6"  width="3" height="28" fill="#4338ca"/>
+                  <rect x="7"  y="6"  width="2" height="28" fill="#6366f1"/>
+                  <rect x="11" y="6"  width="4" height="28" fill="#4338ca"/>
+                  <rect x="17" y="6"  width="2" height="28" fill="#6366f1"/>
+                  <rect x="21" y="6"  width="3" height="28" fill="#4338ca"/>
+                  <rect x="26" y="6"  width="2" height="28" fill="#6366f1"/>
+                  <rect x="30" y="6"  width="4" height="28" fill="#4338ca"/>
+                  <rect x="36" y="6"  width="2" height="28" fill="#6366f1"/>
+                  <rect x="2"  y="36" width="36" height="3"  rx="1" fill="#818cf8"/>
+                </>;
+              } else if (b.t === 'arrow') {
+                svgContent = <>
+                  <circle cx="20" cy="20" r="17" fill="#6366f1"/>
+                  <path d="M20 10 L20 28 M12 21 L20 30 L28 21" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </>;
+              } else {
+                svgContent = <>
+                  <rect x="4"  y="4"  width="32" height="32" rx="4" fill="#6366f1"/>
+                  <rect x="10" y="2"  width="20" height="6"  rx="2" fill="#818cf8"/>
+                  <line x1="9"  y1="14" x2="31" y2="14" stroke="white" strokeWidth="2" strokeOpacity="0.5"/>
+                  <line x1="9"  y1="20" x2="25" y2="20" stroke="white" strokeWidth="2" strokeOpacity="0.5"/>
+                  <line x1="9"  y1="26" x2="28" y2="26" stroke="white" strokeWidth="2" strokeOpacity="0.5"/>
+                </>;
+              }
+              return (
+                <div key={i} style={{
+                  position: 'absolute',
+                  left: `${b.x}%`, top: `${b.y}%`,
+                  width: b.s, height: b.s,
+                  animation: `catalogFloat ${b.dr}s ease-in-out ${b.d}s infinite`,
+                  rotate: `${b.r}deg`,
+                  opacity: op,
+                }}>
+                  <svg viewBox="0 0 40 40" fill="none" width={b.s} height={b.s}>
+                    {svgContent}
+                  </svg>
+                </div>
+              );
+            })}
             <style>{`
               @keyframes catalogFloat {
                 0%,100% { translate: 0 0px;   }
-                50%     { translate: 0 -18px; }
+                50%     { translate: 0 -22px; }
               }
             `}</style>
           </div>

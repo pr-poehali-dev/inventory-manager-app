@@ -156,6 +156,7 @@ function PartnerTable({ partners, type, state, onStateChange }: {
   const [search, setSearch] = useState('');
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<Partner | null>(null);
 
   const filtered = partners.filter(p =>
     !search.trim() || p.name.toLowerCase().includes(search.toLowerCase())
@@ -234,12 +235,10 @@ function PartnerTable({ partners, type, state, onStateChange }: {
                     className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors">
                     <Icon name="History" size={14} />
                   </button>
-                  {stats.opCount === 0 && (
-                    <button onClick={() => handleDelete(p.id)}
-                      className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
-                      <Icon name="Trash2" size={13} />
-                    </button>
-                  )}
+                  <button onClick={() => setDeleteConfirm(p)}
+                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
+                    <Icon name="Trash2" size={13} />
+                  </button>
                 </div>
               </div>
             );
@@ -249,6 +248,32 @@ function PartnerTable({ partners, type, state, onStateChange }: {
 
       {selectedPartner && <PartnerHistory partner={selectedPartner} state={state} onClose={() => setSelectedPartner(null)} />}
       {showAdd && <AddPartnerModal type={type} onSave={handleAdd} onClose={() => setShowAdd(false)} />}
+      {deleteConfirm && (
+        <Dialog open onOpenChange={() => setDeleteConfirm(null)}>
+          <DialogContent className="max-w-sm animate-scale-in">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
+                  <Icon name="Trash2" size={16} />
+                </div>
+                Удалить {type === 'supplier' ? 'поставщика' : 'получателя'}?
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">
+                <b className="text-foreground">«{deleteConfirm.name}»</b> будет удалён из справочника. История операций сохранится.
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setDeleteConfirm(null)} className="flex-1">Отмена</Button>
+                <Button onClick={() => { handleDelete(deleteConfirm.id); setDeleteConfirm(null); }}
+                  className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold">
+                  <Icon name="Trash2" size={14} className="mr-1.5" />Удалить
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
