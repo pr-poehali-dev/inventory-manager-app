@@ -433,6 +433,17 @@ function guardState(p: AppState): AppState {
       })),
     }));
   }
+  if (Array.isArray(p.warehouseStocks) && p.warehouseStocks.length > 0 && Array.isArray(p.items)) {
+    p.items = p.items.map(item => {
+      const whTotal = p.warehouseStocks
+        .filter(ws => ws.itemId === item.id)
+        .reduce((s, ws) => s + ws.quantity, 0);
+      if (whTotal > 0 && item.quantity !== whTotal) {
+        return { ...item, quantity: whTotal };
+      }
+      return item;
+    });
+  }
   return p;
 }
 
