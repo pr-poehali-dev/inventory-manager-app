@@ -44,11 +44,10 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
     .map(ws => ({ ...ws, warehouse: (state.warehouses || []).find(w => w.id === ws.warehouseId) }))
     .filter(ws => ws.warehouse);
 
-  const handleOperation = (op: import('@/data/store').Operation, newQty: number, updatedState?: AppState) => {
+  const handleOperation = (op: import('@/data/store').Operation, _newQty: number, updatedState?: AppState) => {
     const base = updatedState || state;
     const next: AppState = {
       ...base,
-      items: base.items.map(i => i.id === liveItem.id ? { ...i, quantity: newQty } : i),
       operations: [op, ...base.operations],
     };
     onStateChange(next);

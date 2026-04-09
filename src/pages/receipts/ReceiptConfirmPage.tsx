@@ -5,7 +5,7 @@ import Icon from '@/components/ui/icon';
 import {
   AppState, saveState, generateId,
   Receipt, ReceiptLine, ScanEvent,
-  updateLocationStock, Operation,
+  updateLocationStock, updateWarehouseStock, Operation,
 } from '@/data/store';
 
 type ScanResult = { ok: true; line: ReceiptLine } | { ok: false; reason: string };
@@ -360,10 +360,14 @@ export function ReceiptConfirmPage({
       const qty = line.confirmedQty || 0;
       if (qty <= 0) continue;
 
-      next = {
-        ...next,
-        items: next.items.map(i => i.id === line.itemId ? { ...i, quantity: i.quantity + qty } : i),
-      };
+      if (liveReceipt.warehouseId) {
+        next = updateWarehouseStock(next, line.itemId, liveReceipt.warehouseId, qty);
+      } else {
+        next = {
+          ...next,
+          items: next.items.map(i => i.id === line.itemId ? { ...i, quantity: i.quantity + qty } : i),
+        };
+      }
 
       if (line.locationId) {
         next = updateLocationStock(next, line.itemId, line.locationId, qty);
