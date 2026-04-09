@@ -194,6 +194,7 @@ export default function ReceiptsPage({ state, onStateChange }: Props) {
         <ReceiptDetailModal
           receipt={selectedReceipt}
           state={state}
+          onStateChange={onStateChange}
           onClose={() => setSelectedReceipt(null)}
           onStartConfirm={(r) => {
             setSelectedReceipt(null);

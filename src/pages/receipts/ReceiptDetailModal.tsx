@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import { AppState, Receipt, ReceiptStatus } from '@/data/store';
+import { AppState, Receipt, ReceiptStatus, saveState } from '@/data/store';
 import { getReceiptProgress } from './ReceiptsList';
 
 const STATUS_CONFIG: Record<ReceiptStatus, { label: string; color: string; bg: string; icon: string }> = {
@@ -12,12 +12,13 @@ const STATUS_CONFIG: Record<ReceiptStatus, { label: string; color: string; bg: s
 };
 
 export function ReceiptDetailModal({
-  receipt, state, onClose, onStartConfirm,
+  receipt, state, onClose, onStartConfirm, onStateChange,
 }: {
   receipt: Receipt;
   state: AppState;
   onClose: () => void;
   onStartConfirm?: (r: Receipt) => void;
+  onStateChange?: (s: AppState) => void;
 }) {
   const liveReceipt = state.receipts.find(r => r.id === receipt.id) || receipt;
   const cfg = STATUS_CONFIG[liveReceipt.status || 'draft'];
@@ -31,6 +32,17 @@ export function ReceiptDetailModal({
     : null;
 
   const canConfirm = liveReceipt.status === 'pending' || liveReceipt.status === 'confirming';
+
+  const handleDelete = () => {
+    if (!onStateChange) return;
+    const next: AppState = {
+      ...state,
+      receipts: state.receipts.filter(r => r.id !== liveReceipt.id),
+    };
+    onStateChange(next);
+    saveState(next);
+    onClose();
+  };
 
   const handleQR = () => {
     const url = `${window.location.origin}/?receipt=${liveReceipt.id}`;
@@ -197,6 +209,13 @@ export function ReceiptDetailModal({
             <Button variant="outline" size="sm" onClick={handleQR} className="flex items-center gap-1.5">
               <Icon name="QrCode" size={14} />QR
             </Button>
+
+            {onStateChange && (
+              <Button variant="outline" size="sm" onClick={handleDelete}
+                className="flex items-center gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10">
+                <Icon name="Trash2" size={14} />Удалить
+              </Button>
+            )}
 
             {canConfirm && onStartConfirm && (
               <Button
