@@ -348,6 +348,27 @@ export function ReceiptConfirmPage({
     saveState(next);
   };
 
+  const handleSetQty = (lineId: string, value: number) => {
+    const updatedLines = liveReceipt.lines.map(l => {
+      if (l.id !== lineId) return l;
+      const clamped = Math.max(0, Math.min(l.qty, value));
+      return { ...l, confirmedQty: clamped };
+    });
+    const updatedReceipt: Receipt = { ...liveReceipt, status: 'confirming', lines: updatedLines };
+    const next: AppState = { ...state, receipts: state.receipts.map(r => r.id === liveReceipt.id ? updatedReceipt : r) };
+    onStateChange(next);
+    saveState(next);
+  };
+
+  const handleDeleteLine = (lineId: string) => {
+    const updatedLines = liveReceipt.lines.filter(l => l.id !== lineId);
+    if (updatedLines.length === 0) return;
+    const updatedReceipt: Receipt = { ...liveReceipt, lines: updatedLines };
+    const next: AppState = { ...state, receipts: state.receipts.map(r => r.id === liveReceipt.id ? updatedReceipt : r) };
+    onStateChange(next);
+    saveState(next);
+  };
+
   const handlePost = () => {
     if (!allConfirmed) return;
     setPosting(true);
@@ -607,31 +628,26 @@ export function ReceiptConfirmPage({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Manual qty controls */}
-                    <button
-                      onClick={() => handleManualQty(line.id, -1)}
-                      disabled={confirmed <= 0}
-                      className="w-7 h-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
-                    >
-                      <Icon name="Minus" size={12} />
-                    </button>
-
-                    <div className="text-center min-w-[52px]">
-                      <span className={`text-base font-bold tabular-nums ${done ? 'text-success' : partial ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
-                        {confirmed}
-                      </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-0.5">
+                      <input
+                        type="number"
+                        min={0}
+                        max={line.qty}
+                        value={confirmed}
+                        onChange={e => handleSetQty(line.id, parseInt(e.target.value) || 0)}
+                        className={`w-12 h-8 text-center text-sm font-bold tabular-nums rounded-lg border border-border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-ring
+                          ${done ? 'text-success' : partial ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}
+                      />
                       <span className="text-muted-foreground text-sm">/{line.qty}</span>
-                      <div className="text-[10px] text-muted-foreground">{line.unit}</div>
                     </div>
-
-                    <button
-                      onClick={() => handleManualQty(line.id, +1)}
-                      disabled={confirmed >= line.qty}
-                      className="w-7 h-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
-                    >
-                      <Icon name="Plus" size={12} />
-                    </button>
+                    <div className="text-[10px] text-muted-foreground">{line.unit}</div>
+                    {liveReceipt.lines.length > 1 && (
+                      <button onClick={() => handleDeleteLine(line.id)} title="Удалить строку"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                        <Icon name="Trash2" size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
