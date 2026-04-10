@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import Autocomplete, { AutocompleteOption } from '@/components/Autocomplete';
 import {
-  AppState, saveState, generateId,
+  AppState, crudAction, generateId,
   WorkOrder, OrderItem, OrderStatus, Partner,
   getReservedQty, getFreeQty,
 } from '@/data/store';
@@ -144,14 +144,20 @@ export function CreateOrderModal({
       updatedAt: new Date().toISOString(),
       items: orderItems,
     };
+    const newCounter = state.orderCounter + 1;
     const next = {
       ...state,
       partners: newPartners,
       workOrders: [order, ...state.workOrders],
-      orderCounter: state.orderCounter + 1,
+      orderCounter: newCounter,
     };
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_work_order', { workOrder: order, orderItems: order.items });
+    crudAction('update_setting', { key: 'orderCounter', value: String(newCounter) });
+    if (recipientLabel.trim() && !recipientId) {
+      const newPartner = newPartners[newPartners.length - 1];
+      crudAction('upsert_partner', { partner: newPartner });
+    }
     onClose();
   };
 

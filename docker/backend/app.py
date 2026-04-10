@@ -442,6 +442,11 @@ def _action_delete_tech_doc(cur, body):
     td_id = body.get("techDocId")
     if td_id: _delete(cur, "tech_docs", "id", td_id)
 
+def _action_upsert_location_stock(cur, body):
+    ls = body.get("locationStock", {})
+    ls_row = _prepare_row("location_stocks", ls)
+    if ls_row: _upsert(cur, "location_stocks", ls_row, TABLE_PKS["location_stocks"])
+
 def _action_update_setting(cur, body):
     key = body.get("key")
     value = body.get("value")
@@ -474,6 +479,7 @@ ACTION_MAP = {
     "delete_receipt": _action_delete_receipt,
     "upsert_tech_doc": _action_upsert_tech_doc,
     "delete_tech_doc": _action_delete_tech_doc,
+    "upsert_location_stock": _action_upsert_location_stock,
     "update_setting": _action_update_setting,
     "update_settings": _action_update_settings,
 }

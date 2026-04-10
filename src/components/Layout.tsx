@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Icon from '@/components/ui/icon';
-import { AppState, saveState } from '@/data/store';
+import { AppState, crudAction } from '@/data/store';
 import QRScanner from '@/components/QRScanner';
 
 export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'technician' | 'partners' | 'history' | 'settings';
@@ -39,7 +39,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
 
   const toggleDark = () => {
     const next = { ...state, darkMode: !state.darkMode };
-    onStateChange(next); saveState(next);
+    onStateChange(next); crudAction('update_setting', { key: 'darkMode', value: String(!state.darkMode) });
   };
 
   const lowStockCount = state.items.filter(i => i.quantity <= i.lowStockThreshold).length;

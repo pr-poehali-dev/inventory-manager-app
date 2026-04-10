@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import { AppState, Receipt, ReceiptStatus, saveState } from '@/data/store';
+import { AppState, Receipt, ReceiptStatus, crudAction } from '@/data/store';
 import { getReceiptProgress } from './ReceiptsList';
 
 const STATUS_CONFIG: Record<ReceiptStatus, { label: string; color: string; bg: string; icon: string }> = {
@@ -40,7 +40,7 @@ export function ReceiptDetailModal({
       receipts: state.receipts.filter(r => r.id !== liveReceipt.id),
     };
     onStateChange(next);
-    saveState(next);
+    crudAction('delete_receipt', { receiptId: liveReceipt.id });
     onClose();
   };
 

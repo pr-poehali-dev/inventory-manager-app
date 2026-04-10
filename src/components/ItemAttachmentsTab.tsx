@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import Icon from '@/components/ui/icon';
-import { Item, AppState, Attachment, saveState, generateId } from '@/data/store';
+import { Item, AppState, Attachment, crudAction, generateId } from '@/data/store';
 
 function FileIcon({ mime, name }: { mime: string; name: string }) {
   const ext = name.split('.').pop()?.toLowerCase() || '';
@@ -64,7 +64,7 @@ export function AttachmentsTab({ item, state, onStateChange }: {
         const updatedItem = { ...item, attachments: [...attachments, ...newAtts] };
         const next: AppState = { ...state, items: state.items.map(i => i.id === item.id ? updatedItem : i) };
         onStateChange(next);
-        saveState(next);
+        crudAction('upsert_item', { item: updatedItem });
       }
       setUploading(false);
     });
@@ -74,7 +74,7 @@ export function AttachmentsTab({ item, state, onStateChange }: {
     const updatedItem = { ...item, attachments: attachments.filter(a => a.id !== attId) };
     const next: AppState = { ...state, items: state.items.map(i => i.id === item.id ? updatedItem : i) };
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_item', { item: updatedItem });
   };
 
   const handleDownload = (att: Attachment) => {

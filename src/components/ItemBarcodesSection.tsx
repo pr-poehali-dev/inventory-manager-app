@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Icon from '@/components/ui/icon';
-import { Item, AppState, Barcode, saveState, generateId, getItemBarcodes } from '@/data/store';
+import { Item, AppState, Barcode, crudAction, generateId, getItemBarcodes } from '@/data/store';
 import ScannerModal, { ScannedCode } from './ScannerModal';
 
 export function BarcodesSection({ item, state, onStateChange }: {
@@ -19,22 +19,23 @@ export function BarcodesSection({ item, state, onStateChange }: {
     if (!code) return;
     const already = (state.barcodes || []).some(b => b.code === code);
     if (already) { setNewCode(''); setNewLabel(''); return; }
+    const newBarcode = {
+      id: generateId(), itemId: item.id, code, format: 'manual',
+      label: newLabel.trim() || undefined, createdAt: new Date().toISOString(),
+    };
     const next: AppState = {
       ...state,
-      barcodes: [...(state.barcodes || []), {
-        id: generateId(), itemId: item.id, code, format: 'manual',
-        label: newLabel.trim() || undefined, createdAt: new Date().toISOString(),
-      }],
+      barcodes: [...(state.barcodes || []), newBarcode],
     };
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_barcode', { barcode: newBarcode });
     setNewCode(''); setNewLabel(''); setAdding(false);
   };
 
   const handleRemove = (id: string) => {
     const next: AppState = { ...state, barcodes: (state.barcodes || []).filter(b => b.id !== id) };
     onStateChange(next);
-    saveState(next);
+    crudAction('delete_barcode', { barcodeId: id });
   };
 
   const handleScanAdd = (codes: ScannedCode[]) => {
@@ -51,7 +52,13 @@ export function BarcodesSection({ item, state, onStateChange }: {
         };
       }
     }
-    if (next !== state) { onStateChange(next); saveState(next); }
+    if (next !== state) {
+      onStateChange(next);
+      const newBarcodes = (next.barcodes || []).filter(b => !(state.barcodes || []).some(ob => ob.id === b.id));
+      for (const bc of newBarcodes) {
+        crudAction('upsert_barcode', { barcode: bc });
+      }
+    }
   };
 
   return (

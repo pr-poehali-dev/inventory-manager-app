@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState, Partner, PartnerType, saveState, generateId } from '@/data/store';
+import { AppState, Partner, PartnerType, crudAction, generateId } from '@/data/store';
 
 type Props = {
   state: AppState;
@@ -178,13 +178,13 @@ function PartnerTable({ partners, type, state, onStateChange }: {
 
   const handleDelete = (id: string) => {
     const next = { ...state, partners: state.partners.filter(p => p.id !== id) };
-    onStateChange(next); saveState(next);
+    onStateChange(next); crudAction('delete_partner', { partnerId: id });
   };
 
   const handleAdd = (data: Omit<Partner, 'id' | 'createdAt'>) => {
     const p: Partner = { ...data, id: generateId(), createdAt: new Date().toISOString() };
     const next = { ...state, partners: [...state.partners, p] };
-    onStateChange(next); saveState(next);
+    onStateChange(next); crudAction('upsert_partner', { partner: p });
   };
 
   return (

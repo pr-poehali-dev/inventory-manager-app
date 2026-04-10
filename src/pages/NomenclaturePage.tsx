@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState, Item, saveState, generateId } from '@/data/store';
+import { AppState, Item, crudAction, generateId } from '@/data/store';
 import ItemDetailModal from '@/components/ItemDetailModal';
 
 const UNITS = ['шт', 'кг', 'л', 'м', 'м²', 'уп', 'пачка', 'рул', 'упак', 'кор', 'пар'];
@@ -35,7 +35,7 @@ function NewItemModal({ state, onStateChange, onClose }: {
       createdAt: new Date().toISOString(),
     };
     const next = { ...state, items: [...state.items, newItem] };
-    onStateChange(next); saveState(next); onClose();
+    onStateChange(next); crudAction('upsert_item', { item: newItem }); onClose();
   };
 
   return (
@@ -128,7 +128,7 @@ function DeleteItemModal({ item, state, onStateChange, onClose }: {
         items: o.items.filter(oi => oi.itemId !== item.id),
       })),
     };
-    onStateChange(next); saveState(next); onClose();
+    onStateChange(next); crudAction('delete_item', { itemId: item.id }); onClose();
   };
 
   return (

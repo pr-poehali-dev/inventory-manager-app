@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import { Item, AppState, saveState } from '@/data/store';
+import { Item, AppState, crudAction } from '@/data/store';
 import OperationModal from './OperationModal';
 import { TechDocsList } from './ItemAttachmentsTab';
 import { BarcodesSection } from './ItemBarcodesSection';
@@ -52,7 +52,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
       operations: [op, ...base.operations],
     };
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_operation', { operation: op });
     setOpType(null);
   };
 
@@ -78,7 +78,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
       })),
     };
     onStateChange(next);
-    saveState(next);
+    crudAction('delete_item', { itemId: liveItem.id });
     onClose();
   };
 

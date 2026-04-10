@@ -9,7 +9,7 @@ import Autocomplete, { AutocompleteOption } from '@/components/Autocomplete';
 import ScannerModal, { ScannedCode } from '@/components/ScannerModal';
 import {
   Item, OperationType, Operation, AppState, Partner, Warehouse,
-  generateId, saveState, getWarehouseStock, updateWarehouseStock, getItemBarcodes,
+  generateId, crudAction, getWarehouseStock, updateWarehouseStock, getItemBarcodes,
 } from '@/data/store';
 
 const IN_BASES = [
@@ -109,7 +109,12 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
         };
       }
     }
-    if (newState !== state) saveState(newState);
+    if (newState !== state) {
+      const newBarcodes = (newState.barcodes || []).filter(b => !(state.barcodes || []).some(ob => ob.id === b.id));
+      for (const bc of newBarcodes) {
+        crudAction('upsert_barcode', { barcode: bc });
+      }
+    }
     setScannedCodes(prev => [...prev, ...codes]);
   };
 
@@ -170,6 +175,21 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
     // newQty is already updated via updateWarehouseStock → items
     const updatedItem = finalState.items.find(it => it.id === item.id);
     onSave(op, updatedItem?.quantity ?? newQty, finalState !== state ? finalState : undefined);
+
+    // Send granular CRUD actions for auto-created entities
+    const updItem = finalState.items.find(i => i.id === item.id);
+    const wsArr = (finalState.warehouseStocks || []).filter(w => w.itemId === item.id);
+    crudAction('upsert_operation', {
+      operation: op,
+      item: updItem,
+      warehouseStocks: wsArr,
+    });
+    if (type === 'out' && toLabel.trim() && !toId) {
+      crudAction('upsert_partner', { partner: finalState.partners[finalState.partners.length - 1] });
+    }
+    if (type === 'in' && supplierLabel.trim() && !supplierId) {
+      crudAction('upsert_partner', { partner: finalState.partners[finalState.partners.length - 1] });
+    }
 
     // Reset
     setQty('1');

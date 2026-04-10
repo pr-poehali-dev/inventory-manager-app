@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import {
-  AppState, saveState,
+  AppState, crudAction,
   WorkOrder, OrderItem, OrderStatus,
   getOrderStatusLabel, getOrderStatusColor,
 } from '@/data/store';
@@ -22,7 +22,7 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
 
   const changeStatus = (status: OrderStatus) => {
     const next = { ...state, workOrders: state.workOrders.map(o => o.id === order.id ? { ...o, status, updatedAt: new Date().toISOString() } : o) };
-    onStateChange(next); saveState(next);
+    onStateChange(next); crudAction('upsert_work_order', { workOrder: { ...order, status, updatedAt: new Date().toISOString() }, orderItems: order.items });
   };
 
   const handleClose = () => {

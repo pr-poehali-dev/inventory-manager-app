@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Icon from '@/components/ui/icon';
-import { AppState, DocEntry, saveState } from '@/data/store';
+import { AppState, DocEntry, crudAction } from '@/data/store';
 import { DocCard } from './technician/DocCard';
 import { DocDetailModal, NewDocModal } from './technician/DocModals';
 import { formatDate } from './technician/technicianUtils';
@@ -64,12 +64,12 @@ export default function TechnicianPage({ state, onStateChange }: Props) {
         ? docs.map(d => d.id === doc.id ? doc : d)
         : [...docs, doc],
     };
-    onStateChange(next); saveState(next);
+    onStateChange(next); crudAction('upsert_tech_doc', { techDoc: doc });
   };
 
   const deleteDoc = (id: string) => {
     const next = { ...state, techDocs: docs.filter(d => d.id !== id) };
-    onStateChange(next); saveState(next);
+    onStateChange(next); crudAction('delete_tech_doc', { techDocId: id });
   };
 
   const activeFilters = [search, typeFilter !== 'all', catFilter !== 'all', itemFilter !== 'all'].filter(Boolean).length;

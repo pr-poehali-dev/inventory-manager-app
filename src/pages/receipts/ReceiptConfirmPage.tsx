@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Icon from '@/components/ui/icon';
 import {
-  AppState, saveState, generateId,
+  AppState, crudAction, generateId,
   Receipt, ReceiptLine, ScanEvent,
   updateLocationStock, updateWarehouseStock, Operation,
 } from '@/data/store';
@@ -161,7 +161,7 @@ export function ReceiptConfirmPage({
     };
 
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_receipt', { receipt: updatedReceipt, receiptLines: updatedReceipt.lines });
 
     const newConfirmed = updatedLines.reduce((s, l) => s + (l.confirmedQty || 0), 0);
     const lineConfirmed = updatedLines.find(l => l.id === line.id)?.confirmedQty || 0;
@@ -222,7 +222,7 @@ export function ReceiptConfirmPage({
     };
 
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_receipt', { receipt: updatedReceipt, receiptLines: updatedReceipt.lines });
 
     const lineConfirmed = updatedLines.find(l => l.id === lineId)?.confirmedQty || 0;
     showNotif('success', `+1 принято (${lineConfirmed}/${targetLine.qty} ${targetLine.unit})`, item?.name || targetLine.itemName);
@@ -345,7 +345,7 @@ export function ReceiptConfirmPage({
       receipts: state.receipts.map(r => r.id === liveReceipt.id ? updatedReceipt : r),
     };
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_receipt', { receipt: updatedReceipt, receiptLines: updatedReceipt.lines });
   };
 
   const handleSetQty = (lineId: string, value: number) => {
@@ -357,7 +357,7 @@ export function ReceiptConfirmPage({
     const updatedReceipt: Receipt = { ...liveReceipt, status: 'confirming', lines: updatedLines };
     const next: AppState = { ...state, receipts: state.receipts.map(r => r.id === liveReceipt.id ? updatedReceipt : r) };
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_receipt', { receipt: updatedReceipt, receiptLines: updatedReceipt.lines });
   };
 
   const handleDeleteLine = (lineId: string) => {
@@ -366,7 +366,7 @@ export function ReceiptConfirmPage({
     const updatedReceipt: Receipt = { ...liveReceipt, lines: updatedLines };
     const next: AppState = { ...state, receipts: state.receipts.map(r => r.id === liveReceipt.id ? updatedReceipt : r) };
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_receipt', { receipt: updatedReceipt, receiptLines: updatedReceipt.lines });
   };
 
   const handlePost = () => {
@@ -426,7 +426,13 @@ export function ReceiptConfirmPage({
     };
 
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_receipt', { receipt: postedReceipt, receiptLines: postedReceipt.lines });
+    for (const op of newOperations) {
+      const updatedItem = next.items.find(i => i.id === op.itemId);
+      const wsArr = (next.warehouseStocks || []).filter(w => w.itemId === op.itemId);
+      const lsArr = (next.locationStocks || []).filter(ls => ls.itemId === op.itemId);
+      crudAction('upsert_operation', { operation: op, item: updatedItem, warehouseStocks: wsArr, locationStocks: lsArr });
+    }
     setPosting(false);
     onPosted();
   };

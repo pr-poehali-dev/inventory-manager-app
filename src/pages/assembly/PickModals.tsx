@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import {
-  AppState, Item, saveState, generateId,
+  AppState, Item, crudAction, generateId,
   WorkOrder, OrderItem, OrderStatus, Operation,
   getLocationStock, updateLocationStock,
 } from '@/data/store';
@@ -56,7 +56,13 @@ export function PickItemModal({
       date: new Date().toISOString(), orderId: order.id, locationId: selectedLocation,
     };
     next = { ...next, workOrders: updatedOrders, operations: [op, ...next.operations] };
-    onStateChange(next); saveState(next); onClose();
+    onStateChange(next);
+    const updatedOrder = updatedOrders.find(o => o.id === order.id)!;
+    const updatedItem = next.items.find(i => i.id === item.id);
+    const updatedLocationStocks = (next.locationStocks || []).filter(ls => ls.itemId === item.id);
+    crudAction('upsert_work_order', { workOrder: updatedOrder, orderItems: updatedOrder.items });
+    crudAction('upsert_operation', { operation: op, item: updatedItem, locationStocks: updatedLocationStocks });
+    onClose();
   };
 
   return (
@@ -306,9 +312,14 @@ export function QRScanModal({ order, state, onStateChange, onClose }: {
       to: liveOrder.recipientName || liveOrder.title,
       performedBy: state.currentUser, date: new Date().toISOString(), orderId: liveOrder.id, locationId: selectedLocationId,
     };
-    next = { ...next, operations: [op, ...next.operations], workOrders: next.workOrders.map(o => o.id === liveOrder.id
-      ? { ...o, items: newItems, status: allDone ? 'assembled' as OrderStatus : o.status, updatedAt: new Date().toISOString() } : o) };
-    onStateChange(next); saveState(next); onClose();
+    const updatedWorkOrder = { ...liveOrder, items: newItems, status: allDone ? 'assembled' as OrderStatus : liveOrder.status, updatedAt: new Date().toISOString() };
+    next = { ...next, operations: [op, ...next.operations], workOrders: next.workOrders.map(o => o.id === liveOrder.id ? updatedWorkOrder : o) };
+    onStateChange(next);
+    const updatedItem = next.items.find(i => i.id === foundItem.item.id);
+    const updatedLocationStocks = (next.locationStocks || []).filter(ls => ls.itemId === foundItem.item.id);
+    crudAction('upsert_work_order', { workOrder: updatedWorkOrder, orderItems: updatedWorkOrder.items });
+    crudAction('upsert_operation', { operation: op, item: updatedItem, locationStocks: updatedLocationStocks });
+    onClose();
   };
 
   return (

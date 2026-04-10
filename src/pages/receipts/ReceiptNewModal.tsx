@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import Autocomplete, { AutocompleteOption } from '@/components/Autocomplete';
 import {
-  AppState, saveState, generateId,
+  AppState, crudAction, generateId,
   Receipt, ReceiptLine, ReceiptCustomField,
   Partner, Item,
 } from '@/data/store';
@@ -104,16 +104,18 @@ export function NewReceiptModal({
     let next = { ...state };
 
     let finalSupplierId = supplierId;
+    let newSupplierPartner: Partner | null = null;
     if (supplierLabel.trim() && !supplierId) {
-      const newPartner: Partner = {
+      newSupplierPartner = {
         id: generateId(), name: supplierLabel.trim(), type: 'supplier',
         createdAt: new Date().toISOString(),
       };
-      next = { ...next, partners: [...(next.partners || []), newPartner] };
-      finalSupplierId = newPartner.id;
+      next = { ...next, partners: [...(next.partners || []), newSupplierPartner] };
+      finalSupplierId = newSupplierPartner.id;
     }
 
     const receiptLines: ReceiptLine[] = [];
+    const newItems: Item[] = [];
 
     for (const line of validLines) {
       const qty = parseInt(line.qty) || 0;
@@ -135,6 +137,7 @@ export function NewReceiptModal({
         };
         next = { ...next, items: [...next.items, newItem] };
         itemId = newItem.id;
+        newItems.push(newItem);
       }
 
       receiptLines.push({
@@ -166,14 +169,22 @@ export function NewReceiptModal({
       scanHistory: [],
     };
 
+    const newCounter = (next.receiptCounter || 1) + 1;
     next = {
       ...next,
       receipts: [receipt, ...(next.receipts || [])],
-      receiptCounter: (next.receiptCounter || 1) + 1,
+      receiptCounter: newCounter,
     };
 
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_receipt', { receipt, receiptLines: receipt.lines });
+    crudAction('update_setting', { key: 'receiptCounter', value: String(newCounter) });
+    for (const newItem of newItems) {
+      crudAction('upsert_item', { item: newItem });
+    }
+    if (newSupplierPartner) {
+      crudAction('upsert_partner', { partner: newSupplierPartner });
+    }
     onCreated?.(receipt);
     onClose();
   };

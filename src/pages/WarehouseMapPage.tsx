@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState, Location, Operation, Warehouse, saveState, generateId, LocationStock, updateLocationStock, getWarehouseStock, updateWarehouseStock } from '@/data/store';
+import { AppState, Location, Operation, Warehouse, crudAction, generateId, LocationStock, updateLocationStock, getWarehouseStock, updateWarehouseStock } from '@/data/store';
 import ItemDetailModal from '@/components/ItemDetailModal';
 
 type Props = {
@@ -121,7 +121,10 @@ function AddItemToLocationModal({
     if (isInvalid) return;
     // Только перераспределяем locationStock — warehouseStock и item.quantity НЕ меняем
     const next = updateLocationStock(state, itemId, locationId, qtyNum);
-    onStateChange(next); saveState(next); onClose();
+    onStateChange(next);
+    const updatedLocationStock = (next.locationStocks || []).find(ls => ls.itemId === itemId && ls.locationId === locationId);
+    if (updatedLocationStock) crudAction('upsert_location_stock', { locationStock: updatedLocationStock });
+    onClose();
   };
 
   return (
@@ -263,7 +266,8 @@ function AddLocationModal({
             : l
         ),
       };
-      onStateChange(next); saveState(next);
+      const updatedLocation = { ...editLocation, name: name.trim(), description: description.trim() || undefined, parentId: parentId || undefined, warehouseId: warehouseId || undefined };
+      onStateChange(next); crudAction('upsert_location', { location: updatedLocation });
     } else {
       const newLoc: Location = {
         id: generateId(),
@@ -273,7 +277,7 @@ function AddLocationModal({
         warehouseId: warehouseId || undefined,
       };
       const next = { ...state, locations: [...state.locations, newLoc] };
-      onStateChange(next); saveState(next);
+      onStateChange(next); crudAction('upsert_location', { location: newLoc });
     }
     onClose();
   };
@@ -375,7 +379,13 @@ function MoveItemModal({
     }
 
     const next = { ...state, locationStocks: newStocks, items: updatedItems };
-    onStateChange(next); saveState(next);
+    onStateChange(next);
+    const fromLS = newStocks.find(ls => ls.itemId === itemId && ls.locationId === fromLocationId);
+    const toLS = newStocks.find(ls => ls.itemId === itemId && ls.locationId === toLocationId);
+    const affectedStocks = [fromLS, toLS].filter(Boolean);
+    for (const ls of affectedStocks) {
+      crudAction('upsert_location_stock', { locationStock: ls });
+    }
     onClose();
   };
 
@@ -756,7 +766,10 @@ function TransferWarehouseModal({
     };
     next = { ...next, operations: [opIn, op, ...next.operations] };
     onStateChange(next);
-    saveState(next);
+    const updatedItem = next.items.find(i => i.id === itemId);
+    const wsArr = (next.warehouseStocks || []).filter(w => w.itemId === itemId);
+    crudAction('upsert_operation', { operation: op, item: updatedItem, warehouseStocks: wsArr });
+    crudAction('upsert_operation', { operation: opIn, item: updatedItem, warehouseStocks: wsArr });
     onClose();
   };
 
@@ -986,7 +999,7 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
       locations: state.locations.filter(l => l.id !== locId),
       locationStocks: (state.locationStocks || []).filter(ls => ls.locationId !== locId),
     };
-    onStateChange(next); saveState(next);
+    onStateChange(next); crudAction('delete_location', { locationId: locId });
     if (selectedLocationId === locId) setSelectedLocationId(null);
 
     // Also remove from layout

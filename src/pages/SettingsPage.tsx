@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import { AppState, saveState, Category, Location, Warehouse, generateId } from '@/data/store';
+import { AppState, crudAction, Category, Location, Warehouse, generateId } from '@/data/store';
 
 type Props = {
   state: AppState;
@@ -38,7 +38,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
   const saveProfile = () => {
     const next = { ...state, currentUser: userName, defaultLowStockThreshold: parseInt(threshold) || 5 };
     onStateChange(next);
-    saveState(next);
+    crudAction('update_settings', { settings: { currentUser: userName, defaultLowStockThreshold: String(threshold) } });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -48,7 +48,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
     const cat: Category = { id: generateId(), name: newCatName.trim(), color: newCatColor };
     const next = { ...state, categories: [...state.categories, cat] };
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_category', { category: cat });
     setNewCatName('');
   };
 
@@ -60,7 +60,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
       items: state.items.map(i => i.categoryId === id ? { ...i, categoryId: fallback } : i),
     };
     onStateChange(next);
-    saveState(next);
+    crudAction('delete_category', { categoryId: id, fallbackCategoryId: fallback });
   };
 
   const addLocation = () => {
@@ -77,7 +77,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
     };
     const next = { ...state, locations: [...state.locations, loc] };
     onStateChange(next);
-    saveState(next);
+    crudAction('upsert_location', { location: loc });
     setNewLocName('');
     setNewLocDesc('');
     setNewLocParent('');
@@ -94,7 +94,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
       locationStocks: state.locationStocks.filter(ls => !idsToRemove.includes(ls.locationId)),
     };
     onStateChange(next);
-    saveState(next);
+    crudAction('delete_location', { locationId: id });
   };
 
   const addWarehouse = () => {
@@ -106,7 +106,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
       createdAt: new Date().toISOString(),
     };
     const next = { ...state, warehouses: [...(state.warehouses || []), wh] };
-    onStateChange(next); saveState(next);
+    onStateChange(next); crudAction('upsert_warehouse', { warehouse: wh });
     setNewWhName(''); setNewWhAddress(''); setNewWhDesc('');
   };
 
@@ -118,7 +118,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
       warehouseStocks: (state.warehouseStocks || []).filter(ws => ws.warehouseId !== id),
       locations: state.locations.map(l => l.warehouseId === id ? { ...l, warehouseId: fallbackWh } : l),
     };
-    onStateChange(next); saveState(next);
+    onStateChange(next); crudAction('delete_warehouse', { warehouseId: id });
   };
 
   const sections = [
@@ -176,7 +176,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
                     onCheckedChange={v => {
                       const next = { ...state, darkMode: v };
                       onStateChange(next);
-                      saveState(next);
+                      crudAction('update_setting', { key: 'darkMode', value: String(!state.darkMode) });
                     }}
                   />
                 </div>
