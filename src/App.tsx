@@ -16,7 +16,9 @@ import DashboardPage from '@/pages/DashboardPage';
 import InventoryPage from '@/pages/InventoryPage';
 import LabelsPage from '@/pages/LabelsPage';
 import AuditPage from '@/pages/AuditPage';
-import { AuthContext, AuthUser } from '@/data/auth';
+import { AuthContext, AuthUser, apiLogin, apiLogout, apiMe, setToken, getToken } from '@/data/auth';
+import LoginPage from '@/pages/LoginPage';
+import Icon from '@/components/ui/icon';
 
 const POLL_INTERVAL = 5000;
 
@@ -30,16 +32,49 @@ function parseQRParams() {
 }
 
 export default function App() {
-  // ── Auth state (disabled — bypass) ──────────────────────────────────────
-  const bypassUser: AuthUser = { id: 'local', username: 'admin', displayName: 'Администратор', role: 'admin' };
+  // ── Auth state ───────────────────────────────────────────────────────────
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) { setAuthLoading(false); return; }
+    apiMe().then(user => {
+      setAuthUser(user);
+      setAuthLoading(false);
+    });
+  }, []);
+
+  const login = async (username: string, password: string): Promise<string | null> => {
+    const result = await apiLogin(username, password);
+    if ('error' in result) return result.error;
+    setToken(result.token);
+    setAuthUser(result.user);
+    setState(prev => ({ ...prev, currentUser: result.user.displayName }));
+    return null;
+  };
+
+  const logout = async () => {
+    await apiLogout();
+    setAuthUser(null);
+  };
+
+  const refreshAuth = async () => {
+    const user = await apiMe();
+    setAuthUser(user);
+  };
+
+  const canEdit = authUser?.role === 'admin' || authUser?.role === 'warehouse';
+  const isAdmin = authUser?.role === 'admin';
+
   const authCtx = {
-    user: bypassUser,
-    loading: false,
-    login: async () => null,
-    logout: async () => {},
-    refresh: async () => {},
-    canEdit: true,
-    isAdmin: true,
+    user: authUser,
+    loading: authLoading,
+    login,
+    logout,
+    refresh: refreshAuth,
+    canEdit,
+    isAdmin,
   };
 
   // ── App state ────────────────────────────────────────────────────────────
@@ -122,6 +157,13 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={authCtx}>
+      {authLoading ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <Icon name="Loader2" size={32} className="animate-spin text-primary" />
+        </div>
+      ) : !authUser ? (
+        <LoginPage />
+      ) : (
       <TooltipProvider>
         <Toaster position="top-right" />
         <Layout
@@ -146,6 +188,7 @@ export default function App() {
           {page === 'settings'     && <SettingsPage state={state} onStateChange={handleStateChange} />}
         </Layout>
       </TooltipProvider>
+      )}
     </AuthContext.Provider>
   );
 }
