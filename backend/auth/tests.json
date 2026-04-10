@@ -1,0 +1,30 @@
+{
+  "tests": [
+    {
+      "name": "Login with admin",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "username": "admin", "password": "admin"},
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login wrong password",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "username": "admin", "password": "wrong"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Me without token",
+      "method": "GET",
+      "path": "/?action=me",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

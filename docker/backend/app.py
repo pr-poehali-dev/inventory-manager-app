@@ -6,11 +6,13 @@
 import json
 import os
 import re
-from datetime import datetime, date
+import uuid
+from datetime import datetime, date, timedelta, timezone
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import psycopg2
 import psycopg2.extras
+import bcrypt
 
 app = Flask(__name__)
 CORS(app)
@@ -511,6 +513,8 @@ def ensure_tables():
         ("receipts", "id TEXT PRIMARY KEY, number TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', supplier_id TEXT, supplier_name TEXT NOT NULL, warehouse_id TEXT, date TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by TEXT NOT NULL, comment TEXT, total_amount NUMERIC, posted_at TIMESTAMPTZ, custom_fields JSONB DEFAULT '[]', scan_history JSONB DEFAULT '[]'"),
         ("receipt_lines", "id TEXT PRIMARY KEY, receipt_id TEXT NOT NULL, item_id TEXT NOT NULL, item_name TEXT NOT NULL, qty INTEGER NOT NULL DEFAULT 0, confirmed_qty INTEGER NOT NULL DEFAULT 0, location_id TEXT, price NUMERIC, unit TEXT NOT NULL DEFAULT 'шт', is_new BOOLEAN DEFAULT FALSE"),
         ("tech_docs", "id TEXT PRIMARY KEY, item_id TEXT NOT NULL, doc_number TEXT, doc_date TEXT, doc_type TEXT NOT NULL, supplier TEXT, notes TEXT, custom_fields JSONB DEFAULT '[]', attachments JSONB DEFAULT '[]', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by TEXT NOT NULL"),
+        ("users", "id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, display_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'viewer', is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"),
+        ("sessions", "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token TEXT NOT NULL UNIQUE, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), ip_address TEXT"),
     ]:
         cur.execute(f"CREATE TABLE IF NOT EXISTS {SCHEMA}.{tbl} ({cols_def})")
 
@@ -521,6 +525,12 @@ def ensure_tables():
             ('receiptCounter', '1'), ('taskCounter', '1')
         ON CONFLICT (key) DO NOTHING
     """)
+    admin_hash = bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode()
+    cur.execute(f"""
+        INSERT INTO {SCHEMA}.users (id, username, password_hash, display_name, role)
+        VALUES ('user-admin-1', 'admin', %s, 'Администратор', 'admin')
+        ON CONFLICT (id) DO NOTHING
+    """, (admin_hash,))
     conn.commit()
     cur.close()
     conn.close()
@@ -584,6 +594,185 @@ def crud_handler():
 
     conn.close()
     return jsonify({"error": "method not allowed"}), 405
+
+
+# ── Auth routes ──────────────────────────────────────────────────────────────
+
+def _hash_pw(password):
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+def _verify_pw(password, hashed):
+    try:
+        return bcrypt.checkpw(password.encode(), hashed.encode())
+    except Exception:
+        return password == hashed
+
+def _get_auth_token():
+    return request.headers.get('X-Auth-Token') or request.headers.get('x-auth-token') or ''
+
+def _authenticate(cur):
+    token = _get_auth_token()
+    if not token:
+        return None
+    cur.execute(f"SELECT s.user_id, s.expires_at, u.id, u.username, u.display_name, u.role, u.is_active FROM {SCHEMA}.sessions s JOIN {SCHEMA}.users u ON s.user_id = u.id WHERE s.token = %s", (token,))
+    row = cur.fetchone()
+    if not row:
+        return None
+    _, expires_at, uid, uname, dname, role, active = row
+    if not active or (expires_at and expires_at < datetime.now(timezone.utc)):
+        return None
+    return {"id": uid, "username": uname, "displayName": dname, "role": role}
+
+
+@app.route("/api/auth", methods=["GET", "POST", "OPTIONS"])
+def auth_handler():
+    if request.method == "OPTIONS":
+        return "", 200
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        if request.method == "GET":
+            action = request.args.get("action", "me")
+            if action == "me":
+                user = _authenticate(cur)
+                conn.close()
+                if not user:
+                    return jsonify({"error": "unauthorized"}), 401
+                return jsonify({"user": user})
+
+            if action == "list_users":
+                user = _authenticate(cur)
+                if not user or user["role"] != "admin":
+                    conn.close()
+                    return jsonify({"error": "forbidden"}), 403
+                cur.execute(f"SELECT id, username, display_name, role, is_active, created_at FROM {SCHEMA}.users ORDER BY created_at")
+                cols = [d[0] for d in cur.description]
+                rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+                conn.close()
+                users = [{"id": r["id"], "username": r["username"], "displayName": r["display_name"], "role": r["role"], "isActive": r["is_active"], "createdAt": r["created_at"].isoformat() if r["created_at"] else None} for r in rows]
+                return jsonify({"users": users})
+
+        if request.method == "POST":
+            body = request.get_json(force=True)
+            action = body.get("action", "")
+
+            if action == "login":
+                username = body.get("username", "")
+                password = body.get("password", "")
+                cur.execute(f"SELECT id, username, password_hash, display_name, role, is_active FROM {SCHEMA}.users WHERE username = %s", (username,))
+                row = cur.fetchone()
+                if not row:
+                    conn.close()
+                    return jsonify({"error": "Неверный логин или пароль"}), 401
+                uid, uname, pw_hash, dname, role, active = row
+                if not active:
+                    conn.close()
+                    return jsonify({"error": "Аккаунт заблокирован"}), 401
+                if not _verify_pw(password, pw_hash):
+                    conn.close()
+                    return jsonify({"error": "Неверный логин или пароль"}), 401
+                token = str(uuid.uuid4())
+                expires = datetime.now(timezone.utc) + timedelta(days=30)
+                cur.execute(f"INSERT INTO {SCHEMA}.sessions (id, user_id, token, expires_at, ip_address) VALUES (%s, %s, %s, %s, %s)",
+                    (str(uuid.uuid4()), uid, token, expires, request.remote_addr or ''))
+                cur.execute(f"DELETE FROM {SCHEMA}.sessions WHERE expires_at < NOW()")
+                conn.commit()
+                conn.close()
+                return jsonify({"ok": True, "token": token, "user": {"id": uid, "username": uname, "displayName": dname, "role": role}})
+
+            if action == "logout":
+                tok = _get_auth_token()
+                if tok:
+                    cur.execute(f"DELETE FROM {SCHEMA}.sessions WHERE token = %s", (tok,))
+                    conn.commit()
+                conn.close()
+                return jsonify({"ok": True})
+
+            if action == "register":
+                user = _authenticate(cur)
+                if not user or user["role"] != "admin":
+                    conn.close()
+                    return jsonify({"error": "forbidden"}), 403
+                uname = body.get("username", "").strip()
+                pw = body.get("password", "")
+                dname = body.get("displayName", uname)
+                role = body.get("role", "viewer")
+                if not uname or not pw:
+                    conn.close()
+                    return jsonify({"error": "Заполните логин и пароль"}), 400
+                pw_hash = _hash_pw(pw)
+                uid = str(uuid.uuid4())
+                try:
+                    cur.execute(f"INSERT INTO {SCHEMA}.users (id, username, password_hash, display_name, role) VALUES (%s, %s, %s, %s, %s)",
+                        (uid, uname, pw_hash, dname, role))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    conn.close()
+                    return jsonify({"error": "Логин уже занят"}), 400
+                conn.close()
+                return jsonify({"ok": True, "user": {"id": uid, "username": uname, "displayName": dname, "role": role}})
+
+            if action == "change_password":
+                user = _authenticate(cur)
+                if not user:
+                    conn.close()
+                    return jsonify({"error": "unauthorized"}), 401
+                target_id = body.get("userId", "")
+                new_pw = body.get("newPassword", "")
+                if user["role"] != "admin" and target_id != user["id"]:
+                    conn.close()
+                    return jsonify({"error": "forbidden"}), 403
+                pw_hash = _hash_pw(new_pw)
+                cur.execute(f"UPDATE {SCHEMA}.users SET password_hash = %s, updated_at = NOW() WHERE id = %s", (pw_hash, target_id))
+                conn.commit()
+                conn.close()
+                return jsonify({"ok": True})
+
+            if action == "update_user":
+                user = _authenticate(cur)
+                if not user or user["role"] != "admin":
+                    conn.close()
+                    return jsonify({"error": "forbidden"}), 403
+                target_id = body.get("userId", "")
+                sets = []
+                vals = []
+                if "displayName" in body:
+                    sets.append("display_name = %s"); vals.append(body["displayName"])
+                if "role" in body:
+                    sets.append("role = %s"); vals.append(body["role"])
+                if "isActive" in body:
+                    sets.append("is_active = %s"); vals.append(body["isActive"])
+                if sets:
+                    sets.append("updated_at = NOW()")
+                    vals.append(target_id)
+                    cur.execute(f"UPDATE {SCHEMA}.users SET {', '.join(sets)} WHERE id = %s", vals)
+                    conn.commit()
+                conn.close()
+                return jsonify({"ok": True})
+
+            if action == "delete_user":
+                user = _authenticate(cur)
+                if not user or user["role"] != "admin":
+                    conn.close()
+                    return jsonify({"error": "forbidden"}), 403
+                target_id = body.get("userId", "")
+                if target_id == user["id"]:
+                    conn.close()
+                    return jsonify({"error": "Нельзя удалить себя"}), 400
+                cur.execute(f"DELETE FROM {SCHEMA}.sessions WHERE user_id = %s", (target_id,))
+                cur.execute(f"DELETE FROM {SCHEMA}.users WHERE id = %s", (target_id,))
+                conn.commit()
+                conn.close()
+                return jsonify({"ok": True})
+
+        conn.close()
+        return jsonify({"error": "unknown action"}), 400
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/health", methods=["GET"])

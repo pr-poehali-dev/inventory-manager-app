@@ -177,7 +177,33 @@ INSERT INTO public.app_settings (key, value) VALUES
     ('taskCounter', '1')
 ON CONFLICT (key) DO NOTHING;
 
+-- Пользователи
+CREATE TABLE IF NOT EXISTS public.users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin', 'warehouse', 'viewer')),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Сессии
+CREATE TABLE IF NOT EXISTS public.sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ip_address TEXT
+);
+
+-- Админ по умолчанию (пароль: admin) — хеш создаётся при старте бэкенда
+
 -- Индексы
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON public.sessions(token);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON public.sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_operations_item_id ON public.operations(item_id);
 CREATE INDEX IF NOT EXISTS idx_operations_date ON public.operations(date DESC);
 CREATE INDEX IF NOT EXISTS idx_location_stocks_item ON public.location_stocks(item_id);

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Icon from '@/components/ui/icon';
 import { AppState, crudAction } from '@/data/store';
 import QRScanner from '@/components/QRScanner';
+import { useAuth } from '@/data/auth';
 
 export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'technician' | 'partners' | 'history' | 'settings';
 
@@ -16,6 +17,7 @@ type LayoutProps = {
 export default function Layout({ state, onStateChange, activePage, onPageChange, children, onQRResult }: LayoutProps & {
   onQRResult?: (type: string, id: string) => void;
 }) {
+  const { user: authUser, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
@@ -113,9 +115,17 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
               className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
               <Icon name={state.darkMode ? 'Sun' : 'Moon'} size={15} />
             </button>
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-sm font-medium text-muted-foreground">
-              <Icon name="User" size={13} />
-              <span className="max-w-20 truncate">{state.currentUser}</span>
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-sm font-medium text-muted-foreground">
+                <Icon name="User" size={13} />
+                <span className="max-w-24 truncate">{authUser?.displayName || state.currentUser}</span>
+                {authUser?.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-semibold">Админ</span>}
+                {authUser?.role === 'warehouse' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-600 dark:text-green-400 font-semibold">Склад</span>}
+                {authUser?.role === 'viewer' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted-foreground/15 text-muted-foreground font-semibold">Просмотр</span>}
+              </div>
+              <button onClick={() => logout()} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Выйти">
+                <Icon name="LogOut" size={16} />
+              </button>
             </div>
             {/* Hamburger for tablet (shown between sm and xl) */}
             <button className="xl:hidden w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted"

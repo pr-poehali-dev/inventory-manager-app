@@ -12,6 +12,9 @@ import ReceiptsPage from '@/pages/ReceiptsPage';
 import TechnicianPage from '@/pages/TechnicianPage';
 import HistoryPage from '@/pages/HistoryPage';
 import SettingsPage from '@/pages/SettingsPage';
+import Icon from '@/components/ui/icon';
+import { AuthContext, AuthUser, apiLogin, apiLogout, apiMe, setToken, getToken } from '@/data/auth';
+import LoginPage from '@/pages/LoginPage';
 
 const POLL_INTERVAL = 5000;
 
@@ -25,6 +28,53 @@ function parseQRParams() {
 }
 
 export default function App() {
+  // ── Auth state ───────────────────────────────────────────────────────────
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) { setAuthLoading(false); return; }
+    apiMe().then(user => {
+      setAuthUser(user);
+      setAuthLoading(false);
+    });
+  }, []);
+
+  const login = async (username: string, password: string): Promise<string | null> => {
+    const result = await apiLogin(username, password);
+    if ('error' in result) return result.error;
+    setToken(result.token);
+    setAuthUser(result.user);
+    // Update currentUser in AppState
+    setState(prev => ({ ...prev, currentUser: result.user.displayName }));
+    return null;
+  };
+
+  const logout = async () => {
+    await apiLogout();
+    setAuthUser(null);
+  };
+
+  const refreshAuth = async () => {
+    const user = await apiMe();
+    setAuthUser(user);
+  };
+
+  const canEdit = authUser?.role === 'admin' || authUser?.role === 'warehouse';
+  const isAdmin = authUser?.role === 'admin';
+
+  const authCtx = {
+    user: authUser,
+    loading: authLoading,
+    login,
+    logout,
+    refresh: refreshAuth,
+    canEdit,
+    isAdmin,
+  };
+
+  // ── App state ────────────────────────────────────────────────────────────
   const [state, setState] = useState<AppState>(loadState);
   const [page, setPage] = useState<Page>('catalog');
 
@@ -103,25 +153,35 @@ export default function App() {
   };
 
   return (
-    <TooltipProvider>
-      <Toaster position="top-right" />
-      <Layout
-        state={state}
-        onStateChange={handleStateChange}
-        activePage={page}
-        onPageChange={handlePageChange}
-        onQRResult={handleQRResult}
-      >
-        {page === 'catalog'      && <CatalogPage state={state} onStateChange={handleStateChange} initialItemId={qrItemId} />}
-        {page === 'nomenclature' && <NomenclaturePage state={state} onStateChange={handleStateChange} />}
-        {page === 'assembly'     && <AssemblyPage state={state} onStateChange={handleStateChange} initialOrderId={qrOrderId} />}
-        {page === 'warehouse'    && <WarehouseMapPage state={state} onStateChange={handleStateChange} initialLocationId={qrLocationId} />}
-        {page === 'receipts'     && <ReceiptsPage state={state} onStateChange={handleStateChange} />}
-        {page === 'technician'   && <TechnicianPage state={state} onStateChange={handleStateChange} />}
-        {page === 'partners'     && <PartnersPage state={state} onStateChange={handleStateChange} />}
-        {page === 'history'      && <HistoryPage state={state} />}
-        {page === 'settings'     && <SettingsPage state={state} onStateChange={handleStateChange} />}
-      </Layout>
-    </TooltipProvider>
+    <AuthContext.Provider value={authCtx}>
+      {authLoading ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <Icon name="Loader2" size={32} className="animate-spin text-primary" />
+        </div>
+      ) : !authUser ? (
+        <LoginPage />
+      ) : (
+        <TooltipProvider>
+          <Toaster position="top-right" />
+          <Layout
+            state={state}
+            onStateChange={handleStateChange}
+            activePage={page}
+            onPageChange={handlePageChange}
+            onQRResult={handleQRResult}
+          >
+            {page === 'catalog'      && <CatalogPage state={state} onStateChange={handleStateChange} initialItemId={qrItemId} />}
+            {page === 'nomenclature' && <NomenclaturePage state={state} onStateChange={handleStateChange} />}
+            {page === 'assembly'     && <AssemblyPage state={state} onStateChange={handleStateChange} initialOrderId={qrOrderId} />}
+            {page === 'warehouse'    && <WarehouseMapPage state={state} onStateChange={handleStateChange} initialLocationId={qrLocationId} />}
+            {page === 'receipts'     && <ReceiptsPage state={state} onStateChange={handleStateChange} />}
+            {page === 'technician'   && <TechnicianPage state={state} onStateChange={handleStateChange} />}
+            {page === 'partners'     && <PartnersPage state={state} onStateChange={handleStateChange} />}
+            {page === 'history'      && <HistoryPage state={state} />}
+            {page === 'settings'     && <SettingsPage state={state} onStateChange={handleStateChange} />}
+          </Layout>
+        </TooltipProvider>
+      )}
+    </AuthContext.Provider>
   );
 }

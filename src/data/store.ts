@@ -364,10 +364,17 @@ function resolveCrudApi(): string {
 }
 const CRUD_API = resolveCrudApi();
 
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('stockbase_auth_token');
+  return token ? { 'X-Auth-Token': token } : {};
+}
+
 /** Только проверить updatedAt на сервере (лёгкий запрос, ~100 байт). */
 export async function checkServerUpdatedAt(): Promise<string | null> {
   try {
-    const res = await fetch(`${CRUD_API}?action=check`);
+    const res = await fetch(`${CRUD_API}?action=check`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return null;
     const json = await res.json();
     return json.updatedAt ?? null;
@@ -379,7 +386,9 @@ export async function checkServerUpdatedAt(): Promise<string | null> {
 /** Загрузить состояние с сервера. Возвращает null если сервер вернул пустое. */
 export async function loadStateFromServer(): Promise<{ state: AppState; updatedAt: string } | null> {
   try {
-    const res = await fetch(`${CRUD_API}?action=load_all`);
+    const res = await fetch(`${CRUD_API}?action=load_all`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return null;
     const json = await res.json();
     if (!json.data) return null;
@@ -394,7 +403,7 @@ export async function saveStateToServer(state: AppState): Promise<string | null>
   try {
     const res = await fetch(CRUD_API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ action: 'save_all', data: state }),
     });
     if (!res.ok) return null;
@@ -410,7 +419,7 @@ export async function crudAction(action: string, payload: Record<string, unknown
   try {
     const res = await fetch(CRUD_API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ action, ...payload }),
     });
     return res.ok;
