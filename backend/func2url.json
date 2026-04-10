@@ -1,4 +1,5 @@
 {
   "crud": "https://functions.poehali.dev/70970e31-8f51-4890-a143-fc1872d0054b",
-  "auth": "https://functions.poehali.dev/95288880-cdba-4f48-b5e8-7f16fb9d0e31"
+  "auth": "https://functions.poehali.dev/95288880-cdba-4f48-b5e8-7f16fb9d0e31",
+  "telegram-notify": "https://functions.poehali.dev/ee8097ba-6926-4cdb-ac81-985a17bf68dc"
 }

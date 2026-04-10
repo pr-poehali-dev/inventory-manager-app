@@ -1,0 +1,47 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST without chatId returns error",
+      "method": "POST",
+      "path": "/",
+      "body": { "action": "test" },
+      "expectedStatus": 400,
+      "expectedBody": { "error": "string" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST unknown action returns error",
+      "method": "POST",
+      "path": "/",
+      "body": { "action": "unknown_action", "chatId": "123" },
+      "expectedStatus": 400,
+      "expectedBody": { "error": "string" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST send_message without text returns error",
+      "method": "POST",
+      "path": "/",
+      "body": { "action": "send_message", "chatId": "123" },
+      "expectedStatus": 400,
+      "expectedBody": { "error": "string" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST send_low_stock with empty items skips",
+      "method": "POST",
+      "path": "/",
+      "body": { "action": "send_low_stock", "chatId": "123", "items": [] },
+      "expectedStatus": 200,
+      "expectedBody": { "ok": true, "skipped": true },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

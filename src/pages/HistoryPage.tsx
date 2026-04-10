@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { AppState } from '@/data/store';
+import { exportOperationsToExcel } from '@/utils/exportExcel';
 
 type Props = {
   state: AppState;
@@ -65,6 +67,21 @@ export default function HistoryPage({ state }: Props) {
             {(state.operations || []).length} операций · все приходы и расходы
           </p>
         </div>
+        <Button variant="outline" size="sm" onClick={() => {
+          const itemMap = new Map(state.items.map(i => [i.id, i.name]));
+          exportOperationsToExcel(state.operations.map(op => ({
+            date: new Date(op.date).toLocaleString('ru'),
+            item: itemMap.get(op.itemId) || op.itemId,
+            type: op.type === 'in' ? 'Приход' : 'Расход',
+            quantity: op.quantity,
+            from: op.from || '',
+            to: op.to || '',
+            performedBy: op.performedBy,
+            comment: op.comment,
+          })));
+        }}>
+          <Icon name="Download" size={14} className="mr-1.5" />Excel
+        </Button>
       </div>
 
       {/* Stats */}

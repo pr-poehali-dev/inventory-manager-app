@@ -12,6 +12,10 @@ import ReceiptsPage from '@/pages/ReceiptsPage';
 import TechnicianPage from '@/pages/TechnicianPage';
 import HistoryPage from '@/pages/HistoryPage';
 import SettingsPage from '@/pages/SettingsPage';
+import DashboardPage from '@/pages/DashboardPage';
+import InventoryPage from '@/pages/InventoryPage';
+import LabelsPage from '@/pages/LabelsPage';
+import AuditPage from '@/pages/AuditPage';
 import { AuthContext, AuthUser } from '@/data/auth';
 
 const POLL_INTERVAL = 5000;
@@ -127,14 +131,18 @@ export default function App() {
           onPageChange={handlePageChange}
           onQRResult={handleQRResult}
         >
+          {page === 'dashboard'    && <DashboardPage state={state} />}
           {page === 'catalog'      && <CatalogPage state={state} onStateChange={handleStateChange} initialItemId={qrItemId} />}
           {page === 'nomenclature' && <NomenclaturePage state={state} onStateChange={handleStateChange} />}
           {page === 'assembly'     && <AssemblyPage state={state} onStateChange={handleStateChange} initialOrderId={qrOrderId} />}
           {page === 'warehouse'    && <WarehouseMapPage state={state} onStateChange={handleStateChange} initialLocationId={qrLocationId} />}
           {page === 'receipts'     && <ReceiptsPage state={state} onStateChange={handleStateChange} />}
+          {page === 'inventory'    && <InventoryPage state={state} onStateChange={handleStateChange} />}
           {page === 'technician'   && <TechnicianPage state={state} onStateChange={handleStateChange} />}
           {page === 'partners'     && <PartnersPage state={state} onStateChange={handleStateChange} />}
+          {page === 'labels'       && <LabelsPage state={state} />}
           {page === 'history'      && <HistoryPage state={state} />}
+          {page === 'audit'        && <AuditPage state={state} />}
           {page === 'settings'     && <SettingsPage state={state} onStateChange={handleStateChange} />}
         </Layout>
       </TooltipProvider>

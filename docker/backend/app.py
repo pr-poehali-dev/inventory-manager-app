@@ -7,6 +7,7 @@ import json
 import os
 import re
 import uuid
+import urllib.request
 from datetime import datetime, date, timedelta, timezone
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -773,6 +774,65 @@ def auth_handler():
         conn.rollback()
         conn.close()
         return jsonify({"error": str(e)}), 500
+
+
+# ── Telegram notify ───────────────────────────────────────────────────────────
+
+def _send_telegram(chat_id, text):
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if not token:
+        return False
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = json.dumps({"chat_id": chat_id, "text": text, "parse_mode": "HTML"}).encode()
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=10)
+        return True
+    except Exception:
+        return False
+
+
+@app.route("/api/telegram-notify", methods=["POST", "OPTIONS"])
+def telegram_handler():
+    if request.method == "OPTIONS":
+        return "", 200
+    body = request.get_json(force=True)
+    action = body.get("action", "")
+    chat_id = body.get("chatId", "")
+    if not chat_id:
+        return jsonify({"error": "chatId обязателен"}), 400
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if not token:
+        return jsonify({"error": "TELEGRAM_BOT_TOKEN не настроен"}), 500
+    if action == "test":
+        ok = _send_telegram(chat_id, "✅ <b>StockBase подключен!</b>\nУведомления работают.")
+        return jsonify({"ok": True}) if ok else (jsonify({"error": "Не удалось отправить"}), 400)
+    if action == "send_low_stock":
+        items = body.get("items", [])
+        if not items:
+            return jsonify({"ok": True, "skipped": True})
+        lines = ["⚠️ <b>Низкий остаток!</b>\n"]
+        for it in items:
+            lines.append(f"• <b>{it['name']}</b> — {it['quantity']} {it.get('unit', 'шт')} (порог: {it['threshold']})")
+        lines.append(f"\nТоваров с низким остатком: {len(items)}")
+        ok = _send_telegram(chat_id, "\n".join(lines))
+        return jsonify({"ok": True}) if ok else (jsonify({"error": "Ошибка отправки"}), 500)
+    if action == "send_operation":
+        item_name = body.get("itemName", "?")
+        op_type = body.get("type", "in")
+        qty = body.get("quantity", 0)
+        who = body.get("performedBy", "?")
+        emoji = "📥" if op_type == "in" else "📤"
+        label = "Приход" if op_type == "in" else "Расход"
+        ok = _send_telegram(chat_id, f"{emoji} <b>{label}</b>\n{item_name} × {qty}\nИсполнитель: {who}")
+        return jsonify({"ok": True}) if ok else (jsonify({"error": "Ошибка отправки"}), 500)
+    if action == "send_message":
+        text = body.get("text", "")
+        if not text:
+            return jsonify({"error": "text обязателен"}), 400
+        ok = _send_telegram(chat_id, text)
+        return jsonify({"ok": True}) if ok else (jsonify({"error": "Ошибка отправки"}), 500)
+    return jsonify({"error": f"unknown action: {action}"}), 400
 
 
 @app.route("/health", methods=["GET"])

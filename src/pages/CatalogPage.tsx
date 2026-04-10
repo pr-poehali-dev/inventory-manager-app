@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { AppState } from '@/data/store';
+import { exportItemsToExcel } from '@/utils/exportExcel';
 import ItemCard from '@/components/ItemCard';
 import ItemDetailModal from '@/components/ItemDetailModal';
 
@@ -66,16 +67,34 @@ export default function CatalogPage({ state, onStateChange, initialItemId }: Pro
           <h1 className="text-2xl font-bold text-foreground">Каталог товаров</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{state.items.length} позиций на складе</p>
         </div>
-        {lowCount > 0 && (
-          <button
-            onClick={() => setShowLowOnly(!showLowOnly)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
-              ${showLowOnly ? 'bg-destructive text-destructive-foreground' : 'bg-destructive/10 text-destructive hover:bg-destructive/20'}`}
-          >
-            <Icon name="AlertTriangle" size={13} />
-            {lowCount} мало
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => {
+            const categoryMap = new Map(state.categories.map(c => [c.id, c.name]));
+            const warehouseMap = new Map(state.warehouses.map(w => [w.id, w.name]));
+            const locationMap = new Map(state.locations.map(l => [l.id, l.name]));
+            exportItemsToExcel(state.items.map(item => ({
+              name: item.name,
+              category: categoryMap.get(item.categoryId) || '',
+              warehouse: warehouseMap.get(item.warehouseId || '') || '',
+              location: locationMap.get(item.locationId) || '',
+              quantity: item.quantity,
+              unit: item.unit,
+              threshold: item.lowStockThreshold,
+            })));
+          }}>
+            <Icon name="Download" size={14} className="mr-1.5" />Excel
+          </Button>
+          {lowCount > 0 && (
+            <button
+              onClick={() => setShowLowOnly(!showLowOnly)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+                ${showLowOnly ? 'bg-destructive text-destructive-foreground' : 'bg-destructive/10 text-destructive hover:bg-destructive/20'}`}
+            >
+              <Icon name="AlertTriangle" size={13} />
+              {lowCount} мало
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search + filters */}

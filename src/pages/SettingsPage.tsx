@@ -17,7 +17,7 @@ const CAT_COLORS = ['#6366f1', '#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6', '#ec4
 
 export default function SettingsPage({ state, onStateChange }: Props) {
   const { user: authUser, isAdmin } = useAuth();
-  const [activeSection, setActiveSection] = useState<'profile' | 'alerts' | 'categories' | 'locations' | 'warehouses' | 'users'>('profile');
+  const [activeSection, setActiveSection] = useState<'profile' | 'alerts' | 'categories' | 'locations' | 'warehouses' | 'users' | 'telegram'>('profile');
   const [userName, setUserName] = useState(state.currentUser);
   const [threshold, setThreshold] = useState(String(state.defaultLowStockThreshold));
   const [saved, setSaved] = useState(false);
@@ -141,9 +141,48 @@ export default function SettingsPage({ state, onStateChange }: Props) {
     onStateChange(next); crudAction('delete_warehouse', { warehouseId: id });
   };
 
+  const [tgChatId, setTgChatId] = useState(localStorage.getItem('stockbase_tg_chat_id') || '');
+  const [tgTesting, setTgTesting] = useState(false);
+  const [tgResult, setTgResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const tgApiUrl = (() => {
+    const env = import.meta.env.VITE_API_URL;
+    if (env === undefined || env === null) return 'https://functions.poehali.dev/ee8097ba-6926-4cdb-ac81-985a17bf68dc';
+    if (env === '' || env === '/') return '/api/telegram-notify';
+    return `${env}/api/telegram-notify`;
+  })();
+
+  const testTelegram = async () => {
+    if (!tgChatId.trim()) return;
+    setTgTesting(true); setTgResult(null);
+    try {
+      const res = await fetch(tgApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test', chatId: tgChatId.trim() }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        localStorage.setItem('stockbase_tg_chat_id', tgChatId.trim());
+        setTgResult({ ok: true, msg: 'Сообщение отправлено! Проверьте Telegram.' });
+      } else {
+        setTgResult({ ok: false, msg: json.error || 'Ошибка отправки' });
+      }
+    } catch {
+      setTgResult({ ok: false, msg: 'Нет связи с сервером' });
+    }
+    setTgTesting(false);
+  };
+
+  const saveTgChatId = () => {
+    localStorage.setItem('stockbase_tg_chat_id', tgChatId.trim());
+    setTgResult({ ok: true, msg: 'Chat ID сохранён!' });
+  };
+
   const sections: { id: typeof activeSection; label: string; icon: string }[] = [
     { id: 'profile', label: 'Профиль', icon: 'User' },
     { id: 'alerts', label: 'Уведомления', icon: 'Bell' },
+    { id: 'telegram', label: 'Telegram', icon: 'Send' },
     { id: 'warehouses', label: 'Склады', icon: 'Warehouse' },
     { id: 'categories', label: 'Категории', icon: 'Tag' },
     { id: 'locations', label: 'Локации', icon: 'MapPin' },
@@ -258,6 +297,44 @@ export default function SettingsPage({ state, onStateChange }: Props) {
 
               <Button onClick={saveProfile} className={saved ? 'bg-success hover:bg-success text-success-foreground' : ''}>
                 {saved ? <><Icon name="Check" size={15} className="mr-1.5" />Сохранено!</> : 'Сохранить'}
+              </Button>
+            </div>
+          )}
+
+          {activeSection === 'telegram' && (
+            <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+              <h2 className="font-semibold text-foreground">Уведомления в Telegram</h2>
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Icon name="Send" size={16} className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                  <div className="text-sm text-blue-700 dark:text-blue-300">
+                    <span className="font-semibold">Как подключить:</span>
+                    <ol className="mt-1 space-y-0.5 list-decimal list-inside">
+                      <li>Найдите бота <b>@userinfobot</b> в Telegram</li>
+                      <li>Отправьте ему /start — он покажет ваш Chat ID</li>
+                      <li>Вставьте Chat ID ниже и нажмите «Тест»</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Chat ID</Label>
+                <div className="flex items-center gap-2">
+                  <Input value={tgChatId} onChange={e => { setTgChatId(e.target.value); setTgResult(null); }} placeholder="123456789" className="flex-1" />
+                  <Button variant="outline" onClick={testTelegram} disabled={tgTesting || !tgChatId.trim()}>
+                    {tgTesting ? <Icon name="Loader2" size={14} className="animate-spin mr-1.5" /> : <Icon name="Send" size={14} className="mr-1.5" />}
+                    Тест
+                  </Button>
+                </div>
+              </div>
+              {tgResult && (
+                <div className={`flex items-center gap-2 p-3 rounded-lg text-sm font-medium ${tgResult.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                  <Icon name={tgResult.ok ? 'CheckCircle' : 'AlertCircle'} size={15} />
+                  {tgResult.msg}
+                </div>
+              )}
+              <Button onClick={saveTgChatId} disabled={!tgChatId.trim()}>
+                <Icon name="Save" size={14} className="mr-1.5" />Сохранить
               </Button>
             </div>
           )}

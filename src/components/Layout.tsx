@@ -4,7 +4,7 @@ import { AppState, crudAction } from '@/data/store';
 import QRScanner from '@/components/QRScanner';
 import { useAuth } from '@/data/auth';
 
-export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'technician' | 'partners' | 'history' | 'settings';
+export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'technician' | 'partners' | 'history' | 'settings' | 'dashboard' | 'inventory' | 'labels' | 'audit';
 
 type LayoutProps = {
   state: AppState;
@@ -48,15 +48,19 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
   const activeOrdersCount = (state.workOrders || []).filter(o => ['active', 'draft', 'pending_stock'].includes(o.status)).length;
 
   const navItems: { id: Page; label: string; icon: string; badge?: number; badgeColor?: string }[] = [
-    { id: 'catalog',       label: 'Каталог',        icon: 'LayoutGrid',  badge: lowStockCount > 0 ? lowStockCount : undefined, badgeColor: 'destructive' },
+    { id: 'dashboard',     label: 'Аналитика',       icon: 'BarChart3' },
+    { id: 'catalog',       label: 'Каталог',         icon: 'LayoutGrid',  badge: lowStockCount > 0 ? lowStockCount : undefined, badgeColor: 'destructive' },
     { id: 'nomenclature',  label: 'Номенклатура',    icon: 'List' },
-    { id: 'assembly',      label: 'Сборка',           icon: 'PackageCheck', badge: activeOrdersCount > 0 ? activeOrdersCount : undefined, badgeColor: 'blue' },
-    { id: 'warehouse',     label: 'Карта складов',    icon: 'Map' },
+    { id: 'assembly',      label: 'Сборка',          icon: 'PackageCheck', badge: activeOrdersCount > 0 ? activeOrdersCount : undefined, badgeColor: 'blue' },
+    { id: 'warehouse',     label: 'Карта складов',   icon: 'Map' },
     { id: 'receipts',      label: 'Оприходование',   icon: 'PackagePlus' },
+    { id: 'inventory',     label: 'Инвентаризация',  icon: 'ClipboardCheck' },
     { id: 'technician',    label: 'Техник',           icon: 'Wrench' },
-    { id: 'partners',      label: 'Партнёры',         icon: 'Users2' },
-    { id: 'history',       label: 'История',          icon: 'History' },
-    { id: 'settings',      label: 'Настройки',        icon: 'Settings' },
+    { id: 'partners',      label: 'Партнёры',        icon: 'Users2' },
+    { id: 'labels',        label: 'Этикетки',        icon: 'Printer' },
+    { id: 'history',       label: 'История',         icon: 'History' },
+    { id: 'audit',         label: 'Аудит-лог',       icon: 'Shield' },
+    { id: 'settings',      label: 'Настройки',       icon: 'Settings' },
   ];
 
   // Mobile bottom nav — 4 primary + "Ещё" button
