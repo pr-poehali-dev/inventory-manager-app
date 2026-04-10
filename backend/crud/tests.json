@@ -1,0 +1,122 @@
+{
+  "tests": [
+    {
+      "name": "GET load_all",
+      "method": "GET",
+      "path": "/?action=load_all",
+      "expectedStatus": 200,
+      "expectedBody": { "data": {} },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET check",
+      "method": "GET",
+      "path": "/?action=check",
+      "expectedStatus": 200,
+      "expectedBody": {},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST save_all with minimal data",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "save_all",
+        "data": {
+          "items": [],
+          "categories": [],
+          "locations": [],
+          "operations": [],
+          "warehouses": [],
+          "partners": [],
+          "barcodes": [],
+          "locationStocks": [],
+          "warehouseStocks": [],
+          "workOrders": [],
+          "receipts": [],
+          "techDocs": [],
+          "darkMode": false,
+          "defaultLowStockThreshold": 5,
+          "currentUser": "test",
+          "orderCounter": 0,
+          "receiptCounter": 0,
+          "taskCounter": 0
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "ok": true },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST save_all backward compat (no action field)",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "data": {
+          "items": [],
+          "categories": [],
+          "locations": [],
+          "operations": [],
+          "warehouses": [],
+          "partners": [],
+          "barcodes": [],
+          "locationStocks": [],
+          "warehouseStocks": [],
+          "workOrders": [],
+          "receipts": [],
+          "techDocs": [],
+          "darkMode": false,
+          "defaultLowStockThreshold": 5,
+          "currentUser": "test",
+          "orderCounter": 0,
+          "receiptCounter": 0,
+          "taskCounter": 0
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "ok": true },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST upsert_category",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "upsert_category",
+        "category": {
+          "id": "test-cat-1",
+          "name": "Test Category",
+          "color": "#ff0000"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "ok": true },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST delete_category",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "delete_category",
+        "categoryId": "test-cat-1"
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "ok": true },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST update_setting",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "update_setting",
+        "key": "currentUser",
+        "value": "TestUser"
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "ok": true },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

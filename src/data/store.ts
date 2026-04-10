@@ -356,18 +356,18 @@ const initialState: AppState = {
 
 const STORAGE_KEY = 'stockbase_v3';
 
-function resolveStateApi(): string {
+function resolveCrudApi(): string {
   const env = import.meta.env.VITE_API_URL;
-  if (env === undefined || env === null) return 'https://functions.poehali.dev/dee3fe46-2ea8-40b0-81ea-2fe56b57a873';
-  if (env === '' || env === '/') return '/api/state';
-  return `${env}/api/state`;
+  if (env === undefined || env === null) return 'https://functions.poehali.dev/70970e31-8f51-4890-a143-fc1872d0054b';
+  if (env === '' || env === '/') return '/api/crud';
+  return `${env}/api/crud`;
 }
-const STATE_API = resolveStateApi();
+const CRUD_API = resolveCrudApi();
 
 /** Только проверить updatedAt на сервере (лёгкий запрос, ~100 байт). */
 export async function checkServerUpdatedAt(): Promise<string | null> {
   try {
-    const res = await fetch(`${STATE_API}?check=1`);
+    const res = await fetch(`${CRUD_API}?action=check`);
     if (!res.ok) return null;
     const json = await res.json();
     return json.updatedAt ?? null;
@@ -379,7 +379,7 @@ export async function checkServerUpdatedAt(): Promise<string | null> {
 /** Загрузить состояние с сервера. Возвращает null если сервер вернул пустое. */
 export async function loadStateFromServer(): Promise<{ state: AppState; updatedAt: string } | null> {
   try {
-    const res = await fetch(STATE_API);
+    const res = await fetch(`${CRUD_API}?action=load_all`);
     if (!res.ok) return null;
     const json = await res.json();
     if (!json.data) return null;
@@ -389,19 +389,33 @@ export async function loadStateFromServer(): Promise<{ state: AppState; updatedA
   }
 }
 
-/** Сохранить состояние на сервер (fire-and-forget). Возвращает новый updatedAt. */
+/** Сохранить полное состояние на сервер (save_all — обратная совместимость). */
 export async function saveStateToServer(state: AppState): Promise<string | null> {
   try {
-    const res = await fetch(STATE_API, {
+    const res = await fetch(CRUD_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: state }),
+      body: JSON.stringify({ action: 'save_all', data: state }),
     });
     if (!res.ok) return null;
     const json = await res.json();
     return json.updatedAt ?? null;
   } catch {
     return null;
+  }
+}
+
+/** Отправить гранулярную операцию на сервер (fire-and-forget). */
+export async function crudAction(action: string, payload: Record<string, unknown>): Promise<boolean> {
+  try {
+    const res = await fetch(CRUD_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
