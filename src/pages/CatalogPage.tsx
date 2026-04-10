@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
@@ -21,6 +21,10 @@ export default function CatalogPage({ state, onStateChange, initialItemId }: Pro
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [showLowOnly, setShowLowOnly] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(initialItemId ?? null);
+
+  useEffect(() => {
+    if (initialItemId) setSelectedItemId(initialItemId);
+  }, [initialItemId]);
 
   const filtered = useMemo(() => {
     let items = [...state.items];

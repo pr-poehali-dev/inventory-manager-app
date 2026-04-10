@@ -22,6 +22,7 @@ type Props = {
 export default function ItemDetailModal({ item, state, onStateChange, onClose }: Props) {
   const [opType, setOpType] = useState<'in' | 'out' | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('info');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!item) return null;
 
@@ -60,6 +61,25 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   const handleQR = () => {
     const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/?item=' + liveItem.id)}`;
     window.open(url, '_blank');
+  };
+
+  const handleDelete = () => {
+    const next: AppState = {
+      ...state,
+      items: state.items.filter(i => i.id !== liveItem.id),
+      operations: state.operations.filter(op => op.itemId !== liveItem.id),
+      locationStocks: state.locationStocks.filter(ls => ls.itemId !== liveItem.id),
+      warehouseStocks: (state.warehouseStocks || []).filter(ws => ws.itemId !== liveItem.id),
+      barcodes: (state.barcodes || []).filter(b => b.itemId !== liveItem.id),
+      techDocs: (state.techDocs || []).filter(d => d.itemId !== liveItem.id),
+      workOrders: state.workOrders.map(o => ({
+        ...o,
+        items: o.items.filter(oi => oi.itemId !== liveItem.id),
+      })),
+    };
+    onStateChange(next);
+    saveState(next);
+    onClose();
   };
 
   const itemDocs = (state.techDocs || []).filter(d => d.itemId === liveItem.id);
@@ -290,6 +310,28 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                     </div>
                   );
                 })()}
+
+                <div className="pt-4 border-t border-border">
+                  {!showDeleteConfirm ? (
+                    <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(true)}
+                      className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 gap-2">
+                      <Icon name="Trash2" size={14} />Удалить номенклатуру
+                    </Button>
+                  ) : (
+                    <div className="p-3 bg-destructive/8 border border-destructive/20 rounded-xl space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        <b className="text-foreground">«{liveItem.name}»</b> будет удалён вместе с историей, остатками и документами. Это необратимо.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)} className="flex-1">Отмена</Button>
+                        <Button size="sm" onClick={handleDelete}
+                          className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold gap-1.5">
+                          <Icon name="Trash2" size={13} />Удалить
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
