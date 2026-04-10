@@ -41,7 +41,8 @@ export async function apiLogin(username: string, password: string): Promise<{ to
     const json = await res.json();
     if (!res.ok) return { error: json.error || 'Ошибка входа' };
     return { token: json.token, user: json.user };
-  } catch {
+  } catch (e) {
+    console.error('Fetch error:', (e as Error)?.message, 'for', AUTH_API);
     return { error: 'Нет связи с сервером' };
   }
 }
