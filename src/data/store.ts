@@ -355,7 +355,14 @@ const initialState: AppState = {
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'stockbase_v3';
-const STATE_API = 'https://functions.poehali.dev/dee3fe46-2ea8-40b0-81ea-2fe56b57a873';
+
+function resolveStateApi(): string {
+  const env = import.meta.env.VITE_API_URL;
+  if (env === undefined || env === null) return 'https://functions.poehali.dev/dee3fe46-2ea8-40b0-81ea-2fe56b57a873';
+  if (env === '' || env === '/') return '/api/state';
+  return `${env}/api/state`;
+}
+const STATE_API = resolveStateApi();
 
 /** Только проверить updatedAt на сервере (лёгкий запрос, ~100 байт). */
 export async function checkServerUpdatedAt(): Promise<string | null> {

@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS public.app_state (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT single_row CHECK (id = 1)
+);
