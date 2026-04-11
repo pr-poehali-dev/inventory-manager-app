@@ -9,7 +9,7 @@ import Autocomplete, { AutocompleteOption } from '@/components/Autocomplete';
 import ScannerModal, { ScannedCode } from '@/components/ScannerModal';
 import {
   Item, OperationType, Operation, AppState, Partner, Warehouse,
-  generateId, crudAction, getWarehouseStock, updateWarehouseStock, getItemBarcodes,
+  generateId, crudAction, getWarehouseStock, updateWarehouseStock, updateLocationStock, getItemBarcodes,
 } from '@/data/store';
 
 const IN_BASES = [
@@ -51,6 +51,7 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
   const [supplierLabel, setSupplierLabel] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState<string>(defaultWarehouseId || (state.warehouses?.[0]?.id || ''));
+  const [locationId, setLocationId] = useState('');
   const [scannedCodes, setScannedCodes] = useState<ScannedCode[]>([]);
   const [showScanner, setShowScanner] = useState(false);
 
@@ -58,6 +59,7 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
   const warehouses: Warehouse[] = state.warehouses || [];
   const selectedWarehouse = warehouses.find(w => w.id === warehouseId);
   const whStock = warehouseId ? getWarehouseStock(state, item.id, warehouseId) : 0;
+  const warehouseLocations = state.locations.filter(l => l.warehouseId === warehouseId);
 
   // Qty from scanned + manual
   const scannedQty = scannedCodes.length;
@@ -158,6 +160,11 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
     // Update warehouse stock
     finalState = updateWarehouseStock(finalState, item.id, warehouseId, isIn ? totalQty : -totalQty);
 
+    // Update location stock
+    if (locationId) {
+      finalState = updateLocationStock(finalState, item.id, locationId, isIn ? totalQty : -totalQty);
+    }
+
     const op: Operation = {
       id: generateId(),
       itemId: item.id,
@@ -169,6 +176,7 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
       performedBy,
       date: new Date().toISOString(),
       warehouseId,
+      locationId: locationId || undefined,
       scannedCodes: scannedCodes.map(s => s.code),
     };
 
@@ -199,6 +207,7 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
     setComment('');
     setToLabel(''); setToId('');
     setSupplierLabel(''); setSupplierId('');
+    setLocationId('');
     setScannedCodes([]);
     onClose();
   };
@@ -238,7 +247,7 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
                           ${ws.warehouseId === warehouseId
                             ? 'bg-primary/10 border-primary/40 text-primary font-semibold'
                             : 'bg-background border-border text-muted-foreground hover:border-primary/30'}`}
-                        onClick={() => setWarehouseId(ws.warehouseId)}>
+                        onClick={() => { setWarehouseId(ws.warehouseId); setLocationId(''); }}>
                         {ws.warehouse?.name}
                       </span>
                     ))}
@@ -264,7 +273,7 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
                     const stock = getWarehouseStock(state, item.id, wh.id);
                     const isSelected = wh.id === warehouseId;
                     return (
-                      <button key={wh.id} type="button" onClick={() => setWarehouseId(wh.id)}
+                      <button key={wh.id} type="button" onClick={() => { setWarehouseId(wh.id); setLocationId(''); }}
                         className={`p-2.5 rounded-xl border text-left transition-all
                           ${isSelected
                             ? 'border-primary bg-primary/8 ring-1 ring-primary/30'
@@ -283,6 +292,20 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
                 </div>
               )}
             </div>
+
+            {/* Location select */}
+            {warehouseId && warehouseLocations.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Локация (стеллаж / полка)</Label>
+                <select value={locationId} onChange={e => setLocationId(e.target.value)}
+                  className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                  <option value="">— Без привязки к локации —</option>
+                  {warehouseLocations.map(l => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Basis */}
             <div className="space-y-1.5">
