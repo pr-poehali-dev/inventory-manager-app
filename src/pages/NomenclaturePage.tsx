@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState, Item, crudAction, generateId } from '@/data/store';
+import { AppState, Item, crudAction, generateId, updateLocationStock, updateWarehouseStock } from '@/data/store';
 import ItemDetailModal from '@/components/ItemDetailModal';
 
 const UNITS = ['шт', 'кг', 'л', 'м', 'м²', 'уп', 'пачка', 'рул', 'упак', 'кор', 'пар'];
@@ -34,8 +34,21 @@ function NewItemModal({ state, onStateChange, onClose }: {
       lowStockThreshold: parseInt(threshold) || 5,
       createdAt: new Date().toISOString(),
     };
-    const next = { ...state, items: [...state.items, newItem] };
-    onStateChange(next); crudAction('upsert_item', { item: newItem }); onClose();
+    let next = { ...state, items: [...state.items, newItem] };
+    const initQty = parseInt(qty) || 0;
+    const locId = newItem.locationId;
+    if (initQty > 0 && locId) {
+      next = updateLocationStock(next, newItem.id, locId, initQty);
+      const loc = state.locations.find(l => l.id === locId);
+      if (loc?.warehouseId) {
+        next = updateWarehouseStock(next, newItem.id, loc.warehouseId, initQty);
+      }
+    }
+    onStateChange(next);
+    const lsArr = (next.locationStocks || []).filter(ls => ls.itemId === newItem.id);
+    const wsArr = (next.warehouseStocks || []).filter(ws => ws.itemId === newItem.id);
+    crudAction('upsert_item', { item: newItem, locationStocks: lsArr, warehouseStocks: wsArr });
+    onClose();
   };
 
   return (
