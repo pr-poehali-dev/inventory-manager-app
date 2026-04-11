@@ -15,11 +15,16 @@ function NewItemModal({ state, onStateChange, onClose }: {
   const [name, setName] = useState('');
   const [unit, setUnit] = useState('шт');
   const [categoryId, setCategoryId] = useState(state.categories[0]?.id || '');
+  const [warehouseId, setWarehouseId] = useState((state.warehouses || [])[0]?.id || '');
   const [locationId, setLocationId] = useState('');
   const [description, setDescription] = useState('');
   const [qty, setQty] = useState('0');
   const [threshold, setThreshold] = useState('5');
   const [error, setError] = useState('');
+
+  const filteredLocations = warehouseId
+    ? state.locations.filter(l => l.warehouseId === warehouseId)
+    : state.locations;
 
   const handleSave = () => {
     if (!name.trim()) { setError('Введите название'); return; }
@@ -39,10 +44,10 @@ function NewItemModal({ state, onStateChange, onClose }: {
     const locId = newItem.locationId;
     if (initQty > 0 && locId) {
       next = updateLocationStock(next, newItem.id, locId, initQty);
-      const loc = state.locations.find(l => l.id === locId);
-      if (loc?.warehouseId) {
-        next = updateWarehouseStock(next, newItem.id, loc.warehouseId, initQty);
-      }
+    }
+    const whId = warehouseId || state.locations.find(l => l.id === locId)?.warehouseId || '';
+    if (initQty > 0 && whId) {
+      next = updateWarehouseStock(next, newItem.id, whId, initQty);
     }
     onStateChange(next);
     const lsArr = (next.locationStocks || []).filter(ls => ls.itemId === newItem.id);
@@ -95,12 +100,21 @@ function NewItemModal({ state, onStateChange, onClose }: {
               <Input type="number" min="0" value={threshold} onChange={e => setThreshold(e.target.value)} />
             </div>
           </div>
+          {(state.warehouses || []).length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Склад</Label>
+              <select value={warehouseId} onChange={e => { setWarehouseId(e.target.value); setLocationId(''); }}
+                className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                {(state.warehouses || []).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>Локация</Label>
             <select value={locationId} onChange={e => setLocationId(e.target.value)}
               className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">— Не указана —</option>
-              {state.locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              {filteredLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
