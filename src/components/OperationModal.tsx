@@ -179,10 +179,12 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
     // Send granular CRUD actions for auto-created entities
     const updItem = finalState.items.find(i => i.id === item.id);
     const wsArr = (finalState.warehouseStocks || []).filter(w => w.itemId === item.id);
+    const lsArr = (finalState.locationStocks || []).filter(ls => ls.itemId === item.id);
     crudAction('upsert_operation', {
       operation: op,
       item: updItem,
       warehouseStocks: wsArr,
+      locationStocks: lsArr,
     });
     if (type === 'out' && toLabel.trim() && !toId) {
       crudAction('upsert_partner', { partner: finalState.partners[finalState.partners.length - 1] });

@@ -7,7 +7,7 @@ import Icon from '@/components/ui/icon';
 import {
   AppState, Item, crudAction, generateId,
   WorkOrder, OrderItem, OrderStatus, Operation,
-  getLocationStock, updateLocationStock,
+  getLocationStock, updateLocationStock, updateWarehouseStock,
 } from '@/data/store';
 
 // ─── Pick Item Modal ───────────────────────────────────────────────────────────
@@ -26,12 +26,22 @@ export function PickItemModal({
   const [selectedLocation, setSelectedLocation] = useState('');
   const [qty, setQty] = useState(String(remaining));
 
-  const locStocks = (state.locationStocks || [])
+  const locStocksReal = (state.locationStocks || [])
     .filter(ls => ls.itemId === item.id && ls.quantity > 0)
     .map(ls => ({ ...ls, location: state.locations.find(l => l.id === ls.locationId) }))
     .filter(ls => ls.location);
 
-  const locStock = selectedLocation ? getLocationStock(state, item.id, selectedLocation) : 0;
+  const hasStocksInLocations = locStocksReal.length > 0;
+  const itemDefaultLoc = item.locationId ? state.locations.find(l => l.id === item.locationId) : null;
+  const locStocks = hasStocksInLocations
+    ? locStocksReal
+    : (item.quantity > 0 && itemDefaultLoc)
+      ? [{ itemId: item.id, locationId: item.locationId, quantity: item.quantity, location: itemDefaultLoc }]
+      : [];
+
+  const locStock = selectedLocation
+    ? (hasStocksInLocations ? getLocationStock(state, item.id, selectedLocation) : item.quantity)
+    : 0;
   const qtyNum = parseInt(qty) || 0;
   const notEnough = selectedLocation && qtyNum > locStock;
 
@@ -40,7 +50,13 @@ export function PickItemModal({
     const actual = Math.min(qtyNum, remaining);
     let next = { ...state };
     next = updateLocationStock(next, item.id, selectedLocation, -actual);
-    next = { ...next, items: next.items.map(i => i.id === item.id ? { ...i, quantity: Math.max(0, i.quantity - actual) } : i) };
+    const loc = state.locations.find(l => l.id === selectedLocation);
+    const whId = loc?.warehouseId || '';
+    if (whId) {
+      next = updateWarehouseStock(next, item.id, whId, -actual);
+    } else {
+      next = { ...next, items: next.items.map(i => i.id === item.id ? { ...i, quantity: Math.max(0, i.quantity - actual) } : i) };
+    }
     const newPicked = orderItem.pickedQty + actual;
     const newStatus: OrderItem['status'] = newPicked >= orderItem.requiredQty ? 'done' : 'partial';
     const updatedOrders = next.workOrders.map(o => {
@@ -51,17 +67,19 @@ export function PickItemModal({
     });
     const op: Operation = {
       id: generateId(), itemId: item.id, type: 'out', quantity: actual,
-      comment: `Сборка по заявке ${order.number}`, from: state.locations.find(l => l.id === selectedLocation)?.name,
+      comment: `Сборка по заявке ${order.number}`, from: loc?.name,
       to: order.recipientName || order.title, performedBy: state.currentUser,
       date: new Date().toISOString(), orderId: order.id, locationId: selectedLocation,
+      warehouseId: whId || undefined,
     };
     next = { ...next, workOrders: updatedOrders, operations: [op, ...next.operations] };
     onStateChange(next);
     const updatedOrder = updatedOrders.find(o => o.id === order.id)!;
     const updatedItem = next.items.find(i => i.id === item.id);
     const updatedLocationStocks = (next.locationStocks || []).filter(ls => ls.itemId === item.id);
+    const updatedWarehouseStocks = (next.warehouseStocks || []).filter(ws => ws.itemId === item.id);
     crudAction('upsert_work_order', { workOrder: updatedOrder, orderItems: updatedOrder.items });
-    crudAction('upsert_operation', { operation: op, item: updatedItem, locationStocks: updatedLocationStocks });
+    crudAction('upsert_operation', { operation: op, item: updatedItem, locationStocks: updatedLocationStocks, warehouseStocks: updatedWarehouseStocks });
     onClose();
   };
 
