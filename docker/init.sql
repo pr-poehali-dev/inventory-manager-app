@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS public.items (
     quantity INTEGER NOT NULL DEFAULT 0,
     low_stock_threshold INTEGER NOT NULL DEFAULT 5,
     image_url TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    attachments JSONB DEFAULT '[]'
 );
 
 -- Операции

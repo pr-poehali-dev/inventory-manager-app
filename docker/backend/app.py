@@ -105,7 +105,7 @@ TABLE_COLUMNS = {
     "categories": ["id", "name", "parent_id", "color"],
     "locations": ["id", "name", "parent_id", "description", "warehouse_id"],
     "items": ["id", "name", "category_id", "location_id", "description", "unit",
-              "quantity", "low_stock_threshold", "image_url", "created_at"],
+              "quantity", "low_stock_threshold", "image_url", "created_at", "attachments"],
     "operations": ["id", "item_id", "type", "quantity", "comment", "from_place",
                     "to_place", "performed_by", "date", "order_id", "location_id",
                     "warehouse_id", "scanned_codes"],
@@ -503,7 +503,7 @@ def ensure_tables():
         ("warehouses", "id TEXT PRIMARY KEY, name TEXT NOT NULL, address TEXT, description TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"),
         ("categories", "id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_id TEXT, color TEXT NOT NULL DEFAULT '#6366f1'"),
         ("locations", "id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_id TEXT, description TEXT, warehouse_id TEXT"),
-        ("items", "id TEXT PRIMARY KEY, name TEXT NOT NULL, category_id TEXT, location_id TEXT, description TEXT, unit TEXT NOT NULL DEFAULT 'шт', quantity INTEGER NOT NULL DEFAULT 0, low_stock_threshold INTEGER NOT NULL DEFAULT 5, image_url TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"),
+        ("items", "id TEXT PRIMARY KEY, name TEXT NOT NULL, category_id TEXT, location_id TEXT, description TEXT, unit TEXT NOT NULL DEFAULT 'шт', quantity INTEGER NOT NULL DEFAULT 0, low_stock_threshold INTEGER NOT NULL DEFAULT 5, image_url TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), attachments JSONB DEFAULT '[]'"),
         ("operations", "id TEXT PRIMARY KEY, item_id TEXT NOT NULL, type TEXT NOT NULL, quantity INTEGER NOT NULL, comment TEXT, from_place TEXT, to_place TEXT, performed_by TEXT NOT NULL, date TIMESTAMPTZ NOT NULL DEFAULT NOW(), order_id TEXT, location_id TEXT, warehouse_id TEXT, scanned_codes JSONB DEFAULT '[]'"),
         ("location_stocks", "item_id TEXT NOT NULL, location_id TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (item_id, location_id)"),
         ("warehouse_stocks", "item_id TEXT NOT NULL, warehouse_id TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (item_id, warehouse_id)"),
@@ -521,6 +521,7 @@ def ensure_tables():
 
     cur.execute(f"ALTER TABLE {SCHEMA}.receipts ADD COLUMN IF NOT EXISTS photo_url TEXT")
     cur.execute(f"ALTER TABLE {SCHEMA}.tech_docs ADD COLUMN IF NOT EXISTS cover_url TEXT")
+    cur.execute(f"ALTER TABLE {SCHEMA}.items ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'")
 
     cur.execute(f"""
         INSERT INTO {SCHEMA}.app_settings (key, value) VALUES
