@@ -129,7 +129,8 @@ CREATE TABLE IF NOT EXISTS public.receipts (
     total_amount NUMERIC,
     posted_at TIMESTAMPTZ,
     custom_fields JSONB DEFAULT '[]',
-    scan_history JSONB DEFAULT '[]'
+    scan_history JSONB DEFAULT '[]',
+    photo_url TEXT
 );
 
 -- Строки поступлений

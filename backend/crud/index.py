@@ -193,7 +193,7 @@ TABLE_COLUMNS = {
     "order_items": ["id", "order_id", "item_id", "required_qty", "picked_qty", "status"],
     "receipts": ["id", "number", "status", "supplier_id", "supplier_name", "warehouse_id",
                   "date", "created_by", "comment", "total_amount", "posted_at",
-                  "custom_fields", "scan_history"],
+                  "custom_fields", "scan_history", "photo_url"],
     "receipt_lines": ["id", "receipt_id", "item_id", "item_name", "qty", "confirmed_qty",
                        "location_id", "price", "unit", "is_new"],
     "tech_docs": ["id", "item_id", "doc_number", "doc_date", "doc_type", "supplier",

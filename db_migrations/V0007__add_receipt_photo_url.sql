@@ -1,0 +1,1 @@
+ALTER TABLE t_p45174738_inventory_manager_ap.receipts ADD COLUMN IF NOT EXISTS photo_url TEXT;

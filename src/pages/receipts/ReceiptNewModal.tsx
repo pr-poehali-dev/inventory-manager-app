@@ -46,6 +46,9 @@ export function NewReceiptModal({
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState(state.warehouses?.[0]?.id || '');
   const [comment, setComment] = useState('');
+  const [photoUrl, setPhotoUrl] = useState<string>('');
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const [customFields, setCustomFields] = useState<ReceiptCustomField[]>([]);
   const [newFieldKey, setNewFieldKey] = useState('');
   const [showFieldSuggestions, setShowFieldSuggestions] = useState(false);
@@ -87,6 +90,30 @@ export function NewReceiptModal({
 
   const removeCustomField = (idx: number) =>
     setCustomFields(prev => prev.filter((_, i) => i !== idx));
+
+  const handlePhotoSelect = (file: File | null | undefined) => {
+    setPhotoError('');
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Можно загрузить только изображение');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError('Размер не больше 5 МБ');
+      return;
+    }
+    setPhotoUploading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPhotoUrl(String(reader.result || ''));
+      setPhotoUploading(false);
+    };
+    reader.onerror = () => {
+      setPhotoError('Не удалось прочитать файл');
+      setPhotoUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const validLines = lines.filter(l => (l.itemId || l.itemLabel.trim()) && parseInt(l.qty) > 0);
   const totalAmount = validLines.reduce((sum, l) => sum + (parseFloat(l.price) || 0) * (parseInt(l.qty) || 0), 0);
@@ -167,6 +194,7 @@ export function NewReceiptModal({
       comment: comment.trim() || undefined,
       totalAmount: totalAmount > 0 ? totalAmount : undefined,
       scanHistory: [],
+      photoUrl: photoUrl || undefined,
     };
 
     const newCounter = (next.receiptCounter || 1) + 1;
@@ -258,6 +286,52 @@ export function NewReceiptModal({
                 <Label>Комментарий</Label>
                 <Input value={comment} onChange={e => setComment(e.target.value)} placeholder="Примечание к документу" />
               </div>
+            </div>
+
+            {/* Главное фото */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <Icon name="Image" size={12} />
+                Главное фото накладной
+              </Label>
+              {photoUrl ? (
+                <div className="relative inline-block">
+                  <img
+                    src={photoUrl}
+                    alt="Фото накладной"
+                    className="max-h-48 rounded-lg border border-border object-contain bg-muted"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setPhotoUrl(''); setPhotoError(''); }}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-background/90 border border-border text-muted-foreground hover:text-destructive flex items-center justify-center shadow-sm"
+                    title="Удалить фото"
+                  >
+                    <Icon name="X" size={12} />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-2 h-20 px-4 rounded-lg border border-dashed border-border bg-muted/30 hover:bg-muted/60 cursor-pointer transition-colors text-sm text-muted-foreground">
+                  {photoUploading ? (
+                    <>
+                      <Icon name="Loader2" size={16} className="animate-spin" />
+                      Загрузка...
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="Upload" size={16} />
+                      Загрузить фото (jpg, png, до 5 МБ)
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => handlePhotoSelect(e.target.files?.[0])}
+                  />
+                </label>
+              )}
+              {photoError && <div className="text-xs text-destructive">{photoError}</div>}
             </div>
           </div>
 

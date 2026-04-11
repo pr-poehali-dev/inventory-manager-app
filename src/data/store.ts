@@ -184,6 +184,7 @@ export type Receipt = {
   totalAmount?: number;
   scanHistory: ScanEvent[];   // история сканирований
   postedAt?: string;          // дата проведения
+  photoUrl?: string;          // главное фото накладной (data URL)
 };
 
 // ─── Technician Documents (база данных документов и вложений) ─────────────────
