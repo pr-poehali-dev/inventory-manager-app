@@ -197,7 +197,7 @@ TABLE_COLUMNS = {
     "receipt_lines": ["id", "receipt_id", "item_id", "item_name", "qty", "confirmed_qty",
                        "location_id", "price", "unit", "is_new"],
     "tech_docs": ["id", "item_id", "doc_number", "doc_date", "doc_type", "supplier",
-                   "notes", "custom_fields", "attachments", "created_at", "updated_at",
+                   "notes", "custom_fields", "attachments", "cover_url", "created_at", "updated_at",
                    "created_by"],
     "app_settings": ["key", "value"],
 }

@@ -1,0 +1,1 @@
+ALTER TABLE t_p45174738_inventory_manager_ap.tech_docs ADD COLUMN IF NOT EXISTS cover_url TEXT;

@@ -6,16 +6,16 @@ export function DocCard({ doc, state, onClick }: { doc: DocEntry; state: AppStat
   const item = state.items.find(i => i.id === doc.itemId);
   const cat  = item ? state.categories.find(c => c.id === item.categoryId) : null;
   const attCount = doc.attachments.length;
-  const hasImages = doc.attachments.some(a => a.mimeType.startsWith('image/'));
   const firstImage = doc.attachments.find(a => a.mimeType.startsWith('image/'));
+  const coverSrc = doc.coverUrl || firstImage?.dataUrl || '';
 
   return (
     <button onClick={onClick}
       className="w-full text-left bg-card border border-border rounded-2xl shadow-card hover:shadow-md hover:border-primary/30 transition-all group animate-fade-in overflow-hidden">
       {/* Image strip */}
-      {hasImages && firstImage && (
+      {coverSrc && (
         <div className="w-full h-28 overflow-hidden bg-muted">
-          <img src={firstImage.dataUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <img src={coverSrc} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         </div>
       )}
 

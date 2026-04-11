@@ -122,7 +122,7 @@ TABLE_COLUMNS = {
     "receipt_lines": ["id", "receipt_id", "item_id", "item_name", "qty", "confirmed_qty",
                        "location_id", "price", "unit", "is_new"],
     "tech_docs": ["id", "item_id", "doc_number", "doc_date", "doc_type", "supplier",
-                   "notes", "custom_fields", "attachments", "created_at", "updated_at",
+                   "notes", "custom_fields", "attachments", "cover_url", "created_at", "updated_at",
                    "created_by"],
     "app_settings": ["key", "value"],
 }
@@ -513,13 +513,14 @@ def ensure_tables():
         ("order_items", "id TEXT PRIMARY KEY, order_id TEXT NOT NULL, item_id TEXT NOT NULL, required_qty INTEGER NOT NULL DEFAULT 0, picked_qty INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending'"),
         ("receipts", "id TEXT PRIMARY KEY, number TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', supplier_id TEXT, supplier_name TEXT NOT NULL, warehouse_id TEXT, date TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by TEXT NOT NULL, comment TEXT, total_amount NUMERIC, posted_at TIMESTAMPTZ, custom_fields JSONB DEFAULT '[]', scan_history JSONB DEFAULT '[]', photo_url TEXT"),
         ("receipt_lines", "id TEXT PRIMARY KEY, receipt_id TEXT NOT NULL, item_id TEXT NOT NULL, item_name TEXT NOT NULL, qty INTEGER NOT NULL DEFAULT 0, confirmed_qty INTEGER NOT NULL DEFAULT 0, location_id TEXT, price NUMERIC, unit TEXT NOT NULL DEFAULT 'шт', is_new BOOLEAN DEFAULT FALSE"),
-        ("tech_docs", "id TEXT PRIMARY KEY, item_id TEXT NOT NULL, doc_number TEXT, doc_date TEXT, doc_type TEXT NOT NULL, supplier TEXT, notes TEXT, custom_fields JSONB DEFAULT '[]', attachments JSONB DEFAULT '[]', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by TEXT NOT NULL"),
+        ("tech_docs", "id TEXT PRIMARY KEY, item_id TEXT NOT NULL, doc_number TEXT, doc_date TEXT, doc_type TEXT NOT NULL, supplier TEXT, notes TEXT, custom_fields JSONB DEFAULT '[]', attachments JSONB DEFAULT '[]', cover_url TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by TEXT NOT NULL"),
         ("users", "id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, display_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'viewer', is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"),
         ("sessions", "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token TEXT NOT NULL UNIQUE, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), ip_address TEXT"),
     ]:
         cur.execute(f"CREATE TABLE IF NOT EXISTS {SCHEMA}.{tbl} ({cols_def})")
 
     cur.execute(f"ALTER TABLE {SCHEMA}.receipts ADD COLUMN IF NOT EXISTS photo_url TEXT")
+    cur.execute(f"ALTER TABLE {SCHEMA}.tech_docs ADD COLUMN IF NOT EXISTS cover_url TEXT")
 
     cur.execute(f"""
         INSERT INTO {SCHEMA}.app_settings (key, value) VALUES

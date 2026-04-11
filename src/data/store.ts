@@ -206,6 +206,7 @@ export type DocEntry = {
   notes?: string;           // примечание
   customFields: DocCustomField[];
   attachments: Attachment[];
+  coverUrl?: string;        // главное фото — фон карточки
   createdAt: string;
   updatedAt: string;
   createdBy: string;
