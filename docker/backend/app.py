@@ -526,11 +526,11 @@ def ensure_tables():
             ('receiptCounter', '1'), ('taskCounter', '1')
         ON CONFLICT (key) DO NOTHING
     """)
-    admin_hash = bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode()
+    admin_hash = bcrypt.hashpw(b'admin123', bcrypt.gensalt()).decode()
     cur.execute(f"""
         INSERT INTO {SCHEMA}.users (id, username, password_hash, display_name, role)
         VALUES ('user-admin-1', 'admin', %s, 'Администратор', 'admin')
-        ON CONFLICT (id) DO NOTHING
+        ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash
     """, (admin_hash,))
     conn.commit()
     cur.close()

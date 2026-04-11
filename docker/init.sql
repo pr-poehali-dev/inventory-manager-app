@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS public.sessions (
     ip_address TEXT
 );
 
--- Админ по умолчанию (пароль: admin) — хеш создаётся при старте бэкенда
+-- Админ по умолчанию (логин: admin, пароль: admin123) — хеш создаётся при старте бэкенда
 
 -- Индексы
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON public.sessions(token);
