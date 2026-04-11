@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { AppState, Receipt, ReceiptStatus, crudAction } from '@/data/store';
+import QRDialog from '@/components/QRDialog';
 import { getReceiptProgress } from './ReceiptsList';
 
 const STATUS_CONFIG: Record<ReceiptStatus, { label: string; color: string; bg: string; icon: string }> = {
@@ -44,12 +46,11 @@ export function ReceiptDetailModal({
     onClose();
   };
 
-  const handleQR = () => {
-    const url = `${window.location.origin}/?receipt=${liveReceipt.id}`;
-    window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`, '_blank');
-  };
+  const [showQR, setShowQR] = useState(false);
+  const qrValue = `${window.location.origin}/?receipt=${liveReceipt.id}`;
 
   return (
+    <>
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in">
         <DialogHeader>
@@ -206,7 +207,7 @@ export function ReceiptDetailModal({
 
           {/* Actions */}
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={handleQR} className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" onClick={() => setShowQR(true)} className="flex items-center gap-1.5">
               <Icon name="QrCode" size={14} />QR
             </Button>
 
@@ -238,5 +239,7 @@ export function ReceiptDetailModal({
         </div>
       </DialogContent>
     </Dialog>
+    <QRDialog open={showQR} onClose={() => setShowQR(false)} value={qrValue} title="QR-код накладной" />
+    </>
   );
 }

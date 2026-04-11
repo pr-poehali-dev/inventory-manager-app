@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { Item, AppState, crudAction } from '@/data/store';
 import { useItemPhoto } from '@/hooks/useItemPhoto';
+import QRDialog from './QRDialog';
 import OperationModal from './OperationModal';
 import { TechDocsList } from './ItemAttachmentsTab';
 import { BarcodesSection } from './ItemBarcodesSection';
@@ -24,6 +25,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   const [opType, setOpType] = useState<'in' | 'out' | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('info');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const liveItem = item ? (state.items.find(i => i.id === item.id) || item) : ({ id: '' } as Item);
   const photo = useItemPhoto(liveItem, state, onStateChange);
 
@@ -57,10 +59,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
     setOpType(null);
   };
 
-  const handleQR = () => {
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/?item=' + liveItem.id)}`;
-    window.open(url, '_blank');
-  };
+  const qrValue = `${window.location.origin}/?item=${liveItem.id}`;
 
   const handleDelete = () => {
     const next: AppState = {
@@ -284,7 +283,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                   ))}
                   <div className="flex justify-between py-2.5">
                     <span className="text-muted-foreground">QR-код товара</span>
-                    <button onClick={handleQR} className="flex items-center gap-1.5 text-primary hover:text-primary/80 font-medium">
+                    <button onClick={() => setShowQR(true)} className="flex items-center gap-1.5 text-primary hover:text-primary/80 font-medium">
                       <Icon name="QrCode" size={13} />Открыть
                     </button>
                   </div>
@@ -453,7 +452,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
         />
       )}
 
-
+      <QRDialog open={showQR} onClose={() => setShowQR(false)} value={qrValue} title="QR-код товара" />
     </>
   );
 }

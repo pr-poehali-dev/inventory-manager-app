@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { AppState, Location, Operation, Warehouse, crudAction, generateId, LocationStock, updateLocationStock, getWarehouseStock, updateWarehouseStock } from '@/data/store';
 import ItemDetailModal from '@/components/ItemDetailModal';
+import QRDialog from '@/components/QRDialog';
 
 type Props = {
   state: AppState;
@@ -582,12 +583,11 @@ function LocationDetailPanel({
   const totalItems = locStocks.length;
   const totalUnits = locStocks.reduce((s, ls) => s + ls.quantity, 0);
 
-  const handleQR = () => {
-    const url = `${window.location.origin}/?location=${location.id}`;
-    window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`, '_blank');
-  };
+  const [showQR, setShowQR] = useState(false);
+  const qrValue = `${window.location.origin}/?location=${location.id}`;
 
   return (
+    <>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-4">
@@ -609,7 +609,7 @@ function LocationDetailPanel({
         <Button size="sm" onClick={() => setShowAddItem(true)} className="flex items-center gap-1.5 flex-1 bg-success hover:bg-success/90 text-success-foreground font-semibold">
           <Icon name="PackagePlus" size={14} />Добавить товар
         </Button>
-        <Button variant="outline" size="sm" onClick={handleQR} className="flex items-center gap-1.5">
+        <Button variant="outline" size="sm" onClick={() => setShowQR(true)} className="flex items-center gap-1.5">
           <Icon name="QrCode" size={13} />QR
         </Button>
       </div>
@@ -695,6 +695,8 @@ function LocationDetailPanel({
         </div>
       )}
     </div>
+    <QRDialog open={showQR} onClose={() => setShowQR(false)} value={qrValue} title="QR-код локации" />
+    </>
   );
 }
 

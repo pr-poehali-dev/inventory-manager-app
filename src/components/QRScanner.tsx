@@ -63,10 +63,20 @@ export default function QRScanner({ open, onClose, onResult }: Props) {
   // List cameras on open
   useEffect(() => {
     if (!open) return;
+    const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (!isSecure) {
+      setError('Камера доступна только по HTTPS или localhost. Используйте ручной ввод.');
+      setMode('manual');
+      return;
+    }
     Html5Qrcode.getCameras()
       .then(cameras => {
+        if (cameras.length === 0) {
+          setError('Камера не найдена. Используйте ручной ввод.');
+          setMode('manual');
+          return;
+        }
         setCameraList(cameras.map(c => ({ id: c.id, label: c.label || `Камера ${c.id.slice(-4)}` })));
-        // Prefer back camera on mobile
         const back = cameras.find(c => /back|rear|environment/i.test(c.label));
         setSelectedCamera((back || cameras[0])?.id || '');
       })
@@ -80,6 +90,7 @@ export default function QRScanner({ open, onClose, onResult }: Props) {
   useEffect(() => {
     if (!open || mode !== 'camera' || !selectedCamera) return;
 
+    let stopped = false;
     const scanner = new Html5Qrcode('qr-scanner-container', {
       formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
       verbose: false,
@@ -92,20 +103,33 @@ export default function QRScanner({ open, onClose, onResult }: Props) {
       selectedCamera,
       { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1 },
       (decodedText) => {
+        if (stopped) return;
         const result = parseQRResult(decodedText);
         setLastResult(result);
-        // Pause scanning to show result
-        scanner.pause(true);
+        try { scanner.pause(true); } catch { /* ignore */ }
         setScanning(false);
       },
-      () => { /* ongoing scan errors are normal */ }
+      () => {}
     ).catch((err: unknown) => {
-      setError(`Не удалось запустить камеру: ${String(err)}`);
+      if (stopped) return;
+      const msg = String(err);
+      if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
+        setError('Доступ к камере запрещён. Разрешите в настройках браузера или используйте ручной ввод.');
+      } else {
+        setError(`Не удалось запустить камеру. Используйте ручной ввод.`);
+      }
       setScanning(false);
+      setMode('manual');
     });
 
     return () => {
-      scanner.stop().catch(() => {});
+      stopped = true;
+      try {
+        const s = scanner.getState?.();
+        if (s === 2 || s === 3) scanner.stop().catch(() => {});
+      } catch {
+        scanner.stop().catch(() => {});
+      }
       scannerRef.current = null;
     };
   }, [open, mode, selectedCamera]);

@@ -77,8 +77,13 @@ export default function ScannerModal({ open, onClose, onConfirm, title = 'Ска
 
   const startCamera = async () => {
     setCameraError('');
+    const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (!isSecure) {
+      setCameraError('Камера доступна только по HTTPS или localhost. Введите код вручную.');
+      return;
+    }
     if (typeof BarcodeDetector === 'undefined') {
-      setCameraError('Ваш браузер не поддерживает встроенный сканер. Введите код вручную.');
+      setCameraError('Ваш браузер не поддерживает встроенный сканер (нужен Chrome/Edge). Введите код вручную.');
       return;
     }
     try {
