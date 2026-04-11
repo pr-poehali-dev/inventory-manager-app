@@ -23,6 +23,8 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   const [opType, setOpType] = useState<'in' | 'out' | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('info');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
 
   if (!item) return null;
 
@@ -57,6 +59,35 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   };
 
 
+
+  const updateItemImage = (imageUrl: string | undefined) => {
+    const updatedItem: Item = { ...liveItem, imageUrl };
+    const next: AppState = {
+      ...state,
+      items: state.items.map(i => i.id === liveItem.id ? updatedItem : i),
+    };
+    onStateChange(next);
+    crudAction('upsert_item', { item: updatedItem });
+  };
+
+  const handlePhotoSelect = (file: File | null | undefined) => {
+    setPhotoError('');
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setPhotoError('Только изображения'); return; }
+    if (file.size > 5 * 1024 * 1024) { setPhotoError('Размер не больше 5 МБ'); return; }
+    setPhotoUploading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateItemImage(String(reader.result || ''));
+      setPhotoUploading(false);
+    };
+    reader.onerror = () => { setPhotoError('Ошибка чтения'); setPhotoUploading(false); };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePhotoRemove = () => {
+    updateItemImage(undefined);
+  };
 
   const handleQR = () => {
     const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/?item=' + liveItem.id)}`;
@@ -106,7 +137,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
       <Dialog open={!!item} onOpenChange={onClose}>
         <DialogContent className="max-w-xl p-0 overflow-hidden animate-scale-in max-h-[92vh] flex flex-col">
           {/* Header image */}
-          <div className="relative h-40 bg-muted overflow-hidden shrink-0">
+          <div className="relative h-40 bg-muted overflow-hidden shrink-0 group">
             {liveItem.imageUrl ? (
               <img src={liveItem.imageUrl} alt={liveItem.name} className="w-full h-full object-cover" />
             ) : (
@@ -114,15 +145,51 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                 <Icon name="Package" size={44} style={{ color: (category?.color || '#6366f1') + '55' }} />
               </div>
             )}
+
+            {/* Photo upload/replace overlay */}
+            <label
+              className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 hover:bg-black/40 text-white opacity-0 hover:opacity-100 cursor-pointer transition-all text-sm font-medium"
+              title={liveItem.imageUrl ? 'Заменить фото' : 'Загрузить фото'}
+            >
+              {photoUploading ? (
+                <><Icon name="Loader2" size={18} className="animate-spin" />Загрузка...</>
+              ) : (
+                <>
+                  <Icon name={liveItem.imageUrl ? 'ImagePlus' : 'Upload'} size={18} />
+                  {liveItem.imageUrl ? 'Заменить фото' : 'Загрузить фото'}
+                </>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => { handlePhotoSelect(e.target.files?.[0]); e.target.value = ''; }}
+              />
+            </label>
+
             <button onClick={onClose}
-              className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-black/20 hover:bg-black/40 text-white flex items-center justify-center backdrop-blur-sm transition-colors">
+              className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-black/30 hover:bg-black/50 text-white flex items-center justify-center backdrop-blur-sm transition-colors z-10">
               <Icon name="X" size={16} />
             </button>
+            {liveItem.imageUrl && (
+              <button
+                onClick={handlePhotoRemove}
+                title="Удалить фото"
+                className="absolute top-3 right-12 w-8 h-8 rounded-lg bg-black/30 hover:bg-destructive/80 text-white flex items-center justify-center backdrop-blur-sm transition-colors z-10"
+              >
+                <Icon name="Trash2" size={14} />
+              </button>
+            )}
             {isLow && (
-              <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-sm
+              <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-sm z-10
                 ${isCritical ? 'bg-destructive text-destructive-foreground' : 'bg-warning text-warning-foreground'}`}>
                 <Icon name="AlertTriangle" size={12} />
                 {isCritical ? 'Нет в наличии' : 'Низкий остаток'}
+              </div>
+            )}
+            {photoError && (
+              <div className="absolute bottom-2 left-2 right-2 text-xs text-white bg-destructive/90 px-2 py-1 rounded text-center z-10">
+                {photoError}
               </div>
             )}
           </div>
