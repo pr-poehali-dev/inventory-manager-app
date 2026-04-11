@@ -1,0 +1,190 @@
+import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import Icon from '@/components/ui/icon';
+import { AppState, crudAction } from '@/data/store';
+
+type ProfileProps = {
+  state: AppState;
+  onStateChange: (s: AppState) => void;
+  userName: string;
+  setUserName: (v: string) => void;
+  saved: boolean;
+  onSave: () => void;
+};
+
+export function ProfileSection({ state, onStateChange, userName, setUserName, saved, onSave }: ProfileProps) {
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+      <h2 className="font-semibold text-foreground">Профиль пользователя</h2>
+      <div className="space-y-1.5">
+        <Label>Имя пользователя</Label>
+        <Input value={userName} onChange={e => setUserName(e.target.value)} placeholder="Администратор" />
+        <p className="text-xs text-muted-foreground">Отображается в записях операций</p>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Тема оформления</Label>
+        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+          <div className="flex items-center gap-2">
+            <Icon name={state.darkMode ? 'Moon' : 'Sun'} size={16} className="text-muted-foreground" />
+            <span className="text-sm font-medium">{state.darkMode ? 'Тёмная тема' : 'Светлая тема'}</span>
+          </div>
+          <Switch
+            checked={state.darkMode}
+            onCheckedChange={v => {
+              const next = { ...state, darkMode: v };
+              onStateChange(next);
+              crudAction('update_setting', { key: 'darkMode', value: String(!state.darkMode) });
+            }}
+          />
+        </div>
+      </div>
+      <Button onClick={onSave} className={saved ? 'bg-success hover:bg-success text-success-foreground' : ''}>
+        {saved ? <><Icon name="Check" size={15} className="mr-1.5" />Сохранено!</> : 'Сохранить'}
+      </Button>
+    </div>
+  );
+}
+
+type AlertsProps = {
+  state: AppState;
+  threshold: string;
+  setThreshold: (v: string) => void;
+  saved: boolean;
+  onSave: () => void;
+};
+
+export function AlertsSection({ state, threshold, setThreshold, saved, onSave }: AlertsProps) {
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+      <h2 className="font-semibold text-foreground">Уведомления об остатках</h2>
+      <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg">
+        <div className="flex items-start gap-2">
+          <Icon name="Bell" size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+          <div className="text-sm text-amber-700 dark:text-amber-300">
+            <span className="font-semibold">Индикатор низкого остатка</span> — при остатке ≤ порога товар отображается красным и появляется предупреждение в шапке.
+          </div>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Порог низкого остатка по умолчанию</Label>
+        <div className="flex items-center gap-3">
+          <Input
+            type="number"
+            min="1"
+            value={threshold}
+            onChange={e => setThreshold(e.target.value)}
+            className="w-28"
+          />
+          <span className="text-sm text-muted-foreground">единиц</span>
+        </div>
+        <p className="text-xs text-muted-foreground">Применяется к новым товарам. Для каждого товара можно задать индивидуальный порог.</p>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-foreground">Сейчас на низком остатке</h3>
+        {state.items.filter(i => i.quantity <= i.lowStockThreshold).length === 0 ? (
+          <div className="flex items-center gap-2 p-3 bg-success/8 border border-success/20 rounded-lg text-sm text-success font-medium">
+            <Icon name="CheckCircle" size={15} />
+            Все товары в норме
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {state.items.filter(i => i.quantity <= i.lowStockThreshold).map(item => (
+              <div key={item.id} className="flex items-center justify-between p-3 bg-destructive/8 border border-destructive/20 rounded-lg">
+                <span className="text-sm font-medium text-foreground">{item.name}</span>
+                <span className={`text-sm font-bold tabular-nums ${item.quantity === 0 ? 'text-destructive' : 'text-warning'}`}>
+                  {item.quantity} {item.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Button onClick={onSave} className={saved ? 'bg-success hover:bg-success text-success-foreground' : ''}>
+        {saved ? <><Icon name="Check" size={15} className="mr-1.5" />Сохранено!</> : 'Сохранить'}
+      </Button>
+    </div>
+  );
+}
+
+export function TelegramSection() {
+  const [tgChatId, setTgChatId] = useState(localStorage.getItem('stockbase_tg_chat_id') || '');
+  const [tgTesting, setTgTesting] = useState(false);
+  const [tgResult, setTgResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const tgApiUrl = (() => {
+    const env = import.meta.env.VITE_API_URL;
+    if (env === undefined || env === null) return 'https://functions.poehali.dev/ee8097ba-6926-4cdb-ac81-985a17bf68dc';
+    if (env === '' || env === '/') return '/api/telegram-notify';
+    return `${env}/api/telegram-notify`;
+  })();
+
+  const testTelegram = async () => {
+    if (!tgChatId.trim()) return;
+    setTgTesting(true); setTgResult(null);
+    try {
+      const res = await fetch(tgApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test', chatId: tgChatId.trim() }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        localStorage.setItem('stockbase_tg_chat_id', tgChatId.trim());
+        setTgResult({ ok: true, msg: 'Сообщение отправлено! Проверьте Telegram.' });
+      } else {
+        setTgResult({ ok: false, msg: json.error || 'Ошибка отправки' });
+      }
+    } catch {
+      setTgResult({ ok: false, msg: 'Нет связи с сервером' });
+    }
+    setTgTesting(false);
+  };
+
+  const saveTgChatId = () => {
+    localStorage.setItem('stockbase_tg_chat_id', tgChatId.trim());
+    setTgResult({ ok: true, msg: 'Chat ID сохранён!' });
+  };
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+      <h2 className="font-semibold text-foreground">Уведомления в Telegram</h2>
+      <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg">
+        <div className="flex items-start gap-2">
+          <Icon name="Send" size={16} className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+          <div className="text-sm text-blue-700 dark:text-blue-300">
+            <span className="font-semibold">Как подключить:</span>
+            <ol className="mt-1 space-y-0.5 list-decimal list-inside">
+              <li>Найдите бота <b>@userinfobot</b> в Telegram</li>
+              <li>Отправьте ему /start — он покажет ваш Chat ID</li>
+              <li>Вставьте Chat ID ниже и нажмите «Тест»</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Chat ID</Label>
+        <div className="flex items-center gap-2">
+          <Input value={tgChatId} onChange={e => { setTgChatId(e.target.value); setTgResult(null); }} placeholder="123456789" className="flex-1" />
+          <Button variant="outline" onClick={testTelegram} disabled={tgTesting || !tgChatId.trim()}>
+            {tgTesting ? <Icon name="Loader2" size={14} className="animate-spin mr-1.5" /> : <Icon name="Send" size={14} className="mr-1.5" />}
+            Тест
+          </Button>
+        </div>
+      </div>
+      {tgResult && (
+        <div className={`flex items-center gap-2 p-3 rounded-lg text-sm font-medium ${tgResult.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+          <Icon name={tgResult.ok ? 'CheckCircle' : 'AlertCircle'} size={15} />
+          {tgResult.msg}
+        </div>
+      )}
+      <Button onClick={saveTgChatId} disabled={!tgChatId.trim()}>
+        <Icon name="Save" size={14} className="mr-1.5" />Сохранить
+      </Button>
+    </div>
+  );
+}
