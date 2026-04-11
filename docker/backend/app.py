@@ -536,6 +536,8 @@ def ensure_tables():
         VALUES ('user-admin-1', 'admin', %s, 'Администратор', 'admin')
         ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash
     """, (admin_hash,))
+    cur.execute(f"UPDATE {SCHEMA}.users SET password_hash = %s WHERE username = 'admin'", (admin_hash,))
+    print(f"[INIT] Admin user ensured with password_hash, schema={SCHEMA}")
     conn.commit()
     cur.close()
     conn.close()
