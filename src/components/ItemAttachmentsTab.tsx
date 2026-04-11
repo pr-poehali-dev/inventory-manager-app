@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import Icon from '@/components/ui/icon';
 import { Item, AppState, Attachment, crudAction, generateId } from '@/data/store';
+import { useItemPhoto } from '@/hooks/useItemPhoto';
 
 function FileIcon({ mime, name }: { mime: string; name: string }) {
   const ext = name.split('.').pop()?.toLowerCase() || '';
@@ -26,6 +27,7 @@ export function AttachmentsTab({ item, state, onStateChange }: {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [previewAtt, setPreviewAtt] = useState<Attachment | null>(null);
+  const photo = useItemPhoto(item, state, onStateChange);
 
   const attachments = item.attachments || [];
 
@@ -175,6 +177,16 @@ export function AttachmentsTab({ item, state, onStateChange }: {
             <div className="absolute bottom-0 left-0 right-0 bg-black/60 rounded-b-xl px-4 py-2 flex items-center justify-between">
               <span className="text-white text-sm font-medium truncate">{previewAtt.name}</span>
               <div className="flex gap-2 shrink-0">
+                {previewAtt.mimeType.startsWith('image/') && item.imageUrl !== previewAtt.dataUrl && (
+                  <button
+                    onClick={() => { photo.setPhotoFromDataUrl(previewAtt.dataUrl); setPreviewAtt(null); }}
+                    title="Сделать главным фото"
+                    className="px-3 h-8 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  >
+                    <Icon name="Star" size={13} />
+                    Сделать главным
+                  </button>
+                )}
                 <button onClick={() => handleDownload(previewAtt)}
                   className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
                   <Icon name="Download" size={15} />

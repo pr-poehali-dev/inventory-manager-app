@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { Item, AppState, crudAction } from '@/data/store';
+import { useItemPhoto } from '@/hooks/useItemPhoto';
 import OperationModal from './OperationModal';
 import { TechDocsList } from './ItemAttachmentsTab';
 import { BarcodesSection } from './ItemBarcodesSection';
@@ -23,12 +24,10 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   const [opType, setOpType] = useState<'in' | 'out' | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('info');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const [photoError, setPhotoError] = useState('');
+  const liveItem = item ? (state.items.find(i => i.id === item.id) || item) : ({ id: '' } as Item);
+  const photo = useItemPhoto(liveItem, state, onStateChange);
 
   if (!item) return null;
-
-  const liveItem = state.items.find(i => i.id === item.id) || item;
   const category = state.categories.find(c => c.id === liveItem.categoryId);
   const location = state.locations.find(l => l.id === liveItem.locationId);
   const itemOps = state.operations
@@ -56,37 +55,6 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
     onStateChange(next);
     crudAction('upsert_operation', { operation: op });
     setOpType(null);
-  };
-
-
-
-  const updateItemImage = (imageUrl: string | undefined) => {
-    const updatedItem: Item = { ...liveItem, imageUrl };
-    const next: AppState = {
-      ...state,
-      items: state.items.map(i => i.id === liveItem.id ? updatedItem : i),
-    };
-    onStateChange(next);
-    crudAction('upsert_item', { item: updatedItem });
-  };
-
-  const handlePhotoSelect = (file: File | null | undefined) => {
-    setPhotoError('');
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { setPhotoError('Только изображения'); return; }
-    if (file.size > 5 * 1024 * 1024) { setPhotoError('Размер не больше 5 МБ'); return; }
-    setPhotoUploading(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      updateItemImage(String(reader.result || ''));
-      setPhotoUploading(false);
-    };
-    reader.onerror = () => { setPhotoError('Ошибка чтения'); setPhotoUploading(false); };
-    reader.readAsDataURL(file);
-  };
-
-  const handlePhotoRemove = () => {
-    updateItemImage(undefined);
   };
 
   const handleQR = () => {
@@ -151,7 +119,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
               className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 hover:bg-black/40 text-white opacity-0 hover:opacity-100 cursor-pointer transition-all text-sm font-medium"
               title={liveItem.imageUrl ? 'Заменить фото' : 'Загрузить фото'}
             >
-              {photoUploading ? (
+              {photo.uploading ? (
                 <><Icon name="Loader2" size={18} className="animate-spin" />Загрузка...</>
               ) : (
                 <>
@@ -163,7 +131,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={e => { handlePhotoSelect(e.target.files?.[0]); e.target.value = ''; }}
+                onChange={e => { photo.selectPhoto(e.target.files?.[0]); e.target.value = ''; }}
               />
             </label>
 
@@ -173,7 +141,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
             </button>
             {liveItem.imageUrl && (
               <button
-                onClick={handlePhotoRemove}
+                onClick={photo.removePhoto}
                 title="Удалить фото"
                 className="absolute top-3 right-12 w-8 h-8 rounded-lg bg-black/30 hover:bg-destructive/80 text-white flex items-center justify-center backdrop-blur-sm transition-colors z-10"
               >
@@ -187,9 +155,9 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                 {isCritical ? 'Нет в наличии' : 'Низкий остаток'}
               </div>
             )}
-            {photoError && (
+            {photo.error && (
               <div className="absolute bottom-2 left-2 right-2 text-xs text-white bg-destructive/90 px-2 py-1 rounded text-center z-10">
-                {photoError}
+                {photo.error}
               </div>
             )}
           </div>
