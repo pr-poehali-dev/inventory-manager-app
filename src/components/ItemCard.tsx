@@ -1,10 +1,11 @@
 import Icon from '@/components/ui/icon';
-import { Item, Category, Location } from '@/data/store';
+import { Item, Category, Location, LocationStock, Warehouse } from '@/data/store';
 
 type Props = {
   item: Item;
   category?: Category;
   location?: Location;
+  locationStocks?: { location: Location; warehouse?: Warehouse; quantity: number }[];
   onClick: () => void;
   index?: number;
 };
@@ -17,7 +18,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   'cat-5': 'Box',
 };
 
-export default function ItemCard({ item, category, location, onClick, index = 0 }: Props) {
+export default function ItemCard({ item, category, location, locationStocks, onClick, index = 0 }: Props) {
   const isLow = item.quantity <= item.lowStockThreshold;
   const isCritical = item.quantity === 0;
   const catColor = category?.color || '#6366f1';
@@ -62,11 +63,20 @@ export default function ItemCard({ item, category, location, onClick, index = 0 
         <h3 className="font-semibold text-sm leading-snug mb-1.5 text-foreground line-clamp-2">{item.name}</h3>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Icon name="MapPin" size={11} />
-            <span className="truncate max-w-[100px]">{location?.name || '—'}</span>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0 flex-1 mr-2">
+            <Icon name="MapPin" size={11} className="shrink-0" />
+            {locationStocks && locationStocks.length > 0 ? (
+              <span className="truncate" title={locationStocks.map(ls => `${ls.warehouse?.name ? ls.warehouse.name + ' → ' : ''}${ls.location.name}: ${ls.quantity}`).join(', ')}>
+                {locationStocks.length === 1
+                  ? (locationStocks[0].warehouse ? `${locationStocks[0].warehouse.name} → ${locationStocks[0].location.name}` : locationStocks[0].location.name)
+                  : `${locationStocks.length} локаций`
+                }
+              </span>
+            ) : (
+              <span className="truncate">{location?.name || '—'}</span>
+            )}
           </div>
-          <div className={`flex items-center gap-1 font-bold text-sm
+          <div className={`flex items-center gap-1 font-bold text-sm shrink-0
             ${isCritical ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'}`}>
             <span className="tabular-nums">{item.quantity}</span>
             <span className="text-xs font-normal text-muted-foreground">{item.unit}</span>

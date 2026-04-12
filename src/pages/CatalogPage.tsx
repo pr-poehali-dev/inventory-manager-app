@@ -216,6 +216,15 @@ export default function CatalogPage({ state, onStateChange, initialItemId }: Pro
               item={item}
               category={state.categories.find(c => c.id === item.categoryId)}
               location={state.locations.find(l => l.id === item.locationId)}
+              locationStocks={(state.locationStocks || [])
+                .filter(ls => ls.itemId === item.id && ls.quantity > 0)
+                .map(ls => ({
+                  location: state.locations.find(l => l.id === ls.locationId)!,
+                  warehouse: (state.warehouses || []).find(w => state.locations.find(l => l.id === ls.locationId)?.warehouseId === w.id),
+                  quantity: ls.quantity,
+                }))
+                .filter(ls => ls.location)
+              }
               onClick={() => setSelectedItemId(item.id)}
               index={idx}
             />
