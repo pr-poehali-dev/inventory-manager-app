@@ -6,6 +6,7 @@ import {
   AppState, crudAction,
   WorkOrder, OrderItem, OrderStatus, InvoiceTemplate,
   getOrderStatusLabel, getOrderStatusColor,
+  updateLocationStock, updateWarehouseStock,
 } from '@/data/store';
 import { PickItemModal, CloseWarningModal } from './PickModals';
 
@@ -29,6 +30,37 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
   const handleClose = () => {
     if (hasUnfinished) { setShowCloseWarning(true); return; }
     changeStatus('closed');
+  };
+
+  const handleReassemble = () => {
+    let next = { ...state };
+    const orderOps = next.operations.filter(op => op.orderId === order.id && op.type === 'out');
+    for (const op of orderOps) {
+      if (op.locationId) {
+        next = updateLocationStock(next, op.itemId, op.locationId, op.quantity);
+      }
+      if (op.warehouseId) {
+        next = updateWarehouseStock(next, op.itemId, op.warehouseId, op.quantity);
+      } else {
+        next = { ...next, items: next.items.map(i => i.id === op.itemId ? { ...i, quantity: i.quantity + op.quantity } : i) };
+      }
+    }
+    next = {
+      ...next,
+      operations: next.operations.filter(op => op.orderId !== order.id),
+      workOrders: next.workOrders.map(o => {
+        if (o.id !== order.id) return o;
+        return {
+          ...o,
+          status: 'active' as OrderStatus,
+          updatedAt: new Date().toISOString(),
+          items: o.items.map(oi => ({ ...oi, pickedQty: 0, status: 'pending' as OrderItem['status'] })),
+        };
+      }),
+    };
+    onStateChange(next);
+    const updatedOrder = next.workOrders.find(o => o.id === order.id)!;
+    crudAction('upsert_work_order', { workOrder: updatedOrder, orderItems: updatedOrder.items });
   };
 
   const orderHistory = state.operations.filter(op => op.orderId === order.id)
@@ -86,11 +118,11 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
             {getOrderStatusLabel(s)}
           </button>
         ))}
-        {liveOrder.status === 'closed' && (
-          <button onClick={() => changeStatus('active')}
+        {(liveOrder.status === 'closed' || liveOrder.status === 'assembled') && (
+          <button onClick={handleReassemble}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-warning/12 text-warning hover:bg-warning/20 transition-all">
             <Icon name="RotateCcw" size={11} />
-            Возобновить сборку
+            Пересобрать
           </button>
         )}
       </div>
