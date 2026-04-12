@@ -22,8 +22,10 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [desktopMoreOpen, setDesktopMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const desktopMoreRef = useRef<HTMLDivElement>(null);
 
   const lowStockItems = state.items.filter(i => i.quantity <= i.lowStockThreshold);
   const recentOps = state.operations
@@ -39,6 +41,14 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     if (notifOpen) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [notifOpen]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (desktopMoreRef.current && !desktopMoreRef.current.contains(e.target as Node)) setDesktopMoreOpen(false);
+    };
+    if (desktopMoreOpen) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [desktopMoreOpen]);
 
   useEffect(() => {
     if (state.darkMode) document.documentElement.classList.add('dark');
@@ -80,6 +90,10 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     { id: 'settings',      label: 'Настройки',       icon: 'Settings' },
   ];
 
+  const desktopNavVisible = navItems.slice(0, 7);
+  const desktopNavHidden = navItems.slice(7);
+  const desktopMoreIsActive = desktopNavHidden.some(n => n.id === activePage);
+
   // Mobile bottom nav — 4 primary + "Ещё" button
   const mobileNavPrimary = navItems.slice(0, 4);
   const mobileNavMore = navItems.slice(4);
@@ -108,7 +122,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
 
           {/* Desktop nav */}
           <nav className="hidden xl:flex items-center gap-0.5 flex-1 justify-center">
-            {navItems.map(n => (
+            {desktopNavVisible.map(n => (
               <button key={n.id} onClick={() => navigate(n.id)}
                 className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all
                   ${activePage === n.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
@@ -122,6 +136,27 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
                 )}
               </button>
             ))}
+            {desktopNavHidden.length > 0 && (
+              <div ref={desktopMoreRef} className="relative">
+                <button onClick={() => setDesktopMoreOpen(!desktopMoreOpen)}
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all
+                    ${desktopMoreIsActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
+                  <Icon name="MoreHorizontal" size={16} />
+                </button>
+                {desktopMoreOpen && (
+                  <div className="absolute top-full right-0 mt-1 w-48 bg-card rounded-xl border border-border shadow-lg z-50 py-1 animate-fade-in">
+                    {desktopNavHidden.map(n => (
+                      <button key={n.id} onClick={() => { navigate(n.id); setDesktopMoreOpen(false); }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium transition-all
+                          ${activePage === n.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
+                        <Icon name={n.icon} size={14} />
+                        {n.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
 
           {/* Right */}
