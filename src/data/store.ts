@@ -582,6 +582,88 @@ export function updateWarehouseStock(state: AppState, itemId: string, warehouseI
   return { ...state, warehouseStocks: next, items: updatedItems };
 }
 
+export function revertPostedReceipt(state: AppState, receipt: Receipt): AppState {
+  if (receipt.status !== 'posted') return state;
+  let next = { ...state };
+  const receiptComment = `[Оприходование ${receipt.number}]`;
+
+  for (const line of receipt.lines) {
+    const qty = line.confirmedQty || line.qty;
+    if (qty <= 0) continue;
+
+    if (receipt.warehouseId) {
+      next = updateWarehouseStock(next, line.itemId, receipt.warehouseId, -qty);
+    } else {
+      next = {
+        ...next,
+        items: next.items.map(i => i.id === line.itemId ? { ...i, quantity: Math.max(0, i.quantity - qty) } : i),
+      };
+    }
+
+    if (line.locationId) {
+      next = updateLocationStock(next, line.itemId, line.locationId, -qty);
+    }
+  }
+
+  next = {
+    ...next,
+    operations: next.operations.filter(op => op.comment !== receiptComment),
+  };
+
+  return next;
+}
+
+export function recalcStocksFromOperations(state: AppState): AppState {
+  const freshWarehouseStocks: WarehouseStock[] = [];
+  const freshLocationStocks: LocationStock[] = [];
+  const itemQuantities: Record<string, number> = {};
+
+  for (const item of state.items) {
+    itemQuantities[item.id] = 0;
+  }
+
+  for (const op of state.operations) {
+    const delta = op.type === 'in' ? op.quantity : -op.quantity;
+
+    if (op.warehouseId) {
+      const existing = freshWarehouseStocks.find(ws => ws.itemId === op.itemId && ws.warehouseId === op.warehouseId);
+      if (existing) {
+        existing.quantity = Math.max(0, existing.quantity + delta);
+      } else if (delta > 0) {
+        freshWarehouseStocks.push({ itemId: op.itemId, warehouseId: op.warehouseId, quantity: delta });
+      }
+    }
+
+    if (op.locationId) {
+      const existing = freshLocationStocks.find(ls => ls.itemId === op.itemId && ls.locationId === op.locationId);
+      if (existing) {
+        existing.quantity = Math.max(0, existing.quantity + delta);
+      } else if (delta > 0) {
+        freshLocationStocks.push({ itemId: op.itemId, locationId: op.locationId, quantity: delta });
+      }
+    }
+
+    if (op.itemId in itemQuantities) {
+      itemQuantities[op.itemId] = Math.max(0, (itemQuantities[op.itemId] || 0) + delta);
+    }
+  }
+
+  const updatedItems = state.items.map(item => {
+    const wsTotal = freshWarehouseStocks
+      .filter(ws => ws.itemId === item.id)
+      .reduce((s, ws) => s + ws.quantity, 0);
+    const quantity = wsTotal > 0 ? wsTotal : (itemQuantities[item.id] ?? item.quantity);
+    return { ...item, quantity };
+  });
+
+  return {
+    ...state,
+    items: updatedItems,
+    warehouseStocks: freshWarehouseStocks,
+    locationStocks: freshLocationStocks,
+  };
+}
+
 export function getItemBarcodes(state: AppState, itemId: string): Barcode[] {
   return (state.barcodes || []).filter(b => b.itemId === itemId);
 }

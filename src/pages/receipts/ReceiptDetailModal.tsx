@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import { AppState, Receipt, ReceiptStatus, crudAction } from '@/data/store';
+import { AppState, Receipt, ReceiptStatus, crudAction, revertPostedReceipt } from '@/data/store';
 import QRDialog from '@/components/QRDialog';
 import { getReceiptProgress } from './ReceiptsList';
 
