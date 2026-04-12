@@ -423,7 +423,7 @@ export default function AuditPage({ state }: Props) {
 
         {/* Search + date range */}
         <div className="flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-48">
+          <div className="relative flex-1 min-w-0 sm:min-w-48">
             <Icon
               name="Search"
               size={15}
@@ -447,7 +447,7 @@ export default function AuditPage({ state }: Props) {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Input
               type="date"
               value={dateFrom}
@@ -455,7 +455,7 @@ export default function AuditPage({ state }: Props) {
                 setDateFrom(e.target.value);
                 setVisibleCount(PAGE_SIZE);
               }}
-              className="h-9 text-sm w-36"
+              className="h-9 text-sm flex-1 sm:w-36 sm:flex-none"
             />
             <span className="text-muted-foreground text-sm">&mdash;</span>
             <Input
@@ -465,7 +465,7 @@ export default function AuditPage({ state }: Props) {
                 setDateTo(e.target.value);
                 setVisibleCount(PAGE_SIZE);
               }}
-              className="h-9 text-sm w-36"
+              className="h-9 text-sm flex-1 sm:w-36 sm:flex-none"
             />
           </div>
         </div>

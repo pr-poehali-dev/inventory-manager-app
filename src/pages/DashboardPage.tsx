@@ -142,7 +142,7 @@ export default function DashboardPage({ state }: Props) {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
         <SummaryCard
           icon="Package"
           iconBg="bg-blue-500/10 text-blue-500"
@@ -249,29 +249,29 @@ export default function DashboardPage({ state }: Props) {
               <p className="text-sm">Все остатки в норме</p>
             </div>
           ) : (
-            <div className="overflow-x-auto -mx-5 px-5">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-0">
                 <thead>
                   <tr className="border-b text-muted-foreground text-left">
                     <th className="pb-2 pr-3 font-medium">Название</th>
                     <th className="pb-2 pr-3 font-medium text-right">Кол-во</th>
-                    <th className="pb-2 pr-3 font-medium text-right">Порог</th>
-                    <th className="pb-2 font-medium">Категория</th>
+                    <th className="pb-2 pr-3 font-medium text-right hidden sm:table-cell">Порог</th>
+                    <th className="pb-2 font-medium hidden sm:table-cell">Категория</th>
                   </tr>
                 </thead>
                 <tbody>
                   {lowStockTable.map((item) => (
                     <tr key={item.id} className="border-b last:border-0">
-                      <td className="py-2.5 pr-3 truncate max-w-[180px]">
+                      <td className="py-2.5 pr-3 truncate max-w-[140px] sm:max-w-[180px]">
                         {item.name}
                       </td>
-                      <td className="py-2.5 pr-3 text-right font-bold text-red-500">
+                      <td className="py-2.5 pr-3 text-right font-bold text-red-500 whitespace-nowrap">
                         {item.quantity}
                       </td>
-                      <td className="py-2.5 pr-3 text-right text-muted-foreground">
+                      <td className="py-2.5 pr-3 text-right text-muted-foreground hidden sm:table-cell">
                         {item.lowStockThreshold}
                       </td>
-                      <td className="py-2.5 text-muted-foreground truncate max-w-[120px]">
+                      <td className="py-2.5 text-muted-foreground truncate max-w-[120px] hidden sm:table-cell">
                         {item.categoryName}
                       </td>
                     </tr>
@@ -291,24 +291,24 @@ export default function DashboardPage({ state }: Props) {
               <p className="text-sm">Нет операций</p>
             </div>
           ) : (
-            <div className="overflow-x-auto -mx-5 px-5">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-0">
                 <thead>
                   <tr className="border-b text-muted-foreground text-left">
-                    <th className="pb-2 pr-3 font-medium">Дата</th>
+                    <th className="pb-2 pr-3 font-medium hidden sm:table-cell">Дата</th>
                     <th className="pb-2 pr-3 font-medium">Товар</th>
                     <th className="pb-2 pr-3 font-medium">Тип</th>
                     <th className="pb-2 pr-3 font-medium text-right">Кол-во</th>
-                    <th className="pb-2 font-medium">Исполнитель</th>
+                    <th className="pb-2 font-medium hidden sm:table-cell">Исполнитель</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentOps.map((op) => (
                     <tr key={op.id} className="border-b last:border-0">
-                      <td className="py-2.5 pr-3 whitespace-nowrap text-muted-foreground">
+                      <td className="py-2.5 pr-3 whitespace-nowrap text-muted-foreground hidden sm:table-cell">
                         {op.formattedDate}
                       </td>
-                      <td className="py-2.5 pr-3 truncate max-w-[160px]">
+                      <td className="py-2.5 pr-3 truncate max-w-[120px] sm:max-w-[160px]">
                         {op.itemName}
                       </td>
                       <td className="py-2.5 pr-3">
@@ -323,7 +323,7 @@ export default function DashboardPage({ state }: Props) {
                         </span>
                       </td>
                       <td className="py-2.5 pr-3 text-right">{op.quantity}</td>
-                      <td className="py-2.5 text-muted-foreground truncate max-w-[120px]">
+                      <td className="py-2.5 text-muted-foreground truncate max-w-[120px] hidden sm:table-cell">
                         {op.performedBy}
                       </td>
                     </tr>

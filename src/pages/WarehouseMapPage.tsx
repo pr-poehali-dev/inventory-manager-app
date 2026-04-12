@@ -218,7 +218,7 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-44">
+        <div className="relative flex-1 min-w-0 sm:min-w-44">
           <Icon name="Search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input placeholder="Найти товар на карте..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
           {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><Icon name="X" size={13} /></button>}

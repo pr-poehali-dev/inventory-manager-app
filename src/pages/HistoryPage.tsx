@@ -85,7 +85,7 @@ export default function HistoryPage({ state }: Props) {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="bg-card rounded-xl border border-border p-4 shadow-card">
           <div className="text-2xl font-bold text-foreground tabular-nums">{enriched.length}</div>
           <div className="text-xs text-muted-foreground mt-0.5">Всего операций</div>
@@ -94,7 +94,7 @@ export default function HistoryPage({ state }: Props) {
           <div className="text-2xl font-bold text-success tabular-nums">+{totalIn}</div>
           <div className="text-xs text-muted-foreground mt-0.5">Единиц принято</div>
         </div>
-        <div className="bg-card rounded-xl border border-border p-4 shadow-card">
+        <div className="bg-card rounded-xl border border-border p-4 shadow-card col-span-2 sm:col-span-1">
           <div className="text-2xl font-bold text-destructive tabular-nums">-{totalOut}</div>
           <div className="text-xs text-muted-foreground mt-0.5">Единиц выдано</div>
         </div>
@@ -149,14 +149,14 @@ export default function HistoryPage({ state }: Props) {
 
         {/* Search + dates */}
         <div className="flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-48">
+          <div className="relative flex-1 min-w-0 sm:min-w-48">
             <Icon name="Search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input placeholder="Поиск по названию, комментарию..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
           </div>
-          <div className="flex items-center gap-2">
-            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 text-sm w-36" />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 text-sm flex-1 sm:w-36 sm:flex-none" />
             <span className="text-muted-foreground text-sm">—</span>
-            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-sm w-36" />
+            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-sm flex-1 sm:w-36 sm:flex-none" />
           </div>
         </div>
       </div>
