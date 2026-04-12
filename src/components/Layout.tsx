@@ -21,7 +21,24 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const lowStockItems = state.items.filter(i => i.quantity <= i.lowStockThreshold);
+  const recentOps = state.operations
+    .slice()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+  const notifCount = lowStockItems.length;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    if (notifOpen) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [notifOpen]);
 
   useEffect(() => {
     if (state.darkMode) document.documentElement.classList.add('dark');
@@ -48,17 +65,17 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
   const activeOrdersCount = (state.workOrders || []).filter(o => ['active', 'draft', 'pending_stock'].includes(o.status)).length;
 
   const navItems: { id: Page; label: string; icon: string; badge?: number; badgeColor?: string }[] = [
-    { id: 'dashboard',     label: 'Аналитика',       icon: 'BarChart3' },
     { id: 'catalog',       label: 'Каталог',         icon: 'LayoutGrid',  badge: lowStockCount > 0 ? lowStockCount : undefined, badgeColor: 'destructive' },
-    { id: 'nomenclature',  label: 'Номенклатура',    icon: 'List' },
     { id: 'assembly',      label: 'Сборка',          icon: 'PackageCheck', badge: activeOrdersCount > 0 ? activeOrdersCount : undefined, badgeColor: 'blue' },
-    { id: 'warehouse',     label: 'Карта складов',   icon: 'Map' },
-    { id: 'receipts',      label: 'Оприходование',   icon: 'PackagePlus' },
+    { id: 'warehouse',     label: 'Склады',          icon: 'Map' },
+    { id: 'receipts',      label: 'Приёмка',         icon: 'PackagePlus' },
+    { id: 'dashboard',     label: 'Аналитика',       icon: 'BarChart3' },
+    { id: 'nomenclature',  label: 'Номенклатура',    icon: 'List' },
     { id: 'inventory',     label: 'Инвентаризация',  icon: 'ClipboardCheck' },
     { id: 'technician',    label: 'Техник',           icon: 'Wrench' },
     { id: 'partners',      label: 'Партнёры',        icon: 'Users2' },
-    { id: 'labels',        label: 'Этикетки',        icon: 'Printer' },
     { id: 'history',       label: 'История',         icon: 'History' },
+    { id: 'labels',        label: 'Этикетки',        icon: 'Printer' },
     { id: 'audit',         label: 'Аудит-лог',       icon: 'Shield' },
     { id: 'settings',      label: 'Настройки',       icon: 'Settings' },
   ];
@@ -115,6 +132,73 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
               title="Сканировать QR-код">
               <Icon name="ScanLine" size={16} />
             </button>
+            <div ref={notifRef} className="relative">
+              <button onClick={() => setNotifOpen(!notifOpen)}
+                className="relative w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                title="Уведомления">
+                <Icon name="Bell" size={16} />
+                {notifCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-destructive ring-2 ring-card" />
+                )}
+              </button>
+              {notifOpen && (
+                <div className="absolute right-0 top-10 w-80 bg-card rounded-xl border border-border shadow-lg z-50 overflow-hidden animate-fade-in">
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <span className="font-semibold text-sm">Уведомления</span>
+                    {notifCount > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/15 text-destructive font-bold">{notifCount}</span>}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {lowStockItems.length > 0 && (
+                      <div className="px-4 py-2">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                          <Icon name="AlertTriangle" size={11} className="text-warning" />Низкий остаток
+                        </div>
+                        {lowStockItems.slice(0, 5).map(item => (
+                          <div key={item.id} className="flex items-center justify-between py-1.5 text-sm">
+                            <span className="truncate text-foreground">{item.name}</span>
+                            <span className={`font-bold tabular-nums shrink-0 ml-2 ${item.quantity === 0 ? 'text-destructive' : 'text-warning'}`}>
+                              {item.quantity} {item.unit}
+                            </span>
+                          </div>
+                        ))}
+                        {lowStockItems.length > 5 && (
+                          <div className="text-xs text-muted-foreground mt-1">и ещё {lowStockItems.length - 5}...</div>
+                        )}
+                      </div>
+                    )}
+                    {recentOps.length > 0 && (
+                      <div className="px-4 py-2 border-t border-border">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                          <Icon name="ArrowUpDown" size={11} />Последние операции
+                        </div>
+                        {recentOps.map(op => {
+                          const it = state.items.find(i => i.id === op.itemId);
+                          return (
+                            <div key={op.id} className="flex items-center gap-2 py-1.5 text-sm">
+                              <span className={`text-xs font-bold ${op.type === 'in' ? 'text-success' : 'text-destructive'}`}>
+                                {op.type === 'in' ? '+' : '−'}{op.quantity}
+                              </span>
+                              <span className="truncate text-foreground">{it?.name || '—'}</span>
+                              <span className="text-xs text-muted-foreground shrink-0 ml-auto">{new Date(op.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {lowStockItems.length === 0 && recentOps.length === 0 && (
+                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        <Icon name="BellOff" size={20} className="mx-auto mb-2 opacity-40" />
+                        Нет уведомлений
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => { setNotifOpen(false); onPageChange('settings'); }}
+                    className="w-full px-4 py-2.5 border-t border-border text-xs text-primary hover:bg-muted/50 font-medium transition-colors">
+                    Настроить уведомления
+                  </button>
+                </div>
+              )}
+            </div>
             <button onClick={toggleDark}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
               <Icon name={state.darkMode ? 'Sun' : 'Moon'} size={15} />
@@ -168,7 +252,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
             <span className="text-destructive font-medium">
               {lowStockCount} {lowStockCount === 1 ? 'товар' : lowStockCount < 5 ? 'товара' : 'товаров'} с низким остатком
             </span>
-            <button onClick={() => navigate('nomenclature')} className="ml-auto text-destructive/70 hover:text-destructive text-xs underline underline-offset-2">
+            <button onClick={() => navigate('catalog')} className="ml-auto text-destructive/70 hover:text-destructive text-xs underline underline-offset-2">
               Посмотреть
             </button>
           </div>

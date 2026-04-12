@@ -48,6 +48,29 @@ export function ProfileSection({ state, onStateChange, userName, setUserName, sa
   );
 }
 
+export type NotificationSettings = {
+  lowStock: boolean;
+  incoming: boolean;
+  outgoing: boolean;
+  newItems: boolean;
+  assembly: boolean;
+  receipts: boolean;
+};
+
+const NOTIF_STORAGE_KEY = 'stockbase_notification_settings';
+
+function loadNotifSettings(): NotificationSettings {
+  try {
+    const raw = localStorage.getItem(NOTIF_STORAGE_KEY);
+    if (raw) return { ...defaultNotifSettings, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return defaultNotifSettings;
+}
+
+const defaultNotifSettings: NotificationSettings = {
+  lowStock: true, incoming: true, outgoing: true, newItems: false, assembly: true, receipts: true,
+};
+
 type AlertsProps = {
   state: AppState;
   threshold: string;
@@ -57,42 +80,72 @@ type AlertsProps = {
 };
 
 export function AlertsSection({ state, threshold, setThreshold, saved, onSave }: AlertsProps) {
+  const [notif, setNotif] = useState<NotificationSettings>(loadNotifSettings);
+
+  const updateNotif = (key: keyof NotificationSettings, value: boolean) => {
+    const next = { ...notif, [key]: value };
+    setNotif(next);
+    localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(next));
+  };
+
+  const notifTypes: { key: keyof NotificationSettings; label: string; desc: string; icon: string; color: string }[] = [
+    { key: 'lowStock', label: 'Низкий остаток', desc: 'Когда товар достигает порога', icon: 'AlertTriangle', color: 'text-warning' },
+    { key: 'incoming', label: 'Приход товара', desc: 'При поступлении на склад', icon: 'ArrowDownToLine', color: 'text-success' },
+    { key: 'outgoing', label: 'Расход товара', desc: 'При выдаче со склада', icon: 'ArrowUpFromLine', color: 'text-destructive' },
+    { key: 'newItems', label: 'Новые позиции', desc: 'При добавлении в номенклатуру', icon: 'PackagePlus', color: 'text-primary' },
+    { key: 'assembly', label: 'Заявки на сборку', desc: 'Создание, завершение, изменения', icon: 'ClipboardList', color: 'text-purple-500' },
+    { key: 'receipts', label: 'Поступления', desc: 'Новые приходные накладные', icon: 'FileInput', color: 'text-blue-500' },
+  ];
+
+  const lowStockItems = state.items.filter(i => i.quantity <= i.lowStockThreshold);
+
   return (
-    <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
-      <h2 className="font-semibold text-foreground">Уведомления об остатках</h2>
-      <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg">
-        <div className="flex items-start gap-2">
-          <Icon name="Bell" size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-          <div className="text-sm text-amber-700 dark:text-amber-300">
-            <span className="font-semibold">Индикатор низкого остатка</span> — при остатке ≤ порога товар отображается красным и появляется предупреждение в шапке.
+    <div className="space-y-4">
+      <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+        <h2 className="font-semibold text-foreground">Порог низкого остатка</h2>
+        <div className="space-y-1.5">
+          <Label>По умолчанию для новых товаров</Label>
+          <div className="flex items-center gap-3">
+            <Input type="number" min="1" value={threshold} onChange={e => setThreshold(e.target.value)} className="w-28" />
+            <span className="text-sm text-muted-foreground">единиц</span>
           </div>
+          <p className="text-xs text-muted-foreground">Для каждого товара можно задать индивидуальный порог в карточке.</p>
         </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label>Порог низкого остатка по умолчанию</Label>
-        <div className="flex items-center gap-3">
-          <Input
-            type="number"
-            min="1"
-            value={threshold}
-            onChange={e => setThreshold(e.target.value)}
-            className="w-28"
-          />
-          <span className="text-sm text-muted-foreground">единиц</span>
-        </div>
-        <p className="text-xs text-muted-foreground">Применяется к новым товарам. Для каждого товара можно задать индивидуальный порог.</p>
+        <Button onClick={onSave} size="sm" className={saved ? 'bg-success hover:bg-success text-success-foreground' : ''}>
+          {saved ? <><Icon name="Check" size={14} className="mr-1" />Сохранено!</> : 'Сохранить'}
+        </Button>
       </div>
 
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-foreground">Сейчас на низком остатке</h3>
-        {state.items.filter(i => i.quantity <= i.lowStockThreshold).length === 0 ? (
+      <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+        <h2 className="font-semibold text-foreground">Типы уведомлений</h2>
+        <p className="text-xs text-muted-foreground">Включите нужные типы — уведомления будут отображаться в центре уведомлений и отправляться в Telegram (если подключён).</p>
+        <div className="space-y-1">
+          {notifTypes.map(nt => (
+            <div key={nt.key} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg bg-muted flex items-center justify-center ${nt.color}`}>
+                  <Icon name={nt.icon} size={16} />
+                </div>
+                <div>
+                  <div className="text-sm font-medium">{nt.label}</div>
+                  <div className="text-xs text-muted-foreground">{nt.desc}</div>
+                </div>
+              </div>
+              <Switch checked={notif[nt.key]} onCheckedChange={v => updateNotif(nt.key, v)} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-3">
+        <h2 className="font-semibold text-foreground">Сейчас на низком остатке</h2>
+        {lowStockItems.length === 0 ? (
           <div className="flex items-center gap-2 p-3 bg-success/8 border border-success/20 rounded-lg text-sm text-success font-medium">
-            <Icon name="CheckCircle" size={15} />
-            Все товары в норме
+            <Icon name="CheckCircle" size={15} />Все товары в норме
           </div>
         ) : (
           <div className="space-y-1.5">
-            {state.items.filter(i => i.quantity <= i.lowStockThreshold).map(item => (
+            {lowStockItems.map(item => (
               <div key={item.id} className="flex items-center justify-between p-3 bg-destructive/8 border border-destructive/20 rounded-lg">
                 <span className="text-sm font-medium text-foreground">{item.name}</span>
                 <span className={`text-sm font-bold tabular-nums ${item.quantity === 0 ? 'text-destructive' : 'text-warning'}`}>
@@ -103,10 +156,6 @@ export function AlertsSection({ state, threshold, setThreshold, saved, onSave }:
           </div>
         )}
       </div>
-
-      <Button onClick={onSave} className={saved ? 'bg-success hover:bg-success text-success-foreground' : ''}>
-        {saved ? <><Icon name="Check" size={15} className="mr-1.5" />Сохранено!</> : 'Сохранить'}
-      </Button>
     </div>
   );
 }

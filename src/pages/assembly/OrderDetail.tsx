@@ -6,14 +6,13 @@ import {
   WorkOrder, OrderItem, OrderStatus,
   getOrderStatusLabel, getOrderStatusColor,
 } from '@/data/store';
-import { PickItemModal, QRScanModal, CloseWarningModal } from './PickModals';
+import { PickItemModal, CloseWarningModal } from './PickModals';
 
 export function OrderDetail({ order, state, onStateChange, onBack }: {
   order: WorkOrder; state: AppState;
   onStateChange: (s: AppState) => void; onBack: () => void;
 }) {
   const [pickingItem, setPickingItem] = useState<OrderItem | null>(null);
-  const [showQRScan, setShowQRScan] = useState(false);
   const [showCloseWarning, setShowCloseWarning] = useState(false);
 
   const doneCount = order.items.filter(i => i.status === 'done').length;
@@ -72,22 +71,6 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         </div>
         <div className="text-xs text-muted-foreground">{doneCount} из {liveOrder.items.length} позиций собрано</div>
       </div>
-
-      {/* QR Scan big button — visible when active */}
-      {(liveOrder.status === 'active') && (
-        <button
-          onClick={() => setShowQRScan(true)}
-          className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/70 transition-all group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Icon name="ScanLine" size={20} className="text-primary-foreground" />
-          </div>
-          <div className="text-left">
-            <div className="font-bold text-base text-foreground">Отсканировать QR-код</div>
-            <div className="text-sm text-muted-foreground">Добавить товар в заявку по QR</div>
-          </div>
-        </button>
-      )}
 
       {/* Status flow */}
       <div className="flex gap-1 flex-wrap">
@@ -216,10 +199,6 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
 
       {/* Footer actions */}
       <div className="flex gap-2 flex-wrap">
-        <Button variant="outline" onClick={() => window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/?order=' + liveOrder.id)}`, '_blank')}
-          className="flex items-center gap-1.5">
-          <Icon name="QrCode" size={14} />QR
-        </Button>
         {liveOrder.status === 'draft' && (
           <>
             <Button variant="outline" onClick={() => {}} className="flex items-center gap-1.5">
@@ -228,11 +207,7 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
             <Button onClick={() => changeStatus('active')} className="flex-1"><Icon name="Play" size={14} className="mr-1.5" />Запустить в работу</Button>
           </>
         )}
-        {liveOrder.status === 'active' && (
-          <Button onClick={() => setShowQRScan(true)} variant="outline" className="flex items-center gap-1.5">
-            <Icon name="ScanLine" size={14} />Сканировать
-          </Button>
-        )}
+
         {liveOrder.status === 'pending_stock' && <Button onClick={() => changeStatus('active')} className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground"><Icon name="Play" size={14} className="mr-1.5" />Запустить (поставка пришла)</Button>}
         {liveOrder.status === 'assembled' && <Button onClick={handleClose} className="flex-1 bg-muted text-foreground hover:bg-muted/80"><Icon name="Archive" size={14} className="mr-1.5" />Закрыть заявку</Button>}
         {liveOrder.status === 'closed' && (
@@ -243,7 +218,6 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
       </div>
 
       {pickingItem && <PickItemModal state={state} onStateChange={onStateChange} order={liveOrder} orderItem={pickingItem} onClose={() => setPickingItem(null)} />}
-      {showQRScan && <QRScanModal order={liveOrder} state={state} onStateChange={onStateChange} onClose={() => setShowQRScan(false)} />}
       {showCloseWarning && (
         <CloseWarningModal
           order={liveOrder}

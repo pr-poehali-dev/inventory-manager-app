@@ -4,13 +4,11 @@ import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { Item, AppState, crudAction } from '@/data/store';
 import { useItemPhoto } from '@/hooks/useItemPhoto';
-import QRDialog from './QRDialog';
 import OperationModal from './OperationModal';
 import { TechDocsList } from './ItemAttachmentsTab';
-import { BarcodesSection } from './ItemBarcodesSection';
 import { ItemHistoryTab } from './ItemHistoryTab';
 
-import { loadBoard, BoardNode, BoardConnection } from '@/pages/technician/BoardView';
+import { loadBoard, BoardNode } from '@/pages/technician/BoardView';
 
 type Tab = 'info' | 'history' | 'documents';
 
@@ -25,13 +23,13 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   const [opType, setOpType] = useState<'in' | 'out' | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('info');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showQR, setShowQR] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [edited, setEdited] = useState({ name: '', unit: '', description: '', categoryId: '', lowStockThreshold: 5 });
   const liveItem = item ? (state.items.find(i => i.id === item.id) || item) : ({ id: '' } as Item);
   const photo = useItemPhoto(liveItem, state, onStateChange);
 
   if (!item) return null;
   const category = state.categories.find(c => c.id === liveItem.categoryId);
-  const location = state.locations.find(l => l.id === liveItem.locationId);
   const itemOps = state.operations
     .filter(o => o.itemId === liveItem.id)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -59,8 +57,6 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
     setOpType(null);
   };
 
-  const qrValue = `${window.location.origin}/?item=${liveItem.id}`;
-
   const handleDelete = () => {
     const next: AppState = {
       ...state,
@@ -78,6 +74,21 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
     onStateChange(next);
     crudAction('delete_item', { itemId: liveItem.id });
     onClose();
+  };
+
+  const handleSaveEdit = () => {
+    const updatedItem = {
+      ...liveItem,
+      name: edited.name.trim() || liveItem.name,
+      unit: edited.unit.trim() || liveItem.unit,
+      description: edited.description.trim(),
+      categoryId: edited.categoryId,
+      lowStockThreshold: edited.lowStockThreshold,
+    };
+    const next = { ...state, items: state.items.map(i => i.id === liveItem.id ? updatedItem : i) };
+    onStateChange(next);
+    crudAction('upsert_item', { item: updatedItem, locationStocks: state.locationStocks.filter(ls => ls.itemId === liveItem.id), warehouseStocks: (state.warehouseStocks || []).filter(ws => ws.itemId === liveItem.id) });
+    setEditing(false);
   };
 
   const itemDocs = (state.techDocs || []).filter(d => d.itemId === liveItem.id);
@@ -164,20 +175,28 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
           <div className="p-5 space-y-4 overflow-y-auto flex-1">
             {/* Title */}
             <div>
-              <h2 className="text-xl font-bold leading-tight">{liveItem.name}</h2>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-xl font-bold leading-tight flex-1">
+                  {editing ? (
+                    <input value={edited.name} onChange={e => setEdited({...edited, name: e.target.value})}
+                      className="w-full text-xl font-bold bg-transparent border-b-2 border-primary outline-none" />
+                  ) : liveItem.name}
+                </h2>
+                {!editing && (
+                  <button onClick={() => { setEditing(true); setEdited({ name: liveItem.name, unit: liveItem.unit, description: liveItem.description || '', categoryId: liveItem.categoryId || '', lowStockThreshold: liveItem.lowStockThreshold }); }}
+                    className="w-8 h-8 rounded-lg border border-border hover:bg-muted flex items-center justify-center shrink-0 transition-colors">
+                    <Icon name="Pencil" size={14} />
+                  </button>
+                )}
+              </div>
               <div className="flex flex-wrap items-center gap-2 mt-1.5">
                 {category && (
                   <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: category.color + '20', color: category.color }}>
                     {category.name}
                   </span>
                 )}
-                {location && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Icon name="MapPin" size={11} />{location.name}
-                  </span>
-                )}
               </div>
-              {liveItem.description && <p className="text-sm text-muted-foreground mt-1.5">{liveItem.description}</p>}
+              {liveItem.description && !editing && <p className="text-sm text-muted-foreground mt-1.5">{liveItem.description}</p>}
             </div>
 
             {/* Quantity block */}
@@ -269,28 +288,52 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
             {/* Tab content */}
             {activeTab === 'info' && (
               <div className="space-y-4">
-                <div className="space-y-0 divide-y divide-border text-sm">
-                  {[
-                    { label: 'Единица измерения', value: liveItem.unit },
-                    { label: 'Добавлен', value: new Date(liveItem.createdAt).toLocaleDateString('ru-RU') },
-                    { label: 'Категория', value: category?.name || '—' },
-                    { label: 'Основная локация', value: location?.name || '—' },
-                  ].map(row => (
-                    <div key={row.label} className="flex justify-between py-2.5">
-                      <span className="text-muted-foreground">{row.label}</span>
-                      <span className="font-medium">{row.value}</span>
+                {editing ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Единица измерения</label>
+                      <input value={edited.unit} onChange={e => setEdited({...edited, unit: e.target.value})}
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
                     </div>
-                  ))}
-                  <div className="flex justify-between py-2.5">
-                    <span className="text-muted-foreground">QR-код товара</span>
-                    <button onClick={() => setShowQR(true)} className="flex items-center gap-1.5 text-primary hover:text-primary/80 font-medium">
-                      <Icon name="QrCode" size={13} />Открыть
-                    </button>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Категория</label>
+                      <select value={edited.categoryId} onChange={e => setEdited({...edited, categoryId: e.target.value})}
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="">Без категории</option>
+                        {state.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Порог низкого остатка</label>
+                      <input type="number" min={0} value={edited.lowStockThreshold} onChange={e => setEdited({...edited, lowStockThreshold: Number(e.target.value)})}
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Описание</label>
+                      <textarea value={edited.description} onChange={e => setEdited({...edited, description: e.target.value})} rows={3}
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button variant="outline" size="sm" onClick={() => setEditing(false)} className="flex-1">Отмена</Button>
+                      <Button size="sm" onClick={handleSaveEdit} className="flex-1 gap-1.5">
+                        <Icon name="Check" size={14} />Сохранить
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <div className="pt-1">
-                  <BarcodesSection item={liveItem} state={state} onStateChange={onStateChange} />
-                </div>
+                ) : (
+                  <div className="space-y-0 divide-y divide-border text-sm">
+                    {[
+                      { label: 'Единица измерения', value: liveItem.unit },
+                      { label: 'Добавлен', value: new Date(liveItem.createdAt).toLocaleDateString('ru-RU') },
+                      { label: 'Категория', value: category?.name || '—' },
+                    ].map(row => (
+                      <div key={row.label} className="flex justify-between py-2.5">
+                        <span className="text-muted-foreground">{row.label}</span>
+                        <span className="font-medium">{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Board connections */}
                 {(() => {
@@ -345,27 +388,29 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                   );
                 })()}
 
-                <div className="pt-4 border-t border-border">
-                  {!showDeleteConfirm ? (
-                    <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(true)}
-                      className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 gap-2">
-                      <Icon name="Trash2" size={14} />Удалить номенклатуру
-                    </Button>
-                  ) : (
-                    <div className="p-3 bg-destructive/8 border border-destructive/20 rounded-xl space-y-3">
-                      <p className="text-sm text-muted-foreground">
-                        <b className="text-foreground">«{liveItem.name}»</b> будет удалён вместе с историей, остатками и документами. Это необратимо.
-                      </p>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)} className="flex-1">Отмена</Button>
-                        <Button size="sm" onClick={handleDelete}
-                          className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold gap-1.5">
-                          <Icon name="Trash2" size={13} />Удалить
-                        </Button>
+                {!editing && (
+                  <div className="pt-4 border-t border-border">
+                    {!showDeleteConfirm ? (
+                      <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(true)}
+                        className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 gap-2">
+                        <Icon name="Trash2" size={14} />Удалить номенклатуру
+                      </Button>
+                    ) : (
+                      <div className="p-3 bg-destructive/8 border border-destructive/20 rounded-xl space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          <b className="text-foreground">«{liveItem.name}»</b> будет удалён вместе с историей, остатками и документами. Это необратимо.
+                        </p>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)} className="flex-1">Отмена</Button>
+                          <Button size="sm" onClick={handleDelete}
+                            className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold gap-1.5">
+                            <Icon name="Trash2" size={13} />Удалить
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -451,8 +496,6 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
           onSave={handleOperation}
         />
       )}
-
-      <QRDialog open={showQR} onClose={() => setShowQR(false)} value={qrValue} title="QR-код товара" />
     </>
   );
 }

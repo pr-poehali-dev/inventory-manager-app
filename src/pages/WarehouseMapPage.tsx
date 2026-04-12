@@ -36,6 +36,18 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
     } catch (e) { /* ignore */ }
     return DEFAULT_LAYOUT;
   });
+  const [rackDirs, setRackDirs] = useState<Record<string, 'horizontal' | 'vertical'>>(() => {
+    try {
+      const saved = localStorage.getItem('rack_directions_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) { /* ignore */ }
+    return {};
+  });
+  const toggleRackDir = (rackId: string) => {
+    const next = { ...rackDirs, [rackId]: rackDirs[rackId] === 'vertical' ? 'horizontal' : 'vertical' };
+    setRackDirs(next);
+    localStorage.setItem('rack_directions_v1', JSON.stringify(next));
+  };
 
   const activeWarehouse = warehouses.find(w => w.id === activeWarehouseId) || warehouses[0];
 
@@ -264,6 +276,13 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
                       {topLoc.description && <span className="text-xs text-muted-foreground">· {topLoc.description}</span>}
                       <div className="flex-1 h-px bg-border" />
                       <button
+                        onClick={() => toggleRackDir(topLoc.id)}
+                        title={rackDirs[topLoc.id] === 'vertical' ? 'Вертикально → Горизонтально' : 'Горизонтально → Вертикально'}
+                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                      >
+                        <Icon name={rackDirs[topLoc.id] === 'vertical' ? 'ArrowDown' : 'ArrowRight'} size={11} />
+                      </button>
+                      <button
                         onClick={() => { setEditLocation(topLoc); setShowAddLocation(true); }}
                         className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                       >
@@ -277,7 +296,7 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2">
+                    <div className={rackDirs[topLoc.id] === 'vertical' ? 'flex flex-col gap-2' : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2'}>
                       {(children.length > 0 ? children : [topLoc]).map(loc => (
                         <LocationCard
                           key={loc.id}
