@@ -106,10 +106,16 @@ export default function App() {
     }
   }, []);
 
-  // Загрузка с сервера при старте — перезаписываем localStorage данные если сервер новее
   useEffect(() => {
     loadStateFromServer().then(result => {
       if (!result) return;
+      const localRaw = localStorage.getItem('stockbase_state');
+      const localTs = localRaw ? (JSON.parse(localRaw)._savedAt || '') : '';
+      const serverTs = result.updatedAt || '';
+      if (localTs && serverTs && localTs > serverTs) {
+        serverUpdatedAtRef.current = serverTs;
+        return;
+      }
       serverUpdatedAtRef.current = result.updatedAt;
       setState(result.state);
       saveLocal(result.state);

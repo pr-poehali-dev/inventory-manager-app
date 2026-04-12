@@ -523,7 +523,8 @@ export function saveLocal(state: AppState): void {
 }
 
 export function saveState(state: AppState): void {
-  saveLocal(state);
+  const stamped = { ...state, _savedAt: new Date().toISOString() };
+  saveLocal(stamped);
   saveStateToServer(state);
 }
 
