@@ -188,8 +188,8 @@ export function TelegramSection() {
       } else {
         setTgResult({ ok: false, msg: json.error || 'Ошибка отправки' });
       }
-    } catch {
-      setTgResult({ ok: false, msg: 'Нет связи с сервером' });
+    } catch (e) {
+      setTgResult({ ok: false, msg: 'Нет связи с сервером. Попробуйте позже.' });
     }
     setTgTesting(false);
   };
@@ -206,12 +206,14 @@ export function TelegramSection() {
         <div className="flex items-start gap-2">
           <Icon name="Send" size={16} className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
           <div className="text-sm text-blue-700 dark:text-blue-300">
-            <span className="font-semibold">Как подключить:</span>
-            <ol className="mt-1 space-y-0.5 list-decimal list-inside">
-              <li>Найдите бота <b>@userinfobot</b> в Telegram</li>
-              <li>Отправьте ему /start — он покажет ваш Chat ID</li>
-              <li>Вставьте Chat ID ниже и нажмите «Тест»</li>
+            <span className="font-semibold">Как подключить (2 шага):</span>
+            <ol className="mt-1 space-y-1 list-decimal list-inside">
+              <li>Откройте Telegram → найдите <b>@userinfobot</b> → отправьте /start → он ответит числом — это ваш <b>Chat ID</b> (например: 123456789)</li>
+              <li>Вставьте этот <b>Chat ID</b> (число!) ниже и нажмите «Тест»</li>
             </ol>
+            <div className="mt-2 p-2 bg-white/50 dark:bg-black/20 rounded text-xs">
+              <b>Важно:</b> сюда нужен Chat ID (число), а НЕ токен бота. Токен бота вставляется в секреты проекта (TELEGRAM_BOT_TOKEN).
+            </div>
           </div>
         </div>
       </div>
