@@ -8,7 +8,7 @@ import Autocomplete, { AutocompleteOption } from '@/components/Autocomplete';
 import {
   AppState, crudAction, generateId,
   Receipt, ReceiptLine, ReceiptCustomField,
-  Partner, Item,
+  Attachment, Partner, Item,
 } from '@/data/store';
 
 const COMMON_DOC_FIELDS = [
@@ -49,6 +49,7 @@ export function NewReceiptModal({
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [customFields, setCustomFields] = useState<ReceiptCustomField[]>([]);
   const [newFieldKey, setNewFieldKey] = useState('');
   const [showFieldSuggestions, setShowFieldSuggestions] = useState(false);
@@ -195,6 +196,7 @@ export function NewReceiptModal({
       totalAmount: totalAmount > 0 ? totalAmount : undefined,
       scanHistory: [],
       photoUrl: photoUrl || undefined,
+      attachments: attachments.length > 0 ? attachments : undefined,
     };
 
     const newCounter = (next.receiptCounter || 1) + 1;
@@ -332,6 +334,64 @@ export function NewReceiptModal({
                 </label>
               )}
               {photoError && <div className="text-xs text-destructive">{photoError}</div>}
+            </div>
+
+            {/* Вложения (документы) */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <Icon name="Paperclip" size={12} />
+                Вложения
+              </Label>
+              {attachments.length > 0 && (
+                <div className="space-y-1">
+                  {attachments.map(att => (
+                    <div key={att.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-sm">
+                      <Icon name="File" size={14} className="text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{att.name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {att.size < 1024 ? `${att.size} Б` : att.size < 1048576 ? `${(att.size / 1024).toFixed(1)} КБ` : `${(att.size / 1048576).toFixed(1)} МБ`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))}
+                        className="p-1 text-muted-foreground hover:text-destructive rounded"
+                        title="Удалить"
+                      >
+                        <Icon name="X" size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <label className="flex items-center justify-center gap-2 h-16 px-4 rounded-lg border border-dashed border-border bg-muted/30 hover:bg-muted/60 cursor-pointer transition-colors text-sm text-muted-foreground">
+                <Icon name="Upload" size={16} />
+                Добавить файлы (до 500 МБ)
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={e => {
+                    if (!e.target.files) return;
+                    Array.from(e.target.files).forEach(file => {
+                      if (file.size > 500 * 1024 * 1024) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const att: Attachment = {
+                          id: generateId(),
+                          name: file.name,
+                          size: file.size,
+                          mimeType: file.type || 'application/octet-stream',
+                          dataUrl: reader.result as string,
+                          uploadedAt: new Date().toISOString(),
+                        };
+                        setAttachments(prev => [...prev, att]);
+                      };
+                      reader.readAsDataURL(file);
+                    });
+                    e.target.value = '';
+                  }}
+                />
+              </label>
             </div>
           </div>
 

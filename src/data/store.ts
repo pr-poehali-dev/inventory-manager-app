@@ -182,9 +182,27 @@ export type Receipt = {
   customFields: ReceiptCustomField[];
   comment?: string;
   totalAmount?: number;
-  scanHistory: ScanEvent[];   // история сканирований
-  postedAt?: string;          // дата проведения
-  photoUrl?: string;          // главное фото накладной (data URL)
+  scanHistory: ScanEvent[];
+  postedAt?: string;
+  photoUrl?: string;
+  attachments?: Attachment[];
+};
+
+export type InvoiceTemplate = {
+  id: string;
+  name: string;
+  companyName: string;
+  companyAddress?: string;
+  companyInn?: string;
+  companyKpp?: string;
+  bankDetails?: string;
+  headerText?: string;
+  footerText?: string;
+  signatory?: string;
+  signatoryRole?: string;
+  logoUrl?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 // ─── Technician Documents (база данных документов и вложений) ─────────────────
@@ -227,6 +245,7 @@ export type AppState = {
   warehouses: Warehouse[];
   warehouseStocks: WarehouseStock[];
   barcodes: Barcode[];
+  invoiceTemplates: InvoiceTemplate[];
   darkMode: boolean;
   defaultLowStockThreshold: number;
   currentUser: string;
@@ -247,6 +266,7 @@ const initialState: AppState = {
   receipts: [],
   techDocs: [],
   barcodes: [],
+  invoiceTemplates: [],
   warehouses: [
     { id: 'wh-1', name: 'Главный склад', address: 'ул. Складская, 1', description: 'Основной склад хранения', createdAt: '2024-01-01' },
     { id: 'wh-2', name: 'Склад №2', address: 'ул. Промышленная, 5', description: 'Дополнительный склад', createdAt: '2024-01-01' },
@@ -453,6 +473,7 @@ function guardState(p: AppState): AppState {
   if (!Array.isArray(p.warehouses))     p.warehouses = initialState.warehouses;
   if (!Array.isArray(p.warehouseStocks)) p.warehouseStocks = initialState.warehouseStocks;
   if (!Array.isArray(p.barcodes))       p.barcodes = [];
+  if (!Array.isArray(p.invoiceTemplates)) p.invoiceTemplates = [];
   if (Array.isArray(p.locations) && Array.isArray(p.warehouses) && p.warehouses.length > 0) {
     const defaultWhId = p.warehouses[0].id;
     p.locations = p.locations.map(l => l.warehouseId ? l : { ...l, warehouseId: defaultWhId });

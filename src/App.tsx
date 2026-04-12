@@ -16,6 +16,7 @@ import DashboardPage from '@/pages/DashboardPage';
 import InventoryPage from '@/pages/InventoryPage';
 import LabelsPage from '@/pages/LabelsPage';
 import AuditPage from '@/pages/AuditPage';
+import DocumentsPage from '@/pages/DocumentsPage';
 import { AuthContext, AuthUser, apiLogin, apiLogout, apiMe, setToken, getToken } from '@/data/auth';
 import LoginPage from '@/pages/LoginPage';
 import Icon from '@/components/ui/icon';
@@ -179,6 +180,7 @@ export default function App() {
           {page === 'assembly'     && <AssemblyPage state={state} onStateChange={handleStateChange} initialOrderId={qrOrderId} />}
           {page === 'warehouse'    && <WarehouseMapPage state={state} onStateChange={handleStateChange} initialLocationId={qrLocationId} />}
           {page === 'receipts'     && <ReceiptsPage state={state} onStateChange={handleStateChange} />}
+          {page === 'documents'    && <DocumentsPage state={state} onStateChange={handleStateChange} />}
           {page === 'inventory'    && <InventoryPage state={state} onStateChange={handleStateChange} />}
           {page === 'technician'   && <TechnicianPage state={state} onStateChange={handleStateChange} />}
           {page === 'partners'     && <PartnersPage state={state} onStateChange={handleStateChange} />}

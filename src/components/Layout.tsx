@@ -4,7 +4,7 @@ import { AppState, crudAction } from '@/data/store';
 import QRScanner from '@/components/QRScanner';
 import { useAuth } from '@/data/auth';
 
-export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'technician' | 'partners' | 'history' | 'settings' | 'dashboard' | 'inventory' | 'labels' | 'audit';
+export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'documents' | 'technician' | 'partners' | 'history' | 'settings' | 'dashboard' | 'inventory' | 'labels' | 'audit';
 
 type LayoutProps = {
   state: AppState;
@@ -79,6 +79,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     { id: 'assembly',      label: 'Сборка',          icon: 'PackageCheck', badge: activeOrdersCount > 0 ? activeOrdersCount : undefined, badgeColor: 'blue' },
     { id: 'warehouse',     label: 'Склады',          icon: 'Map' },
     { id: 'receipts',      label: 'Приёмка',         icon: 'PackagePlus' },
+    { id: 'documents',     label: 'Документы',       icon: 'FileText' },
     { id: 'dashboard',     label: 'Аналитика',       icon: 'BarChart3' },
     { id: 'nomenclature',  label: 'Номенклатура',    icon: 'List' },
     { id: 'inventory',     label: 'Инвентаризация',  icon: 'ClipboardCheck' },
