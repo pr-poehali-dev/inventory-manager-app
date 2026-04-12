@@ -77,17 +77,11 @@ function LabelCard({
       </div>
 
       <div className={`${cfg.fontSize} text-gray-600 text-center w-full space-y-0`}>
-        <div className="flex items-center justify-center gap-1">
-          <span className="font-medium text-black">
-            {item.quantity} {item.unit}
-          </span>
-          {categoryName && (
-            <>
-              <span className="text-gray-400">&middot;</span>
-              <span className="truncate">{categoryName}</span>
-            </>
-          )}
-        </div>
+        {categoryName && (
+          <div className="flex items-center justify-center gap-1">
+            <span className="truncate">{categoryName}</span>
+          </div>
+        )}
         {locationInfo && (
           <div className="text-gray-400 truncate leading-tight">{locationInfo}</div>
         )}
