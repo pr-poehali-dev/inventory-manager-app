@@ -51,8 +51,14 @@ function saveBoardLocal(b: BoardData) {
 
 export default function BoardView({ state }: { state: AppState; onStateChange: (s: AppState) => void }) {
   const [board, setBoard] = useState<BoardData>(loadBoard);
+  const boardRef = useRef(board);
+  useEffect(() => { boardRef.current = board; }, [board]);
   const [dragging, setDragging] = useState<string | null>(null);
+  const draggingRef = useRef(dragging);
+  useEffect(() => { draggingRef.current = dragging; }, [dragging]);
   const [dragOff, setDragOff] = useState({ x: 0, y: 0 });
+  const dragOffRef = useRef(dragOff);
+  useEffect(() => { dragOffRef.current = dragOff; }, [dragOff]);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [connColor, setConnColor] = useState(CONN_COLORS[0]);
   const [connLabel, setConnLabel] = useState('');
@@ -60,8 +66,12 @@ export default function BoardView({ state }: { state: AppState; onStateChange: (
   const [addSearch, setAddSearch] = useState('');
   const [addTab, setAddTab] = useState<'items' | 'docs' | 'files' | 'notes'>('items');
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const panRef = useRef(pan);
+  useEffect(() => { panRef.current = pan; }, [pan]);
   const [isPanning, setIsPanning] = useState(false);
+  const isPanningRef = useRef(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const panStartRef = useRef(panStart);
   const [selConn, setSelConn] = useState<string | null>(null);
   const [selNode, setSelNode] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
@@ -136,30 +146,46 @@ export default function BoardView({ state }: { state: AppState; onStateChange: (
     const node = board.nodes.find(n => n.id === nodeId);
     if (!node || node.pinned) { setSelNode(nodeId); return; }
     setDragging(nodeId); setSelNode(nodeId);
-    setDragOff({ x: e.clientX - node.x - pan.x, y: e.clientY - node.y - pan.y });
+    const off = { x: e.clientX - node.x - pan.x, y: e.clientY - node.y - pan.y };
+    setDragOff(off); dragOffRef.current = off;
   };
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (dragging) {
-      setBoard(prev => ({ ...prev, nodes: prev.nodes.map(n => n.id === dragging ? { ...n, x: e.clientX - dragOff.x - pan.x, y: e.clientY - dragOff.y - pan.y } : n) }));
-    }
-    if (isPanning) setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
-  }, [dragging, dragOff, pan, isPanning, panStart]);
-
-  const handleMouseUp = useCallback(() => {
-    if (dragging) { saveBoardLocal(board); setDragging(null); }
-    if (isPanning) setIsPanning(false);
-  }, [dragging, board, isPanning]);
-
   useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const did = draggingRef.current;
+      if (did) {
+        const off = dragOffRef.current;
+        const p = panRef.current;
+        setBoard(prev => ({ ...prev, nodes: prev.nodes.map(n => n.id === did ? { ...n, x: e.clientX - off.x - p.x, y: e.clientY - off.y - p.y } : n) }));
+      }
+      if (isPanningRef.current) {
+        const ps = panStartRef.current;
+        setPan({ x: e.clientX - ps.x, y: e.clientY - ps.y });
+      }
+    };
+    const handleMouseUp = () => {
+      if (draggingRef.current) {
+        saveBoardLocal(boardRef.current);
+        setDragging(null);
+      }
+      if (isPanningRef.current) {
+        setIsPanning(false);
+        isPanningRef.current = false;
+      }
+    };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-    return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
-  }, [handleMouseMove, handleMouseUp]);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const handleBgDown = (e: React.MouseEvent) => {
     if (e.target === containerRef.current || e.target === svgRef.current) {
-      setIsPanning(true); setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      setIsPanning(true); isPanningRef.current = true;
+      const ps = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+      setPanStart(ps); panStartRef.current = ps;
       setSelConn(null); setSelNode(null); if (connecting) setConnecting(null);
     }
   };

@@ -419,13 +419,16 @@ export async function saveStateToServer(state: AppState): Promise<string | null>
 /** Отправить гранулярную операцию на сервер (fire-and-forget). */
 export async function crudAction(action: string, payload: Record<string, unknown>): Promise<boolean> {
   try {
+    const body = JSON.stringify({ action, ...payload });
     const res = await fetch(CRUD_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ action, ...payload }),
+      body,
     });
+    if (!res.ok) console.error(`[crudAction] ${action} failed (${res.status}), payload ${(body.length / 1024).toFixed(0)} KB`);
     return res.ok;
-  } catch {
+  } catch (e) {
+    console.error(`[crudAction] ${action} error:`, e);
     return false;
   }
 }

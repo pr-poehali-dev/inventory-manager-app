@@ -37,8 +37,8 @@ export function AttachmentsTab({ item, state, onStateChange }: {
 
     const readers = Array.from(files).map(file =>
       new Promise<Attachment>((resolve, reject) => {
-        if (file.size > 10 * 1024 * 1024) {
-          reject(new Error(`Файл "${file.name}" слишком большой (макс. 10 МБ)`));
+        if (file.size > 500 * 1024 * 1024) {
+          reject(new Error(`Файл "${file.name}" слишком большой (макс. 500 МБ)`));
           return;
         }
         const reader = new FileReader();

@@ -25,7 +25,7 @@ function CoverPhotoPicker({
     setError('');
     if (!file) return;
     if (!file.type.startsWith('image/')) { setError('Только изображения'); return; }
-    if (file.size > 5 * 1024 * 1024) { setError('Размер не больше 5 МБ'); return; }
+    if (file.size > 500 * 1024 * 1024) { setError('Размер не больше 500 МБ'); return; }
     setUploading(true);
     const reader = new FileReader();
     reader.onload = () => {

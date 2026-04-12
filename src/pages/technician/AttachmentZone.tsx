@@ -20,7 +20,7 @@ export function AttachmentZone({
     setUploading(true);
     const readers = Array.from(files).map(file =>
       new Promise<Attachment>((resolve, reject) => {
-        if (file.size > 20 * 1024 * 1024) { reject(new Error('Файл слишком большой (макс. 20 МБ)')); return; }
+        if (file.size > 500 * 1024 * 1024) { reject(new Error('Файл слишком большой (макс. 500 МБ)')); return; }
         const reader = new FileReader();
         reader.onload = () => resolve({
           id: generateId(), name: file.name, size: file.size,
@@ -60,7 +60,7 @@ export function AttachmentZone({
           <>
             <Icon name="Upload" size={22} className="mx-auto mb-2 text-muted-foreground" />
             <p className="text-sm font-medium text-foreground">Перетащите файлы или нажмите</p>
-            <p className="text-xs text-muted-foreground mt-0.5">PDF, Word, Excel, фото, архивы — до 20 МБ</p>
+            <p className="text-xs text-muted-foreground mt-0.5">PDF, Word, Excel, фото, архивы — до 500 МБ</p>
           </>
         )}
       </div>
