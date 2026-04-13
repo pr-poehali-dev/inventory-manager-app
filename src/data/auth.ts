@@ -11,6 +11,14 @@ export type AuthUser = {
 
 const TOKEN_KEY = 'stockbase_auth_token';
 
+function resolveAuthApi(): string {
+  const env = import.meta.env.VITE_API_URL;
+  if (env === undefined || env === null) return '/api/auth';
+  if (env === '' || env === '/') return '/api/auth';
+  return `${env}/api/auth`;
+}
+const AUTH_API = resolveAuthApi();
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -23,44 +31,122 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-const LOCAL_ADMIN: AuthUser = {
-  id: 'local-admin',
-  username: 'admin',
-  displayName: 'Администратор',
-  role: 'admin',
-};
-
-export async function apiLogin(_username: string, _password: string): Promise<{ token: string; user: AuthUser } | { error: string }> {
-  setToken('local-token');
-  return { token: 'local-token', user: LOCAL_ADMIN };
+export async function apiLogin(username: string, password: string): Promise<{ token: string; user: AuthUser } | { error: string }> {
+  try {
+    const res = await fetch(AUTH_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login', username, password }),
+    });
+    const json = await res.json();
+    if (!res.ok) return { error: json.error || 'Ошибка входа' };
+    return { token: json.token, user: json.user };
+  } catch {
+    return { error: 'Нет связи с сервером' };
+  }
 }
 
 export async function apiMe(): Promise<AuthUser | null> {
-  return LOCAL_ADMIN;
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(`${AUTH_API}?action=me`, {
+      headers: { 'X-Auth-Token': token },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.user || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function apiLogout(): Promise<void> {
+  const token = getToken();
+  if (token) {
+    fetch(AUTH_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
+      body: JSON.stringify({ action: 'logout' }),
+    }).catch(() => {});
+  }
   clearToken();
 }
 
 export async function apiListUsers(): Promise<AuthUser[]> {
-  return [LOCAL_ADMIN];
+  const token = getToken();
+  if (!token) return [];
+  try {
+    const res = await fetch(`${AUTH_API}?action=list_users`, {
+      headers: { 'X-Auth-Token': token },
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.users || [];
+  } catch {
+    return [];
+  }
 }
 
-export async function apiRegister(_data: { username: string; password: string; displayName: string; role: UserRole }): Promise<{ user?: AuthUser; error?: string }> {
-  return { error: 'Локальный режим — управление пользователями недоступно' };
+export async function apiRegister(data: { username: string; password: string; displayName: string; role: UserRole }): Promise<{ user?: AuthUser; error?: string }> {
+  const token = getToken();
+  try {
+    const res = await fetch(AUTH_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token || '' },
+      body: JSON.stringify({ action: 'register', ...data }),
+    });
+    const json = await res.json();
+    if (!res.ok) return { error: json.error || 'Ошибка' };
+    return { user: json.user };
+  } catch {
+    return { error: 'Нет связи с сервером' };
+  }
 }
 
-export async function apiChangePassword(_userId: string, _newPassword: string): Promise<{ error?: string }> {
-  return { error: 'Локальный режим — управление пользователями недоступно' };
+export async function apiChangePassword(userId: string, newPassword: string): Promise<{ error?: string }> {
+  const token = getToken();
+  try {
+    const res = await fetch(AUTH_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token || '' },
+      body: JSON.stringify({ action: 'change_password', userId, newPassword }),
+    });
+    if (!res.ok) { const json = await res.json(); return { error: json.error }; }
+    return {};
+  } catch {
+    return { error: 'Нет связи' };
+  }
 }
 
-export async function apiUpdateUser(_userId: string, _data: Partial<{ displayName: string; role: UserRole; isActive: boolean }>): Promise<{ error?: string }> {
-  return { error: 'Локальный режим — управление пользователями недоступно' };
+export async function apiUpdateUser(userId: string, data: Partial<{ displayName: string; role: UserRole; isActive: boolean }>): Promise<{ error?: string }> {
+  const token = getToken();
+  try {
+    const res = await fetch(AUTH_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token || '' },
+      body: JSON.stringify({ action: 'update_user', userId, ...data }),
+    });
+    if (!res.ok) { const json = await res.json(); return { error: json.error }; }
+    return {};
+  } catch {
+    return { error: 'Нет связи' };
+  }
 }
 
-export async function apiDeleteUser(_userId: string): Promise<{ error?: string }> {
-  return { error: 'Локальный режим — управление пользователями недоступно' };
+export async function apiDeleteUser(userId: string): Promise<{ error?: string }> {
+  const token = getToken();
+  try {
+    const res = await fetch(AUTH_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token || '' },
+      body: JSON.stringify({ action: 'delete_user', userId }),
+    });
+    if (!res.ok) { const json = await res.json(); return { error: json.error }; }
+    return {};
+  } catch {
+    return { error: 'Нет связи' };
+  }
 }
 
 export type AuthContextType = {
@@ -74,13 +160,13 @@ export type AuthContextType = {
 };
 
 export const AuthContext = createContext<AuthContextType>({
-  user: LOCAL_ADMIN,
-  loading: false,
+  user: null,
+  loading: true,
   login: async () => null,
   logout: async () => {},
   refresh: async () => {},
-  canEdit: true,
-  isAdmin: true,
+  canEdit: false,
+  isAdmin: false,
 });
 
 export function useAuth() {

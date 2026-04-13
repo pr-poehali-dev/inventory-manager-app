@@ -167,7 +167,7 @@ export function TelegramSection() {
 
   const tgApiUrl = (() => {
     const env = import.meta.env.VITE_API_URL;
-    if (env === undefined || env === null) return 'https://functions.poehali.dev/ee8097ba-6926-4cdb-ac81-985a17bf68dc';
+    if (env === undefined || env === null) return '/api/telegram-notify';
     if (env === '' || env === '/') return '/api/telegram-notify';
     return `${env}/api/telegram-notify`;
   })();

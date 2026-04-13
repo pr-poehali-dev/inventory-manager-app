@@ -378,21 +378,71 @@ const initialState: AppState = {
 
 const STORAGE_KEY = 'stockbase_v3';
 
-/** Локальный режим — облако отключено, все данные в localStorage. */
+function resolveCrudApi(): string {
+  const env = import.meta.env.VITE_API_URL;
+  if (env === undefined || env === null) return '/api/crud';
+  if (env === '' || env === '/') return '/api/crud';
+  return `${env}/api/crud`;
+}
+const CRUD_API = resolveCrudApi();
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('stockbase_auth_token');
+  return token ? { 'X-Auth-Token': token } : {};
+}
+
 export async function checkServerUpdatedAt(): Promise<string | null> {
-  return null;
+  try {
+    const res = await fetch(`${CRUD_API}?action=check`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.updatedAt ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function loadStateFromServer(): Promise<{ state: AppState; updatedAt: string } | null> {
-  return null;
+  try {
+    const res = await fetch(`${CRUD_API}?action=load_all`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json.data) return null;
+    return { state: guardState(json.data), updatedAt: json.updatedAt };
+  } catch {
+    return null;
+  }
 }
 
-export async function saveStateToServer(_state: AppState): Promise<string | null> {
-  return new Date().toISOString();
+export async function saveStateToServer(state: AppState): Promise<string | null> {
+  try {
+    const res = await fetch(CRUD_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ action: 'save_all', data: state }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.updatedAt ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export async function crudAction(_action: string, _payload: Record<string, unknown>): Promise<boolean> {
-  return true;
+export async function crudAction(action: string, payload: Record<string, unknown>): Promise<boolean> {
+  try {
+    const body = JSON.stringify({ action, ...payload });
+    const res = await fetch(CRUD_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body,
+    });
+    if (!res.ok) console.error(`[crudAction] ${action} failed (${res.status})`);
+    return res.ok;
+  } catch (e) {
+    console.error(`[crudAction] ${action} error:`, e);
+    return false;
+  }
 }
 
 /** Применить guard-проверки к загруженному состоянию. */

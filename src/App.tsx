@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { AppState, loadState, saveLocal } from '@/data/store';
+import { AppState, loadState, saveLocal, loadStateFromServer, checkServerUpdatedAt } from '@/data/store';
 import Layout, { Page } from '@/components/Layout';
 import CatalogPage from '@/pages/CatalogPage';
 import NomenclaturePage from '@/pages/NomenclaturePage';
@@ -17,9 +17,11 @@ import InventoryPage from '@/pages/InventoryPage';
 import LabelsPage from '@/pages/LabelsPage';
 import AuditPage from '@/pages/AuditPage';
 import DocumentsPage from '@/pages/DocumentsPage';
-import { AuthContext, AuthUser, apiLogin, apiLogout, apiMe, setToken } from '@/data/auth';
+import { AuthContext, AuthUser, apiLogin, apiLogout, apiMe, setToken, getToken } from '@/data/auth';
 import LoginPage from '@/pages/LoginPage';
 import Icon from '@/components/ui/icon';
+
+const POLL_INTERVAL = 5000;
 
 function parseQRParams() {
   const params = new URLSearchParams(window.location.search);
@@ -35,6 +37,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
+    const token = getToken();
+    if (!token) { setAuthLoading(false); return; }
     apiMe().then(user => {
       setAuthUser(user);
       setAuthLoading(false);
@@ -80,6 +84,9 @@ export default function App() {
   const [qrLocationId, setQrLocationId] = useState<string | null>(null);
   const [qrOrderId, setQrOrderId] = useState<string | null>(null);
 
+  const serverUpdatedAtRef = useRef<string | null>(null);
+  const lastLocalSaveRef = useRef<number>(0);
+
   useEffect(() => {
     if (state.darkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
@@ -95,9 +102,42 @@ export default function App() {
     }
   }, []);
 
+  useEffect(() => {
+    loadStateFromServer().then(result => {
+      if (!result) return;
+      const localRaw = localStorage.getItem('stockbase_state');
+      const localTs = localRaw ? (JSON.parse(localRaw)._savedAt || '') : '';
+      const serverTs = result.updatedAt || '';
+      if (localTs && serverTs && localTs > serverTs) {
+        serverUpdatedAtRef.current = serverTs;
+        return;
+      }
+      serverUpdatedAtRef.current = result.updatedAt;
+      setState(result.state);
+      saveLocal(result.state);
+    });
+  }, []);
+
+  const poll = useCallback(async () => {
+    if (Date.now() - lastLocalSaveRef.current < 3000) return;
+    const remoteTs = await checkServerUpdatedAt();
+    if (!remoteTs) return;
+    if (remoteTs === serverUpdatedAtRef.current) return;
+    const result = await loadStateFromServer();
+    if (!result) return;
+    serverUpdatedAtRef.current = result.updatedAt;
+    setState(result.state);
+    saveLocal(result.state);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(poll, POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, [poll]);
+
   const handleStateChange = useCallback((s: AppState) => {
+    lastLocalSaveRef.current = Date.now();
     setState(s);
-    saveLocal(s);
   }, []);
 
   const handleQRResult = (type: string, id: string) => {
