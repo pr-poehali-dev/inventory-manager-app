@@ -60,7 +60,16 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
     };
     onStateChange(next);
     const updatedOrder = next.workOrders.find(o => o.id === order.id)!;
+    crudAction('delete_operations_by_order', { orderId: order.id });
     crudAction('upsert_work_order', { workOrder: updatedOrder, orderItems: updatedOrder.items });
+    for (const op of orderOps) {
+      const updatedItem = next.items.find(i => i.id === op.itemId);
+      const wsArr = (next.warehouseStocks || []).filter(w => w.itemId === op.itemId);
+      const lsArr = (next.locationStocks || []).filter(ls => ls.itemId === op.itemId);
+      if (updatedItem) {
+        crudAction('upsert_item', { item: updatedItem, warehouseStocks: wsArr, locationStocks: lsArr });
+      }
+    }
   };
 
   const orderHistory = state.operations.filter(op => op.orderId === order.id)

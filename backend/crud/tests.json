@@ -129,6 +129,18 @@
       "expectedStatus": 200,
       "expectedBody": { "ok": true },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST delete_operations_by_order",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "delete_operations_by_order",
+        "orderId": "nonexistent-order"
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "ok": true },
+      "bodyMatcher": "partial"
     }
   ]
 }

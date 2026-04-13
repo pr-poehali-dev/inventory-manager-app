@@ -641,8 +641,17 @@ def _action_delete_work_order(cur, body: dict):
     wo_id = body.get("workOrderId")
     if not wo_id:
         return
+    _delete_multi(cur, "operations", "order_id", wo_id)
     _delete_multi(cur, "order_items", "order_id", wo_id)
     _delete(cur, "work_orders", "id", wo_id)
+
+
+def _action_delete_operations_by_order(cur, body: dict):
+    """Delete all operations linked to a work order (for reassemble)."""
+    order_id = body.get("orderId")
+    if not order_id:
+        return
+    _delete_multi(cur, "operations", "order_id", order_id)
 
 
 def _action_upsert_receipt(cur, body: dict):
@@ -789,6 +798,7 @@ POST_ACTIONS = {
     "delete_barcode": _action_delete_barcode,
     "upsert_work_order": _action_upsert_work_order,
     "delete_work_order": _action_delete_work_order,
+    "delete_operations_by_order": _action_delete_operations_by_order,
     "upsert_receipt": _action_upsert_receipt,
     "delete_receipt": _action_delete_receipt,
     "delete_receipt_with_revert": _action_delete_receipt_with_revert,
