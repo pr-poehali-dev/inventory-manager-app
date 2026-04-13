@@ -117,6 +117,18 @@
       "expectedStatus": 200,
       "expectedBody": { "ok": true },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST delete_receipt_with_revert",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "delete_receipt_with_revert",
+        "receiptId": "nonexistent-receipt"
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "ok": true },
+      "bodyMatcher": "partial"
     }
   ]
 }
