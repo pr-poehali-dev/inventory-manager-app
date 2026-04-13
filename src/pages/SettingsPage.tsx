@@ -116,20 +116,47 @@ export default function SettingsPage({ state, onStateChange }: Props) {
                 <Icon name="AlertTriangle" size={16} className="text-destructive mt-0.5 shrink-0" />
                 <span className="text-sm text-destructive font-medium">Это действие нельзя отменить. Все данные будут удалены безвозвратно.</span>
               </div>
-              <Button
-                variant="destructive"
-                onClick={() => handleDeleteConfirm('все данные приложения', () => {
-                  const empty = getEmptyState(state.currentUser);
-                  empty.darkMode = state.darkMode;
-                  onStateChange(empty);
-                  saveState(empty);
-                  setUserName(empty.currentUser);
-                  setThreshold(String(empty.defaultLowStockThreshold));
-                })}
-              >
-                <Icon name="Trash2" size={14} className="mr-1.5" />
-                Очистить все данные
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="outline"
+                  className="justify-start border-warning/40 text-warning hover:bg-warning/10"
+                  onClick={() => handleDeleteConfirm('историю, приходы, расходы, документы и остатки (номенклатура сохранится)', () => {
+                    const next: AppState = {
+                      ...state,
+                      operations: [],
+                      receipts: [],
+                      workOrders: [],
+                      techDocs: [],
+                      orderCounter: 1,
+                      receiptCounter: 1,
+                      taskCounter: 1,
+                      items: state.items.map(i => ({ ...i, quantity: 0 })),
+                      locationStocks: [],
+                      warehouseStocks: [],
+                    };
+                    onStateChange(next);
+                    saveState(next);
+                  })}
+                >
+                  <Icon name="Eraser" size={14} className="mr-1.5" />
+                  Очистить историю и остатки
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="justify-start"
+                  onClick={() => handleDeleteConfirm('все данные приложения', () => {
+                    const empty = getEmptyState(state.currentUser);
+                    empty.darkMode = state.darkMode;
+                    onStateChange(empty);
+                    saveState(empty);
+                    setUserName(empty.currentUser);
+                    setThreshold(String(empty.defaultLowStockThreshold));
+                  })}
+                >
+                  <Icon name="Trash2" size={14} className="mr-1.5" />
+                  Очистить все данные
+                </Button>
+              </div>
             </div>
           )}
         </div>
