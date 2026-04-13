@@ -37,12 +37,16 @@ export function ReceiptDetailModal({
 
   const handleDelete = () => {
     if (!onStateChange) return;
-    const next: AppState = {
-      ...state,
-      receipts: state.receipts.filter(r => r.id !== liveReceipt.id),
+    let next = { ...state };
+    if (liveReceipt.status === 'posted') {
+      next = revertPostedReceipt(next, liveReceipt);
+    }
+    next = {
+      ...next,
+      receipts: next.receipts.filter(r => r.id !== liveReceipt.id),
     };
     onStateChange(next);
-    crudAction('delete_receipt', { receiptId: liveReceipt.id });
+    crudAction('delete_receipt_with_revert', { receiptId: liveReceipt.id });
     onClose();
   };
 

@@ -670,6 +670,72 @@ def _action_delete_receipt(cur, body: dict):
     _delete(cur, "receipts", "id", rc_id)
 
 
+def _action_delete_receipt_with_revert(cur, body: dict):
+    """Delete receipt and revert stock changes if it was posted."""
+    rc_id = body.get("receiptId")
+    if not rc_id:
+        return
+
+    cur.execute(f"SELECT * FROM {_table('receipts')} WHERE id = %s", (rc_id,))
+    cols = [desc[0] for desc in cur.description]
+    row = cur.fetchone()
+    if not row:
+        return
+    receipt = dict(zip(cols, row))
+
+    cur.execute(f"SELECT * FROM {_table('receipt_lines')} WHERE receipt_id = %s", (rc_id,))
+    line_cols = [desc[0] for desc in cur.description]
+    lines = [dict(zip(line_cols, r)) for r in cur.fetchall()]
+
+    if receipt.get("status") == "posted":
+        receipt_number = receipt.get("number", "")
+        comment_marker = f"[Оприходование {receipt_number}]"
+        warehouse_id = receipt.get("warehouse_id")
+
+        for line in lines:
+            qty = line.get("confirmed_qty") or line.get("qty") or 0
+            if qty <= 0:
+                continue
+            item_id = line.get("item_id")
+            location_id = line.get("location_id")
+
+            if warehouse_id:
+                cur.execute(
+                    f"UPDATE {_table('warehouse_stocks')} SET quantity = GREATEST(0, quantity - %s) "
+                    f"WHERE item_id = %s AND warehouse_id = %s",
+                    (qty, item_id, warehouse_id),
+                )
+                cur.execute(
+                    f"SELECT COALESCE(SUM(quantity), 0) FROM {_table('warehouse_stocks')} WHERE item_id = %s",
+                    (item_id,),
+                )
+                total = cur.fetchone()[0]
+                cur.execute(
+                    f"UPDATE {_table('items')} SET quantity = %s WHERE id = %s",
+                    (total, item_id),
+                )
+            else:
+                cur.execute(
+                    f"UPDATE {_table('items')} SET quantity = GREATEST(0, quantity - %s) WHERE id = %s",
+                    (qty, item_id),
+                )
+
+            if location_id:
+                cur.execute(
+                    f"UPDATE {_table('location_stocks')} SET quantity = GREATEST(0, quantity - %s) "
+                    f"WHERE item_id = %s AND location_id = %s",
+                    (qty, item_id, location_id),
+                )
+
+        cur.execute(
+            f"DELETE FROM {_table('operations')} WHERE comment = %s",
+            (comment_marker,),
+        )
+
+    _delete_multi(cur, "receipt_lines", "receipt_id", rc_id)
+    _delete(cur, "receipts", "id", rc_id)
+
+
 def _action_upsert_tech_doc(cur, body: dict):
     td = body.get("techDoc", {})
     row = _prepare_row("tech_docs", td)
@@ -725,6 +791,7 @@ POST_ACTIONS = {
     "delete_work_order": _action_delete_work_order,
     "upsert_receipt": _action_upsert_receipt,
     "delete_receipt": _action_delete_receipt,
+    "delete_receipt_with_revert": _action_delete_receipt_with_revert,
     "upsert_tech_doc": _action_upsert_tech_doc,
     "delete_tech_doc": _action_delete_tech_doc,
     "upsert_location_stock": _action_upsert_location_stock,
