@@ -503,6 +503,30 @@ function guardState(p: AppState): AppState {
   return p;
 }
 
+export function getEmptyState(preserveUser?: string): AppState {
+  return {
+    darkMode: false,
+    defaultLowStockThreshold: 5,
+    currentUser: preserveUser || 'Администратор',
+    orderCounter: 1,
+    receiptCounter: 1,
+    taskCounter: 1,
+    items: [],
+    categories: [],
+    locations: [],
+    operations: [],
+    locationStocks: [],
+    workOrders: [],
+    partners: [],
+    receipts: [],
+    techDocs: [],
+    warehouses: [],
+    warehouseStocks: [],
+    barcodes: [],
+    invoiceTemplates: [],
+  };
+}
+
 export function loadState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);

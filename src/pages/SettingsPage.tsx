@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import { AppState, crudAction } from '@/data/store';
+import { AppState, crudAction, getEmptyState, saveState } from '@/data/store';
 import { useAuth } from '@/data/auth';
 import { ProfileSection, AlertsSection, TelegramSection } from './settings/ProfileSections';
 import { WarehousesSection, CategoriesSection, LocationsSection } from './settings/EntitySections';
@@ -15,7 +15,7 @@ type Props = {
 
 export default function SettingsPage({ state, onStateChange }: Props) {
   const { isAdmin } = useAuth();
-  const [activeSection, setActiveSection] = useState<'profile' | 'alerts' | 'categories' | 'locations' | 'warehouses' | 'users' | 'telegram'>('profile');
+  const [activeSection, setActiveSection] = useState<'profile' | 'alerts' | 'categories' | 'locations' | 'warehouses' | 'users' | 'telegram' | 'data'>('profile');
   const [userName, setUserName] = useState(state.currentUser);
   const [threshold, setThreshold] = useState(String(state.defaultLowStockThreshold));
   const [saved, setSaved] = useState(false);
@@ -41,6 +41,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
     { id: 'categories', label: 'Категории', icon: 'Tag' },
     { id: 'locations', label: 'Локации', icon: 'MapPin' },
     ...(isAdmin ? [{ id: 'users' as const, label: 'Пользователи', icon: 'Users' }] : []),
+    { id: 'data' as const, label: 'Данные', icon: 'Database' },
   ];
 
   return (
@@ -104,6 +105,33 @@ export default function SettingsPage({ state, onStateChange }: Props) {
           )}
 
           {activeSection === 'users' && isAdmin && <UsersSection />}
+
+          {activeSection === 'data' && (
+            <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+              <h2 className="font-semibold text-foreground">Управление данными</h2>
+              <p className="text-sm text-muted-foreground">
+                Полная очистка удалит все товары, операции, заявки, приходы, категории, склады и локации. Пользователь и настройки темы сохранятся.
+              </p>
+              <div className="p-3 bg-destructive/8 border border-destructive/20 rounded-lg flex items-start gap-2.5">
+                <Icon name="AlertTriangle" size={16} className="text-destructive mt-0.5 shrink-0" />
+                <span className="text-sm text-destructive font-medium">Это действие нельзя отменить. Все данные будут удалены безвозвратно.</span>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => handleDeleteConfirm('все данные приложения', () => {
+                  const empty = getEmptyState(state.currentUser);
+                  empty.darkMode = state.darkMode;
+                  onStateChange(empty);
+                  saveState(empty);
+                  setUserName(empty.currentUser);
+                  setThreshold(String(empty.defaultLowStockThreshold));
+                })}
+              >
+                <Icon name="Trash2" size={14} className="mr-1.5" />
+                Очистить все данные
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
