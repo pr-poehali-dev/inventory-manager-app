@@ -102,7 +102,6 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         </div>
       </div>
 
-      {/* Progress */}
       <div className="bg-card rounded-xl border border-border p-4 shadow-card space-y-3">
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">Прогресс сборки</span>
@@ -114,7 +113,6 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         <div className="text-xs text-muted-foreground">{doneCount} из {liveOrder.items.length} позиций собрано</div>
       </div>
 
-      {/* Status flow */}
       <div className="flex gap-1 flex-wrap">
         {statusFlow.map((s, i) => (
           <button key={s} disabled={i <= currentIdx} onClick={() => changeStatus(s)}
@@ -135,7 +133,6 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         )}
       </div>
 
-      {/* Items */}
       <div className="space-y-2">
         <h3 className="font-semibold">Позиции к сборке</h3>
         {liveOrder.items.map(oi => {
@@ -165,73 +162,57 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
                         {locStocks.map(ls => {
                           const loc = state.locations.find(l => l.id === ls.locationId);
                           return (
-                            <span key={ls.locationId} className="text-xs text-muted-foreground flex items-center gap-0.5">
-                              <Icon name="MapPin" size={10} />{loc?.name}: {ls.quantity} {item.unit}
+                            <span key={ls.locationId} className="text-[11px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                              <Icon name="MapPin" size={9} className="inline mr-0.5 -mt-0.5" />
+                              {loc?.name}: {ls.quantity} {item.unit}
                             </span>
                           );
                         })}
                       </div>
                     </div>
-                    <div className="text-right shrink-0 text-lg font-bold tabular-nums">
-                      <span className="text-success">{oi.pickedQty}</span>
-                      <span className="text-muted-foreground text-sm font-normal">/{oi.requiredQty}</span>
-                      <span className="text-xs font-normal text-muted-foreground ml-1">{item.unit}</span>
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-bold">{oi.pickedQty}/{oi.requiredQty}</div>
+                      <div className="text-[11px] text-muted-foreground">{item.unit}</div>
                     </div>
                   </div>
-                  <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
                     <div className={`h-full rounded-full transition-all ${oi.status === 'done' ? 'bg-success' : 'bg-primary'}`} style={{ width: `${pct}%` }} />
                   </div>
-                  {oi.status !== 'done' && isInsufficient && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-destructive">
-                      <Icon name="AlertCircle" size={12} />
-                      Недостаточно — нужно {remaining}, есть {totalAvailable} {item.unit}
-                    </div>
-                  )}
-                  {oi.status === 'done' && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-success font-medium">
-                      <Icon name="CheckCircle2" size={12} />Полностью собрано
+                  {isInsufficient && (
+                    <div className="flex items-center gap-1.5 mt-2 text-[11px] text-warning">
+                      <Icon name="AlertTriangle" size={12} />
+                      Не хватает {remaining - totalAvailable} {item.unit}
                     </div>
                   )}
                 </div>
               </div>
-              {oi.status !== 'done' && liveOrder.status === 'active' && (
-                <div className="mt-3 pt-3 border-t border-border/50">
-                  <Button size="sm" onClick={() => setPickingItem(oi)} disabled={totalAvailable === 0}
-                    className={`w-full font-semibold ${isInsufficient ? 'bg-warning/90 hover:bg-warning text-warning-foreground' : ''}`}>
-                    <Icon name="PackageMinus" size={14} className="mr-1.5" />
-                    {oi.status === 'partial' ? `Добрать (${remaining} ${item.unit})` : `Собрать ${oi.requiredQty} ${item.unit}`}
-                  </Button>
-                </div>
-              )}
-              {liveOrder.status === 'draft' && oi.status !== 'done' && (
-                <p className="mt-2 text-xs text-muted-foreground text-center">Запустите заявку для сборки</p>
+              {liveOrder.status === 'active' && oi.status !== 'done' && (
+                <Button size="sm" onClick={() => setPickingItem(oi)} className="w-full mt-3 gap-1.5">
+                  <Icon name="PackageCheck" size={14} />
+                  {oi.status === 'partial' ? 'Продолжить сборку' : 'Собрать'}
+                </Button>
               )}
             </div>
           );
         })}
       </div>
 
-      {/* History */}
       {orderHistory.length > 0 && (
         <div className="space-y-2">
           <h3 className="font-semibold">История операций</h3>
-          <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
-            {orderHistory.map((op, idx) => {
-              const it = state.items.find(i => i.id === op.itemId);
+          <div className="bg-card rounded-xl border border-border shadow-card divide-y divide-border">
+            {orderHistory.slice(0, 10).map(op => {
+              const item = state.items.find(i => i.id === op.itemId);
               const loc = op.locationId ? state.locations.find(l => l.id === op.locationId) : null;
               return (
-                <div key={op.id} className={`flex items-center gap-3 px-4 py-3 text-sm ${idx > 0 ? 'border-t border-border/50' : ''}`}>
-                  <div className="w-7 h-7 rounded-md bg-success/15 text-success flex items-center justify-center shrink-0">
-                    <Icon name="ArrowDownToLine" size={12} />
+                <div key={op.id} className="px-4 py-2.5 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium">{item?.name || '—'}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {loc?.name || 'Общий склад'} · {new Date(op.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium">{it?.name}</div>
-                    <div className="text-xs text-muted-foreground">{loc ? `← ${loc.name}` : ''} · {op.performedBy}</div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-bold text-success tabular-nums">−{op.quantity} {it?.unit}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(op.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}</div>
-                  </div>
+                  <span className="text-sm font-bold text-destructive">−{op.quantity} {item?.unit}</span>
                 </div>
               );
             })}
@@ -239,11 +220,15 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         </div>
       )}
 
-      {/* Footer actions */}
       <div className="flex gap-2 flex-wrap">
+        {liveOrder.status === 'active' && progress === 100 && (
+          <Button onClick={() => changeStatus('assembled')} className="flex-1 bg-success hover:bg-success/90 text-success-foreground gap-1.5">
+            <Icon name="CheckCircle" size={14} />Завершить сборку
+          </Button>
+        )}
         {liveOrder.status === 'draft' && (
           <>
-            <Button variant="outline" onClick={() => {}} className="flex items-center gap-1.5">
+            <Button variant="outline" onClick={() => changeStatus('draft')} disabled className="flex-1 opacity-50">
               <Icon name="Pencil" size={14} />Черновик
             </Button>
             <Button onClick={() => changeStatus('active')} className="flex-1"><Icon name="Play" size={14} className="mr-1.5" />Запустить в работу</Button>
@@ -287,41 +272,16 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
   );
 }
 
-type InvoiceFields = {
-  docNumber: string;
-  docDate: string;
-  okpo: string;
-  institution: string;
-  senderDept: string;
-  receiverDept: string;
-  requestedByRank: string;
-  requestedByName: string;
-  approvedByRole: string;
-  approvedBySignature: string;
-  approvedByName: string;
-  releasedByRank: string;
-  releasedBySignature: string;
-  releasedByName: string;
-  responsibleRole: string;
-  responsibleSignature: string;
-  receivedByRank: string;
-  receivedBySignature: string;
-  receivedByName: string;
-  releasedDate: string;
-  receivedDate: string;
-  accountingNote: string;
-};
-
-type InvoiceRow = {
+type IRow = {
   name: string;
-  nomenclatureNum: string;
+  nomenNum: string;
   passport: string;
   unitName: string;
   unitCode: string;
   price: string;
-  requiredQty: string;
-  releasedQty: string;
-  sumNoVat: string;
+  qtyReq: string;
+  qtyRel: string;
+  sum: string;
   debit: string;
   credit: string;
   note: string;
@@ -334,458 +294,280 @@ function InvoicePreviewPage({ order, state, onClose }: { order: WorkOrder; state
   const [editing, setEditing] = useState(false);
 
   const now = new Date();
-  const dateStr = now.toLocaleDateString('ru-RU');
+  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const longDate = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} г.`;
+  const yearShort = String(now.getFullYear()).slice(-2);
 
-  const initFields = (): InvoiceFields => ({
-    docNumber: order.number,
-    docDate: dateStr,
-    okpo: '',
-    institution: tpl?.companyName || '',
-    senderDept: '',
-    receiverDept: order.recipientName || '',
-    requestedByRank: '',
-    requestedByName: '',
-    approvedByRole: tpl?.signatoryRole || '',
-    approvedBySignature: '',
-    approvedByName: tpl?.signatory || '',
-    releasedByRank: '',
-    releasedBySignature: '',
-    releasedByName: '',
-    responsibleRole: '',
-    responsibleSignature: '',
-    receivedByRank: '',
-    receivedBySignature: '',
-    receivedByName: order.recipientName || '',
-    releasedDate: dateStr,
-    receivedDate: dateStr,
-    accountingNote: '',
-  });
+  const [f, setF] = useState<Record<string, string>>(() => ({
+    num: order.number, date: longDate, okud: '0504204', dateCode: '', okpo: '', okei: '383',
+    institution: tpl?.companyName || '', senderDept: '', receiverDept: order.recipientName || '',
+    reqRank: '', reqName: '',
+    appRole: tpl?.signatoryRole || '', appSign: '', appName: tpl?.signatory || '',
+    relRank: '', relSign: '', relName: '', relFio: '',
+    respRole: '', respSign: '', respSignName: '',
+    relDay: '', relMonth: '', relYear: yearShort,
+    recRank: '', recSign: '', recName: '',
+    accJournalMonth: '', accYear: yearShort,
+    accExecRole: '', accExecSign: '', accExecName: '',
+    accExecDay: '', accExecMonth: '', accExecYear: yearShort,
+  }));
 
-  const initRows = (): InvoiceRow[] =>
+  const [rows, setRows] = useState<IRow[]>(() =>
     order.items.map(oi => {
       const it = state.items.find(i => i.id === oi.itemId);
-      return {
-        name: it?.name || '',
-        nomenclatureNum: '',
-        passport: '',
-        unitName: it?.unit || 'шт',
-        unitCode: '',
-        price: '',
-        requiredQty: String(oi.requiredQty),
-        releasedQty: String(oi.pickedQty),
-        sumNoVat: '',
-        debit: '',
-        credit: '',
-        note: '',
-      };
-    });
-
-  const [fields, setFields] = useState<InvoiceFields>(initFields);
-  const [rows, setRows] = useState<InvoiceRow[]>(initRows);
+      return { name: it?.name || '', nomenNum: '', passport: '', unitName: it?.unit || 'шт.', unitCode: '', price: '', qtyReq: String(oi.requiredQty), qtyRel: String(oi.pickedQty), sum: '', debit: '', credit: '', note: '' };
+    })
+  );
 
   const applyTemplate = (t: InvoiceTemplate | undefined) => {
-    setFields(prev => ({
-      ...prev,
-      institution: t?.companyName || prev.institution,
-      approvedByRole: t?.signatoryRole || prev.approvedByRole,
-      approvedByName: t?.signatory || prev.approvedByName,
-    }));
+    setF(p => ({ ...p, institution: t?.companyName || p.institution, appRole: t?.signatoryRole || p.appRole, appName: t?.signatory || p.appName }));
   };
 
-  const updateField = (key: keyof InvoiceFields, value: string) => {
-    setFields(prev => ({ ...prev, [key]: value }));
+  const uf = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
+  const ur = (i: number, k: keyof IRow, v: string) => setRows(p => p.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
+
+  const totReq = rows.reduce((s, r) => s + (parseFloat(r.qtyReq) || 0), 0);
+  const totRel = rows.reduce((s, r) => s + (parseFloat(r.qtyRel) || 0), 0);
+
+  const EF = ({ k, w, a }: { k: string; w?: string; a?: string }) => {
+    if (editing) return <input type="text" value={f[k] || ''} onChange={e => uf(k, e.target.value)} className="bg-blue-50/70 border-b border-blue-300 outline-none px-0.5" style={{ width: w || '100%', fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'left') as never }} />;
+    return <span className="border-b border-black inline-block align-bottom" style={{ width: w || '100%', minHeight: '1.1em', textAlign: (a || 'left') as never }}>{f[k] || '\u00A0'}</span>;
   };
 
-  const updateRow = (idx: number, key: keyof InvoiceRow, value: string) => {
-    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [key]: value } : r));
-  };
-
-  const totalRequired = rows.reduce((s, r) => s + (parseFloat(r.requiredQty) || 0), 0);
-  const totalReleased = rows.reduce((s, r) => s + (parseFloat(r.releasedQty) || 0), 0);
-
-  const renderField = (value: string, onChange: (v: string) => void, width?: string) => {
-    if (editing) {
-      return (
-        <input
-          type="text"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="bg-blue-50 border border-blue-200 rounded px-1 py-0.5 text-xs w-full outline-none focus:border-blue-400"
-          style={width ? { width } : undefined}
-        />
-      );
-    }
-    return (
-      <span
-        className="border-b border-dotted border-gray-400 min-w-[40px] inline-block text-xs cursor-default"
-        style={width ? { width } : undefined}
-      >
-        {value || '\u00A0'}
-      </span>
-    );
-  };
-
-  const renderCell = (value: string, onChange: (v: string) => void) => {
-    if (editing) {
-      return (
-        <input
-          type="text"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="bg-blue-50 border-0 text-xs w-full outline-none text-center px-0.5 py-0"
-          style={{ minWidth: 0 }}
-        />
-      );
-    }
-    return <span className="text-xs">{value || '\u00A0'}</span>;
-  };
-
-  const buildPrintHtml = () => {
-    const rowsHtml = rows.map((r, i) => `
-      <tr>
-        <td class="c">${i + 1}</td>
-        <td>${r.name}</td>
-        <td class="c">${r.nomenclatureNum}</td>
-        <td class="c">${r.passport}</td>
-        <td class="c">${r.unitName}</td>
-        <td class="c">${r.unitCode}</td>
-        <td class="r">${r.price}</td>
-        <td class="r">${r.requiredQty}</td>
-        <td class="r">${r.releasedQty}</td>
-        <td class="r">${r.sumNoVat}</td>
-        <td class="c">${r.debit}</td>
-        <td class="c">${r.credit}</td>
-        <td>${r.note}</td>
-      </tr>
-    `).join('');
-
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Требование-накладная ${fields.docNumber}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Times New Roman',serif;font-size:10pt;padding:8mm 10mm;color:#000}
-.top{display:flex;justify-content:space-between;margin-bottom:6pt}
-.title{text-align:center;font-size:12pt;font-weight:bold;margin:8pt 0 4pt}
-.codes{border:1px solid #000;font-size:8pt;width:180px}
-.codes td,.codes th{border:1px solid #000;padding:1pt 4pt;text-align:center}
-.field-row{font-size:9pt;margin:2pt 0}
-.field-row .underline{border-bottom:1px solid #000;min-width:100px;display:inline-block;padding:0 4pt}
-.auth{font-size:9pt;margin:6pt 0}
-table.main{width:100%;border-collapse:collapse;margin:6pt 0;font-size:8pt}
-table.main th,table.main td{border:1px solid #000;padding:2pt 3pt;text-align:left}
-table.main th{text-align:center;font-weight:bold;background:#f5f5f5}
-table.main td.c{text-align:center}
-table.main td.r{text-align:right}
-.footer-section{font-size:9pt;margin-top:10pt}
-.sign-line{display:inline-flex;align-items:flex-end;margin:0 4pt}
-.sign-line .line{border-bottom:1px solid #000;min-width:120px;display:inline-block}
-.sign-line .label{font-size:7pt;text-align:center;display:block}
-.accounting{border:1px dashed #000;padding:6pt;margin:8pt 0;min-height:40pt;font-size:9pt}
-@media print{body{padding:5mm 8mm}}
-</style></head><body>
-<div class="top">
-  <div style="flex:1">
-    <div class="field-row">Учреждение: <span class="underline">${fields.institution}</span></div>
-  </div>
-  <div>
-    <table class="codes">
-      <tr><td colspan="2" style="font-size:7pt">Коды</td></tr>
-      <tr><td style="text-align:left">Форма по ОКУД</td><td>0504204</td></tr>
-      <tr><td style="text-align:left">Дата</td><td>${fields.docDate}</td></tr>
-      <tr><td style="text-align:left">по ОКПО</td><td>${fields.okpo}</td></tr>
-    </table>
-  </div>
-</div>
-<div class="title">ТРЕБОВАНИЕ-НАКЛАДНАЯ ${'\u2116'} ${fields.docNumber}</div>
-<div style="text-align:center;font-size:9pt;margin-bottom:6pt">от ${fields.docDate}</div>
-<div class="field-row">Структурное подразделение - отправитель: <span class="underline">${fields.senderDept}</span></div>
-<div class="field-row">Структурное подразделение - получатель: <span class="underline">${fields.receiverDept}</span></div>
-<div class="field-row">Единица измерения: руб. (с точностью до второго десятичного знака) -- по ОКЕИ: 383</div>
-<div class="auth">
-  Затребовал: (звание) <span class="underline">${fields.requestedByRank}</span> (фамилия, инициалы) <span class="underline">${fields.requestedByName}</span>
-</div>
-<div class="auth">
-  Разрешил: (должность) <span class="underline">${fields.approvedByRole}</span> (подпись) <span class="underline">${fields.approvedBySignature}</span> (расшифровка подписи) <span class="underline">${fields.approvedByName}</span>
-</div>
-<table class="main">
-  <thead>
-    <tr>
-      <th rowspan="2" style="width:20px">${'\u2116'}</th>
-      <th colspan="3">Материальные ценности</th>
-      <th colspan="2">Единица измерения</th>
-      <th rowspan="2">Цена</th>
-      <th colspan="2">Количество</th>
-      <th rowspan="2">Сумма<br>(без НДС)</th>
-      <th colspan="2">Корреспондирующие счета</th>
-      <th rowspan="2">Примечание</th>
-    </tr>
-    <tr>
-      <th>наименование</th>
-      <th>номенкл.<br>номер</th>
-      <th>паспорта<br>(иной)</th>
-      <th>наимен.</th>
-      <th>код по<br>ОКЕИ</th>
-      <th>затребо-<br>вано</th>
-      <th>отпу-<br>щено</th>
-      <th>дебет</th>
-      <th>кредит</th>
-    </tr>
-    <tr><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th></tr>
-  </thead>
-  <tbody>
-    ${rowsHtml}
-    <tr style="font-weight:bold">
-      <td colspan="7" style="text-align:right">Итого</td>
-      <td class="r">${totalRequired}</td>
-      <td class="r">${totalReleased}</td>
-      <td colspan="4"></td>
-    </tr>
-  </tbody>
-</table>
-<div class="footer-section">
-  Отпустил: (звание) <span class="underline">${fields.releasedByRank}</span> (подпись) <span class="underline">${fields.releasedBySignature}</span> (расшифровка подписи) <span class="underline">${fields.releasedByName}</span>
-</div>
-<div class="footer-section" style="margin-top:6pt">
-  Ответственный исполнитель: (должность) <span class="underline">${fields.responsibleRole}</span> (подпись) <span class="underline">${fields.responsibleSignature}</span>
-</div>
-<div class="accounting">Отметка бухгалтерии: ${fields.accountingNote}</div>
-<div class="footer-section">
-  Получил: (звание) <span class="underline">${fields.receivedByRank}</span> (подпись) <span class="underline">${fields.receivedBySignature}</span> (расшифровка подписи) <span class="underline">${fields.receivedByName}</span>
-</div>
-<div class="footer-section" style="margin-top:4pt">
-  <span style="font-size:8pt">Дата отпуска: ${fields.releasedDate}</span>
-  <span style="font-size:8pt;margin-left:40pt">Дата получения: ${fields.receivedDate}</span>
-</div>
-</body></html>`;
+  const EC = ({ value, onChange, a }: { value: string; onChange: (v: string) => void; a?: string }) => {
+    if (editing) return <input type="text" value={value} onChange={e => onChange(e.target.value)} className="bg-blue-50/70 border-0 outline-none w-full px-0" style={{ fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'center') as never, minWidth: 0 }} />;
+    return <span className="block" style={{ textAlign: (a || 'center') as never }}>{value || '\u00A0'}</span>;
   };
 
   const handlePrint = () => {
+    const rh = rows.map(r => `<tr><td>${r.name}</td><td class="c">${r.nomenNum}</td><td class="c">${r.passport}</td><td class="c">${r.unitName}</td><td class="c">${r.unitCode}</td><td class="r">${r.price}</td><td class="r">${r.qtyReq}</td><td class="r">${r.qtyRel}</td><td class="r">${r.sum}</td><td class="c">${r.debit}</td><td class="c">${r.credit}</td><td>${r.note}</td></tr>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Накладная ${f.num}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Times New Roman',serif;font-size:9pt;padding:6mm 8mm;color:#000}
+.u{border-bottom:1px solid #000;min-width:40px;display:inline-block;padding:0 2pt}.hdr{display:flex;justify-content:space-between}
+.codes{border-collapse:collapse;font-size:8pt}.codes td{border:1px solid #000;padding:1pt 4pt}
+.row{margin:1pt 0;font-size:8.5pt}.lbl{font-size:7pt;color:#555}
+table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m th,table.m td{border:1px solid #000;padding:1pt 2pt;text-align:center;vertical-align:middle}table.m td.r{text-align:right}
+.ft{font-size:8pt;margin-top:3pt}.acc{border:1px dashed #000;padding:4pt;font-size:7.5pt}
+@media print{body{padding:4mm 6mm}@page{size:landscape;margin:6mm}}</style></head><body>
+<div class="hdr"><div style="flex:1"><div style="text-align:center;font-weight:bold;font-size:11pt;margin-bottom:2pt">ТРЕБОВАНИЕ-НАКЛАДНАЯ \u2116 <span class="u">${f.num}</span></div><div style="text-align:center;font-size:8.5pt;margin-bottom:4pt">от <span class="u" style="min-width:120px">${f.date}</span></div></div>
+<table class="codes"><tr><td colspan="2" style="text-align:center;font-weight:bold">Коды</td></tr><tr><td style="text-align:left">Форма по ОКУД</td><td>${f.okud}</td></tr><tr><td style="text-align:left">Дата</td><td>${f.dateCode}</td></tr><tr><td style="text-align:left">по ОКПО</td><td>${f.okpo}</td></tr></table></div>
+<div class="row">Учреждение <span class="u" style="min-width:400px">${f.institution}</span></div>
+<div class="row">Структурное подразделение - отправитель <span class="u" style="min-width:300px">${f.senderDept}</span></div>
+<div class="row">Структурное подразделение - получатель <span class="u" style="min-width:300px">${f.receiverDept}</span></div>
+<div class="row">Единица измерения: руб. (с точностью до второго десятичного знака) <span style="float:right">по ОКЕИ <span class="u">${f.okei}</span></span></div>
+<div style="height:4pt"></div>
+<div class="row" style="display:flex;gap:20pt"><div>Затребовал <span class="u">${f.reqRank}</span> <span class="lbl">(звание)</span> <span class="u" style="min-width:80px">${f.reqName}</span> <span class="lbl">(фамилия, инициалы)</span></div>
+<div>Разрешил <span class="u">${f.appRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.appSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:80px">${f.appName}</span> <span class="lbl">(расшифровка подписи)</span></div></div>
+<table class="m"><thead>
+<tr><th rowspan="2" colspan="2" style="min-width:130px">Материальные ценности</th><th colspan="2">номер</th><th colspan="2">Единица измерения</th><th rowspan="2">Цена</th><th colspan="2">Количество</th><th rowspan="2">Сумма<br>(без НДС)</th><th colspan="2">Корреспондирующие счета</th><th rowspan="2">Примечание</th></tr>
+<tr><th>наименование</th><th style="font-size:6.5pt">номенкла-<br>турный</th><th style="font-size:6.5pt">паспорта (иной)</th><th style="font-size:6.5pt">наимено-<br>вание</th><th style="font-size:6.5pt">код по ОКЕИ</th><th style="font-size:6.5pt">затре-<br>бовано</th><th style="font-size:6.5pt">отпу-<br>щено</th><th>дебет</th><th>кредит</th></tr>
+<tr><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th></tr>
+</thead><tbody>${rh}
+<tr style="font-weight:bold"><td colspan="6" style="text-align:right">Итого</td><td class="r">${totReq}</td><td class="r">${totRel}</td><td colspan="4"></td></tr></tbody></table>
+<div style="display:flex;gap:8pt;margin-top:6pt;align-items:flex-start">
+<div style="flex:1"><div class="ft"><b>Отпустил</b></div><div class="ft"><span class="u">${f.relRank}</span> <span class="lbl">(звание)</span> <span class="u">${f.relSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:80px">${f.relName}</span> <span class="lbl">(расшифровка подписи)</span></div>
+<div class="ft" style="margin-left:16pt"><b>Фио</b> <span class="u" style="min-width:100px">${f.relFio}</span> <span class="lbl">(расшифровка подписи)</span></div><div class="ft" style="margin-left:16pt">${f.date}</div></div>
+<div style="flex:1"><div class="ft"><b>Ответственный исполнитель</b></div><div class="ft"><span class="u">${f.respRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.respSign}</span> <span class="lbl">(подпись)</span></div>
+<div class="ft"><span class="lbl">"</span><span class="u">${f.relDay}</span><span class="lbl">" </span><span class="u">${f.relMonth}</span><span class="lbl"> 20</span><span class="u">${f.relYear}</span><span class="lbl"> г.</span></div></div>
+<div class="acc" style="min-width:220px"><div style="text-align:center;font-weight:bold;margin-bottom:2pt">Отметка бухгалтерии</div><div>Корреспонденция счетов (графы 10, 11) отражена</div><div>в журнале операций за <span class="u">${f.accJournalMonth}</span> 20<span class="u">${f.accYear}</span> г.</div>
+<div style="margin-top:3pt"><b>Исполнитель</b></div><div><span class="u">${f.accExecRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.accExecSign}</span> <span class="lbl">(подпись)</span> <span class="u">${f.accExecName}</span> <span class="lbl">(расшифровка подписи)</span></div>
+<div><span class="lbl">"</span><span class="u">${f.accExecDay}</span><span class="lbl">" </span><span class="u">${f.accExecMonth}</span><span class="lbl"> 20</span><span class="u">${f.accExecYear}</span><span class="lbl"> г.</span></div></div></div>
+<div style="margin-top:6pt"><div class="ft"><b>Получил</b> <span class="u">${f.recRank}</span> <span class="lbl">(звание)</span></div>
+<div class="ft"><span class="u">${f.recSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:120px">${f.recName}</span> <span class="lbl">(расшифровка подписи)</span></div><div class="ft">${f.date}</div></div>
+</body></html>`;
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.write(buildPrintHtml());
+    w.document.write(html);
     w.document.close();
     setTimeout(() => w.print(), 300);
   };
 
+  const bb = 'border border-black';
+  const th = `${bb} px-1 py-0.5 text-center`;
+  const serif = { fontFamily: "'Times New Roman', 'PT Serif', Georgia, serif" };
+
   return (
-    <div className="h-full flex flex-col bg-gray-100 overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 shrink-0">
+    <div className="h-full flex flex-col bg-gray-200 overflow-hidden" style={serif}>
+      <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-300 shrink-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
         <Button variant="outline" size="sm" onClick={onClose} className="gap-1.5">
-          <Icon name="ArrowLeft" size={14} />
-          Назад
+          <Icon name="ArrowLeft" size={14} />Назад
         </Button>
         {templates.length > 1 && (
-          <select
-            value={selId}
-            onChange={e => { setSelId(e.target.value); applyTemplate(templates.find(t => t.id === e.target.value)); }}
-            className="h-8 px-2 text-xs rounded border border-gray-300 bg-white"
-          >
+          <select value={selId} onChange={e => { setSelId(e.target.value); applyTemplate(templates.find(t => t.id === e.target.value)); }}
+            className="h-8 px-2 text-xs rounded border border-gray-300 bg-white">
             {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         )}
         <div className="flex-1" />
-        <Button
-          variant={editing ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setEditing(prev => !prev)}
-          className="gap-1.5"
-        >
-          <Icon name="Pencil" size={14} />
-          {editing ? 'Просмотр' : 'Редактировать'}
+        <Button variant={editing ? 'default' : 'outline'} size="sm" onClick={() => setEditing(p => !p)} className="gap-1.5">
+          <Icon name={editing ? 'Eye' : 'Pencil'} size={14} />{editing ? 'Просмотр' : 'Редактировать'}
         </Button>
         <Button size="sm" onClick={handlePrint} className="gap-1.5">
-          <Icon name="Printer" size={14} />
-          Печать
+          <Icon name="Printer" size={14} />Печать
         </Button>
       </div>
 
       <div className="flex-1 overflow-auto p-4">
-        <div
-          className="bg-white mx-auto shadow-lg border border-gray-300 p-8 min-w-[900px]"
-          style={{ maxWidth: 1100, fontFamily: "'Times New Roman', 'PT Serif', Georgia, serif" }}
-        >
-          <div className="flex justify-between items-start mb-2">
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center gap-2 text-xs">
-                <span>Учреждение:</span>
-                {renderField(fields.institution, v => updateField('institution', v), '300px')}
+        <div className="bg-white mx-auto shadow-lg border border-gray-300 px-10 py-6" style={{ maxWidth: 1200, minWidth: 1000, fontSize: '9pt', ...serif }}>
+
+          <div className="flex justify-between items-start gap-4">
+            <div className="flex-1">
+              <div className="text-center font-bold" style={{ fontSize: '12pt' }}>
+                ТРЕБОВАНИЕ-НАКЛАДНАЯ {'\u2116'}{' '}<EF k="num" w="70px" a="center" />
+              </div>
+              <div className="text-center mt-0.5" style={{ fontSize: '8.5pt' }}>
+                от{' '}<EF k="date" w="150px" a="center" />
               </div>
             </div>
-            <div className="shrink-0">
-              <table className="border-collapse text-[9px]" style={{ border: '1px solid #000' }}>
-                <tbody>
-                  <tr>
-                    <td colSpan={2} className="text-center border border-black px-2 py-0.5 font-bold">Коды</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-black px-2 py-0.5 text-left">Форма по ОКУД</td>
-                    <td className="border border-black px-2 py-0.5 text-center font-mono">0504204</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-black px-2 py-0.5 text-left">Дата</td>
-                    <td className="border border-black px-2 py-0.5 text-center">
-                      {renderField(fields.docDate, v => updateField('docDate', v))}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="border border-black px-2 py-0.5 text-left">по ОКПО</td>
-                    <td className="border border-black px-2 py-0.5 text-center">
-                      {renderField(fields.okpo, v => updateField('okpo', v))}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <table className="border-collapse shrink-0" style={{ fontSize: '8pt', border: '1px solid #000' }}>
+              <tbody>
+                <tr><td colSpan={2} className={`${th} font-bold`}>Коды</td></tr>
+                <tr><td className={`${bb} px-2 py-0.5 text-left`}>Форма по ОКУД</td><td className={th}><EF k="okud" w="60px" a="center" /></td></tr>
+                <tr><td className={`${bb} px-2 py-0.5 text-left`}>Дата</td><td className={th}><EF k="dateCode" w="60px" a="center" /></td></tr>
+                <tr><td className={`${bb} px-2 py-0.5 text-left`}>по ОКПО</td><td className={th}><EF k="okpo" w="60px" a="center" /></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="space-y-0.5 mt-2" style={{ fontSize: '8.5pt' }}>
+            <div className="flex items-end gap-1">
+              <span className="whitespace-nowrap">Учреждение</span><EF k="institution" />
+            </div>
+            <div className="flex items-end gap-1">
+              <span className="whitespace-nowrap">Структурное подразделение - отправитель</span><EF k="senderDept" />
+            </div>
+            <div className="flex items-end gap-1">
+              <span className="whitespace-nowrap">Структурное подразделение - получатель</span><EF k="receiverDept" />
+            </div>
+            <div className="flex items-end justify-between">
+              <span>Единица измерения: руб. (с точностью до второго десятичного знака)</span>
+              <span className="whitespace-nowrap flex items-end gap-1">по ОКЕИ{' '}<EF k="okei" w="40px" a="center" /></span>
             </div>
           </div>
 
-          <div className="text-center font-bold text-sm my-3">
-            ТРЕБОВАНИЕ-НАКЛАДНАЯ {'\u2116'} {renderField(fields.docNumber, v => updateField('docNumber', v), '60px')}
-          </div>
-          <div className="text-center text-xs mb-3">
-            от {renderField(fields.docDate, v => updateField('docDate', v), '80px')}
-          </div>
-
-          <div className="space-y-1 text-xs mb-3">
-            <div className="flex items-center gap-1">
-              <span className="whitespace-nowrap">Структурное подразделение - отправитель:</span>
-              {renderField(fields.senderDept, v => updateField('senderDept', v), '400px')}
+          <div className="flex items-start gap-6 mt-3" style={{ fontSize: '8.5pt' }}>
+            <div className="flex items-end gap-1 flex-wrap">
+              <span className="font-semibold">Затребовал</span>
+              <div className="text-center"><EF k="reqRank" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(звание)</div></div>
+              <div className="text-center"><EF k="reqName" w="130px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(фамилия, инициалы)</div></div>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="whitespace-nowrap">Структурное подразделение - получатель:</span>
-              {renderField(fields.receiverDept, v => updateField('receiverDept', v), '400px')}
-            </div>
-            <div>Единица измерения: руб. (с точностью до второго десятичного знака) -- по ОКЕИ: 383</div>
-          </div>
-
-          <div className="space-y-1 text-xs mb-3">
-            <div className="flex items-center gap-1 flex-wrap">
-              <span>Затребовал:</span>
-              <span className="text-[10px] text-gray-500">(звание)</span>
-              {renderField(fields.requestedByRank, v => updateField('requestedByRank', v), '150px')}
-              <span className="text-[10px] text-gray-500">(фамилия, инициалы)</span>
-              {renderField(fields.requestedByName, v => updateField('requestedByName', v), '200px')}
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span>Разрешил:</span>
-              <span className="text-[10px] text-gray-500">(должность)</span>
-              {renderField(fields.approvedByRole, v => updateField('approvedByRole', v), '150px')}
-              <span className="text-[10px] text-gray-500">(подпись)</span>
-              {renderField(fields.approvedBySignature, v => updateField('approvedBySignature', v), '120px')}
-              <span className="text-[10px] text-gray-500">(расшифровка подписи)</span>
-              {renderField(fields.approvedByName, v => updateField('approvedByName', v), '180px')}
+            <div className="flex items-end gap-1 flex-wrap">
+              <span className="font-semibold">Разрешил</span>
+              <div className="text-center"><EF k="appRole" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(должность)</div></div>
+              <div className="text-center"><EF k="appSign" w="90px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(подпись)</div></div>
+              <div className="text-center"><EF k="appName" w="130px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(расшифровка подписи)</div></div>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[9px]" style={{ border: '1px solid #000' }}>
+          <div className="overflow-x-auto mt-3">
+            <table className="w-full border-collapse" style={{ fontSize: '7.5pt', border: '1px solid #000' }}>
               <thead>
                 <tr>
-                  <th rowSpan={2} className="border border-black px-1 py-0.5 text-center align-middle" style={{ width: 24 }}>{'\u2116'}</th>
-                  <th colSpan={3} className="border border-black px-1 py-0.5 text-center">Материальные ценности</th>
-                  <th colSpan={2} className="border border-black px-1 py-0.5 text-center">Единица измерения</th>
-                  <th rowSpan={2} className="border border-black px-1 py-0.5 text-center align-middle">Цена</th>
-                  <th colSpan={2} className="border border-black px-1 py-0.5 text-center">Количество</th>
-                  <th rowSpan={2} className="border border-black px-1 py-0.5 text-center align-middle">Сумма<br/>(без НДС)</th>
-                  <th colSpan={2} className="border border-black px-1 py-0.5 text-center">Корресп. счета</th>
-                  <th rowSpan={2} className="border border-black px-1 py-0.5 text-center align-middle">Примечание</th>
+                  <th rowSpan={2} colSpan={2} className={`${bb} px-1 py-0.5`} style={{ minWidth: 140 }}>Материальные ценности</th>
+                  <th colSpan={2} className={`${bb} px-1 py-0.5`}>номер</th>
+                  <th colSpan={2} className={`${bb} px-1 py-0.5`}>Единица<br/>измерения</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5 align-middle`} style={{ width: 46 }}>Цена</th>
+                  <th colSpan={2} className={`${bb} px-1 py-0.5`}>Количество</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5 align-middle`} style={{ width: 52 }}>Сумма<br/>(без НДС)</th>
+                  <th colSpan={2} className={`${bb} px-1 py-0.5`}>Корреспондирующие счета</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5 align-middle`} style={{ width: 66 }}>Примечание</th>
                 </tr>
                 <tr>
-                  <th className="border border-black px-1 py-0.5 text-center">наименование</th>
-                  <th className="border border-black px-1 py-0.5 text-center">номенкл.<br/>номер</th>
-                  <th className="border border-black px-1 py-0.5 text-center">паспорта<br/>(иной)</th>
-                  <th className="border border-black px-1 py-0.5 text-center">наимен.</th>
-                  <th className="border border-black px-1 py-0.5 text-center">код по<br/>ОКЕИ</th>
-                  <th className="border border-black px-1 py-0.5 text-center">затребо-<br/>вано</th>
-                  <th className="border border-black px-1 py-0.5 text-center">отпу-<br/>щено</th>
-                  <th className="border border-black px-1 py-0.5 text-center">дебет</th>
-                  <th className="border border-black px-1 py-0.5 text-center">кредит</th>
+                  <th className={`${bb} px-1 py-0.5`}>наименование</th>
+                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>номенкла-<br/>турный</th>
+                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>паспорта<br/>(иной)</th>
+                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>наимено-<br/>вание</th>
+                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>код по<br/>ОКЕИ</th>
+                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>затре-<br/>бовано</th>
+                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>отпу-<br/>щено</th>
+                  <th className={`${bb} px-1 py-0.5`}>дебет</th>
+                  <th className={`${bb} px-1 py-0.5`}>кредит</th>
                 </tr>
-                <tr>
-                  {['1','2','3','4','5','6','7','8','9','10','11','12','13'].map(n => (
-                    <th key={n} className="border border-black px-1 py-0.5 text-center text-[8px] text-gray-500">{n}</th>
-                  ))}
-                </tr>
+                <tr>{['1','2','3','4','5','6','7','8','9','10','11','12'].map(n => <th key={n} className={`${bb} px-1 py-0 font-normal text-gray-500`} style={{ fontSize: '6.5pt' }}>{n}</th>)}</tr>
               </thead>
               <tbody>
-                {rows.map((row, idx) => (
-                  <tr key={idx}>
-                    <td className="border border-black px-1 py-0.5 text-center">{idx + 1}</td>
-                    <td className="border border-black px-1 py-0.5">{renderCell(row.name, v => updateRow(idx, 'name', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.nomenclatureNum, v => updateRow(idx, 'nomenclatureNum', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.passport, v => updateRow(idx, 'passport', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.unitName, v => updateRow(idx, 'unitName', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.unitCode, v => updateRow(idx, 'unitCode', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-right">{renderCell(row.price, v => updateRow(idx, 'price', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-right">{renderCell(row.requiredQty, v => updateRow(idx, 'requiredQty', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-right">{renderCell(row.releasedQty, v => updateRow(idx, 'releasedQty', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-right">{renderCell(row.sumNoVat, v => updateRow(idx, 'sumNoVat', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.debit, v => updateRow(idx, 'debit', v))}</td>
-                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.credit, v => updateRow(idx, 'credit', v))}</td>
-                    <td className="border border-black px-1 py-0.5">{renderCell(row.note, v => updateRow(idx, 'note', v))}</td>
+                {rows.map((row, i) => (
+                  <tr key={i}>
+                    <td className={`${bb} px-1 py-0.5`} style={{ minWidth: 100 }}><EC value={row.name} onChange={v => ur(i, 'name', v)} a="left" /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 48 }}><EC value={row.nomenNum} onChange={v => ur(i, 'nomenNum', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 56 }}><EC value={row.passport} onChange={v => ur(i, 'passport', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 40 }}><EC value={row.unitName} onChange={v => ur(i, 'unitName', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 36 }}><EC value={row.unitCode} onChange={v => ur(i, 'unitCode', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 46 }}><EC value={row.price} onChange={v => ur(i, 'price', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 46 }}><EC value={row.qtyReq} onChange={v => ur(i, 'qtyReq', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 46 }}><EC value={row.qtyRel} onChange={v => ur(i, 'qtyRel', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 52 }}><EC value={row.sum} onChange={v => ur(i, 'sum', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 50 }}><EC value={row.debit} onChange={v => ur(i, 'debit', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 50 }}><EC value={row.credit} onChange={v => ur(i, 'credit', v)} /></td>
+                    <td className={`${bb} px-1 py-0.5`} style={{ width: 66 }}><EC value={row.note} onChange={v => ur(i, 'note', v)} a="left" /></td>
                   </tr>
                 ))}
                 <tr className="font-bold">
-                  <td colSpan={7} className="border border-black px-1 py-0.5 text-right">Итого</td>
-                  <td className="border border-black px-1 py-0.5 text-right">{totalRequired}</td>
-                  <td className="border border-black px-1 py-0.5 text-right">{totalReleased}</td>
-                  <td colSpan={4} className="border border-black px-1 py-0.5"></td>
+                  <td colSpan={6} className={`${bb} px-1 py-0.5 text-right`}>Итого</td>
+                  <td className={`${bb} px-1 py-0.5 text-right`}>{totReq}</td>
+                  <td className={`${bb} px-1 py-0.5 text-right`}>{totRel}</td>
+                  <td colSpan={4} className={`${bb} px-1 py-0.5`} />
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div className="space-y-3 mt-5 text-xs">
-            <div className="flex items-center gap-1 flex-wrap">
-              <span>Отпустил:</span>
-              <span className="text-[10px] text-gray-500">(звание)</span>
-              {renderField(fields.releasedByRank, v => updateField('releasedByRank', v), '150px')}
-              <span className="text-[10px] text-gray-500">(подпись)</span>
-              {renderField(fields.releasedBySignature, v => updateField('releasedBySignature', v), '120px')}
-              <span className="text-[10px] text-gray-500">(расшифровка подписи)</span>
-              {renderField(fields.releasedByName, v => updateField('releasedByName', v), '180px')}
-            </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span>Ответственный исполнитель:</span>
-              <span className="text-[10px] text-gray-500">(должность)</span>
-              {renderField(fields.responsibleRole, v => updateField('responsibleRole', v), '180px')}
-              <span className="text-[10px] text-gray-500">(подпись)</span>
-              {renderField(fields.responsibleSignature, v => updateField('responsibleSignature', v), '180px')}
-            </div>
-
-            <div className="border border-dashed border-gray-400 rounded p-3 min-h-[50px]">
-              <div className="text-[10px] text-gray-500 mb-1">Отметка бухгалтерии:</div>
-              {editing ? (
-                <textarea
-                  value={fields.accountingNote}
-                  onChange={e => updateField('accountingNote', e.target.value)}
-                  className="w-full bg-blue-50 border border-blue-200 rounded px-1 py-0.5 text-xs outline-none resize-none"
-                  rows={2}
-                />
-              ) : (
-                <span className="text-xs">{fields.accountingNote || '\u00A0'}</span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1 flex-wrap">
-              <span>Получил:</span>
-              <span className="text-[10px] text-gray-500">(звание)</span>
-              {renderField(fields.receivedByRank, v => updateField('receivedByRank', v), '150px')}
-              <span className="text-[10px] text-gray-500">(подпись)</span>
-              {renderField(fields.receivedBySignature, v => updateField('receivedBySignature', v), '120px')}
-              <span className="text-[10px] text-gray-500">(расшифровка подписи)</span>
-              {renderField(fields.receivedByName, v => updateField('receivedByName', v), '180px')}
-            </div>
-
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-gray-500">Дата отпуска:</span>
-                {renderField(fields.releasedDate, v => updateField('releasedDate', v), '80px')}
+          <div className="flex gap-4 mt-4 items-start" style={{ fontSize: '8pt' }}>
+            <div className="flex-1 space-y-1.5">
+              <div className="font-bold" style={{ fontSize: '9pt' }}>Отпустил</div>
+              <div className="flex items-end gap-1.5 flex-wrap">
+                <div className="text-center"><EF k="relRank" w="90px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(звание)</div></div>
+                <div className="text-center"><EF k="relSign" w="80px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
+                <div className="text-center"><EF k="relName" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-gray-500">Дата получения:</span>
-                {renderField(fields.receivedDate, v => updateField('receivedDate', v), '80px')}
+              <div className="flex items-end gap-1.5 pl-4">
+                <span className="font-bold">Фио</span>
+                <div className="text-center"><EF k="relFio" w="140px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
+              </div>
+              <div className="pl-4"><EF k="date" w="130px" /></div>
+            </div>
+
+            <div className="flex-1 space-y-1.5">
+              <div className="font-bold" style={{ fontSize: '9pt' }}>Ответственный исполнитель</div>
+              <div className="flex items-end gap-1.5 flex-wrap">
+                <div className="text-center"><EF k="respRole" w="90px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(должность)</div></div>
+                <div className="text-center"><EF k="respSign" w="80px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
+              </div>
+              <div className="flex items-center gap-0.5" style={{ fontSize: '7.5pt' }}>
+                <span>{'" '}</span><EF k="relDay" w="24px" a="center" /><span>{' " '}</span><EF k="relMonth" w="60px" a="center" /><span> 20</span><EF k="relYear" w="20px" a="center" /><span> г.</span>
+              </div>
+            </div>
+
+            <div className="border border-dashed border-black p-2.5" style={{ fontSize: '7.5pt', minWidth: 250, maxWidth: 290 }}>
+              <div className="text-center font-bold mb-1">Отметка бухгалтерии</div>
+              <div>Корреспонденция счетов (графы 10, 11) отражена</div>
+              <div className="flex items-end gap-0.5 flex-wrap">
+                <span>в журнале операций за</span><EF k="accJournalMonth" w="50px" a="center" /><span>20</span><EF k="accYear" w="20px" a="center" /><span> г.</span>
+              </div>
+              <div className="font-bold mt-1.5">Исполнитель</div>
+              <div className="flex items-end gap-0.5 flex-wrap mt-0.5">
+                <div className="text-center"><EF k="accExecRole" w="55px" a="center" /><div className="text-gray-500" style={{ fontSize: '5.5pt' }}>(должность)</div></div>
+                <div className="text-center"><EF k="accExecSign" w="50px" a="center" /><div className="text-gray-500" style={{ fontSize: '5.5pt' }}>(подпись)</div></div>
+                <div className="text-center"><EF k="accExecName" w="65px" a="center" /><div className="text-gray-500" style={{ fontSize: '5.5pt' }}>(расшифровка подписи)</div></div>
+              </div>
+              <div className="flex items-center gap-0.5 mt-0.5">
+                <span>{'" '}</span><EF k="accExecDay" w="18px" a="center" /><span>{' " '}</span><EF k="accExecMonth" w="45px" a="center" /><span> 20</span><EF k="accExecYear" w="16px" a="center" /><span> г.</span>
               </div>
             </div>
           </div>
+
+          <div className="mt-4 space-y-1" style={{ fontSize: '8.5pt' }}>
+            <div className="flex items-end gap-1.5">
+              <span className="font-bold">Получил</span>
+              <div className="text-center"><EF k="recRank" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(звание)</div></div>
+            </div>
+            <div className="flex items-end gap-1.5 pl-14">
+              <div className="text-center"><EF k="recSign" w="100px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
+              <div className="text-center"><EF k="recName" w="160px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
+            </div>
+            <div className="pl-14"><EF k="date" w="130px" /></div>
+          </div>
+
         </div>
       </div>
     </div>
