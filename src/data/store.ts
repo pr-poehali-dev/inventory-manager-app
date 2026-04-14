@@ -203,6 +203,33 @@ export type InvoiceTemplate = {
   logoUrl?: string;
   createdAt: string;
   updatedAt: string;
+  elements?: InvElement[];
+  canvasWidth?: number;
+  canvasHeight?: number;
+};
+
+export type InvElementType = 'text' | 'table' | 'line' | 'frame';
+
+export type InvTableCol = { key: string; label: string; width: number; source?: string };
+
+export type InvElement = {
+  id: string;
+  type: InvElementType;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text?: string;
+  fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  align?: 'left' | 'center' | 'right';
+  source?: string;
+  columns?: InvTableCol[];
+  lineStyle?: 'solid' | 'dashed' | 'dotted';
+  lineWidth?: number;
+  frameLabel?: string;
+  vertical?: boolean;
 };
 
 // ─── Technician Documents (база данных документов и вложений) ─────────────────

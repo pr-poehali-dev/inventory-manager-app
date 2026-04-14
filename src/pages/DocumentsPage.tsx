@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import Icon from '@/components/ui/icon';
 import { AppState, Receipt, WorkOrder, Attachment, InvoiceTemplate, generateId, crudAction } from '@/data/store';
+import InvoiceDesigner from './documents/InvoiceDesigner';
 
 type Props = { state: AppState; onStateChange: (s: AppState) => void };
 
@@ -181,10 +182,10 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
 
-  // Template state
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<InvoiceTemplate | null>(null);
   const [deleteTemplateConfirm, setDeleteTemplateConfirm] = useState<string | null>(null);
+  const [designerTemplate, setDesignerTemplate] = useState<InvoiceTemplate | null>(null);
 
   const receipts = state.receipts || [];
   const workOrders = state.workOrders || [];
@@ -632,9 +633,16 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
+                      onClick={() => setDesignerTemplate(tmpl)}
+                      className="p-2 rounded-lg hover:bg-primary/10 transition-colors text-primary"
+                      title="Конструктор"
+                    >
+                      <Icon name="PenTool" size={14} />
+                    </button>
+                    <button
                       onClick={() => { setEditingTemplate(tmpl); setShowTemplateEditor(true); }}
                       className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                      title="Редактировать"
+                      title="Реквизиты"
                     >
                       <Icon name="Pencil" size={14} />
                     </button>
@@ -676,8 +684,11 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
                   )}
                 </div>
 
-                <div className="text-[11px] text-muted-foreground mt-2">
-                  Обновлен: {new Date(tmpl.updatedAt).toLocaleDateString('ru-RU')}
+                <div className="text-[11px] text-muted-foreground mt-2 flex items-center gap-3">
+                  <span>Обновлен: {new Date(tmpl.updatedAt).toLocaleDateString('ru-RU')}</span>
+                  {tmpl.elements && tmpl.elements.length > 0 && (
+                    <span className="flex items-center gap-1"><Icon name="LayoutGrid" size={10} />{tmpl.elements.length} элементов</span>
+                  )}
                 </div>
               </div>
             ))
@@ -718,6 +729,16 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {designerTemplate && (
+        <div className="fixed inset-0 z-50 bg-background">
+          <InvoiceDesigner
+            template={designerTemplate}
+            onSave={(t) => { handleSaveTemplate(t); setDesignerTemplate(null); }}
+            onClose={() => setDesignerTemplate(null)}
+          />
+        </div>
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import {
   updateLocationStock, updateWarehouseStock,
 } from '@/data/store';
 import { PickItemModal, CloseWarningModal } from './PickModals';
+import InvoiceFiller from '@/pages/documents/InvoiceFiller';
 
 export function OrderDetail({ order, state, onStateChange, onBack }: {
   order: WorkOrder; state: AppState;
@@ -249,15 +250,22 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         />
       )}
 
-      {showPrint && (
-        <div className="fixed inset-0 z-50 bg-background">
-          <InvoicePreviewPage
-            order={liveOrder}
-            state={state}
-            onClose={() => setShowPrint(false)}
-          />
-        </div>
-      )}
+      {showPrint && (() => {
+        const templates: InvoiceTemplate[] = state.invoiceTemplates || [];
+        const visualTpl = templates.find(t => t.elements && t.elements.length > 0);
+        if (visualTpl) {
+          return (
+            <div className="fixed inset-0 z-50 bg-background">
+              <InvoiceFiller template={visualTpl} order={liveOrder} state={state} onClose={() => setShowPrint(false)} />
+            </div>
+          );
+        }
+        return (
+          <div className="fixed inset-0 z-50 bg-background">
+            <InvoicePreviewPage order={liveOrder} state={state} onClose={() => setShowPrint(false)} />
+          </div>
+        );
+      })()}
     </div>
   );
 }
