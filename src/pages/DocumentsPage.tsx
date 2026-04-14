@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import Icon from '@/components/ui/icon';
-import { AppState, Receipt, WorkOrder, Attachment, InvoiceTemplate, generateId, crudAction } from '@/data/store';
+import { AppState, Receipt, WorkOrder, Attachment, InvoiceTemplate, generateId, crudAction, saveState } from '@/data/store';
 import InvoiceDesigner from './documents/InvoiceDesigner';
 import { create0504204Template } from '@/data/invoice0504204';
 import { excelToTemplate } from '@/data/excelImport';
@@ -199,12 +199,14 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
         const buf = ev.target?.result as ArrayBuffer;
         const tpl = excelToTemplate(buf, file.name);
         const exists = (state.invoiceTemplates || []).some(x => x.id === tpl.id);
-        onStateChange({
+        const next = {
           ...state,
           invoiceTemplates: exists
             ? (state.invoiceTemplates || []).map(x => x.id === tpl.id ? tpl : x)
             : [...(state.invoiceTemplates || []), tpl],
-        });
+        };
+        onStateChange(next);
+        saveState(next);
         setTab('templates');
         setDesignerTemplate(tpl);
       } catch (err) {
@@ -308,6 +310,7 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
         : [...templates, t],
     };
     onStateChange(next);
+    saveState(next);
     setShowTemplateEditor(false);
     setEditingTemplate(null);
   };
@@ -315,6 +318,7 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
   const handleDeleteTemplate = (id: string) => {
     const next = { ...state, invoiceTemplates: templates.filter(t => t.id !== id) };
     onStateChange(next);
+    saveState(next);
     setDeleteTemplateConfirm(null);
   };
 
