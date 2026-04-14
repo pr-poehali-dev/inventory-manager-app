@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import {
-  AppState, crudAction,
+  AppState, crudAction, saveState,
   WorkOrder, OrderItem, OrderStatus, InvoiceTemplate,
   getOrderStatusLabel, getOrderStatusColor,
   updateLocationStock, updateWarehouseStock,
@@ -58,17 +58,7 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
       }),
     };
     onStateChange(next);
-    const updatedOrder = next.workOrders.find(o => o.id === order.id)!;
-    crudAction('delete_operations_by_order', { orderId: order.id });
-    crudAction('upsert_work_order', { workOrder: updatedOrder, orderItems: updatedOrder.items });
-    for (const op of orderOps) {
-      const updatedItem = next.items.find(i => i.id === op.itemId);
-      const wsArr = (next.warehouseStocks || []).filter(w => w.itemId === op.itemId);
-      const lsArr = (next.locationStocks || []).filter(ls => ls.itemId === op.itemId);
-      if (updatedItem) {
-        crudAction('upsert_item', { item: updatedItem, warehouseStocks: wsArr, locationStocks: lsArr });
-      }
-    }
+    saveState(next);
   };
 
   const orderHistory = state.operations.filter(op => op.orderId === order.id)
