@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { InvoiceTemplate, InvElement, InvElementType, generateId } from '@/data/store';
+import { excelToTemplate } from '@/data/excelImport';
 
 type Props = {
   template: InvoiceTemplate;
@@ -61,6 +62,7 @@ export default function InvoiceDesigner({ template, onSave, onClose }: Props) {
   const [resizing, setResizing] = useState<{ id: string; edge: string; ox: number; oy: number; ow: number; oh: number; ex: number; ey: number } | null>(null);
   const [tplName, setTplName] = useState(template.name);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const excelRef = useRef<HTMLInputElement>(null);
   const [zoom, setZoom] = useState(0.7);
 
   const sel = elements.find(e => e.id === selected) || null;
@@ -218,6 +220,21 @@ export default function InvoiceDesigner({ template, onSave, onClose }: Props) {
           <Button variant="outline" size="sm" onClick={() => add('table')} className="gap-1 text-xs"><Icon name="Table" size={13} />Таблица</Button>
           <Button variant="outline" size="sm" onClick={() => add('line')} className="gap-1 text-xs"><Icon name="Minus" size={13} />Линия</Button>
           <Button variant="outline" size="sm" onClick={() => add('frame')} className="gap-1 text-xs"><Icon name="Square" size={13} />Рамка</Button>
+          <div className="w-px h-5 bg-gray-200 mx-1" />
+          <Button variant="outline" size="sm" onClick={() => excelRef.current?.click()} className="gap-1 text-xs"><Icon name="FileSpreadsheet" size={13} />Excel</Button>
+          <input ref={excelRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              try {
+                const tpl = excelToTemplate(ev.target?.result as ArrayBuffer, file.name);
+                setElements(prev => [...prev, ...(tpl.elements || [])]);
+              } catch (err) { console.error(err); }
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = '';
+          }} />
         </div>
         <div className="flex-1" />
         {sel && <span className="text-[10px] text-gray-400 font-mono">X:{sel.x} Y:{sel.y} {sel.w}×{sel.h}</span>}

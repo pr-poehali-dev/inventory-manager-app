@@ -8,6 +8,7 @@ import Icon from '@/components/ui/icon';
 import { AppState, Receipt, WorkOrder, Attachment, InvoiceTemplate, generateId, crudAction } from '@/data/store';
 import InvoiceDesigner from './documents/InvoiceDesigner';
 import { create0504204Template } from '@/data/invoice0504204';
+import { excelToTemplate } from '@/data/excelImport';
 
 type Props = { state: AppState; onStateChange: (s: AppState) => void };
 
@@ -187,6 +188,25 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
   const [editingTemplate, setEditingTemplate] = useState<InvoiceTemplate | null>(null);
   const [deleteTemplateConfirm, setDeleteTemplateConfirm] = useState<string | null>(null);
   const [designerTemplate, setDesignerTemplate] = useState<InvoiceTemplate | null>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExcelUpload = (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const buf = ev.target?.result as ArrayBuffer;
+        const tpl = excelToTemplate(buf, file.name);
+        handleSaveTemplate(tpl);
+        setDesignerTemplate(tpl);
+      } catch (err) {
+        console.error('Excel import error:', err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    if (excelInputRef.current) excelInputRef.current.value = '';
+  };
 
   const receipts = state.receipts || [];
   const workOrders = state.workOrders || [];
@@ -611,16 +631,24 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
               <p className="text-sm mt-1">Создайте шаблон, чтобы быстро формировать накладные</p>
               <div className="flex flex-col gap-2 mt-4 items-center">
                 <Button
+                  onClick={() => excelInputRef.current?.click()}
+                  className="gap-2"
+                >
+                  <Icon name="FileSpreadsheet" size={14} />
+                  Загрузить из Excel
+                </Button>
+                <Button
                   onClick={() => { const t = create0504204Template(); handleSaveTemplate(t); setDesignerTemplate(t); }}
+                  variant="outline"
                   className="gap-2"
                 >
                   <Icon name="FileSignature" size={14} />
-                  Создать шаблон 0504204
+                  Шаблон 0504204
                 </Button>
                 <Button
                   onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }}
-                  variant="outline"
-                  className="gap-2"
+                  variant="ghost"
+                  className="gap-2 text-xs"
                 >
                   <Icon name="Plus" size={14} />
                   Пустой шаблон
@@ -628,7 +656,8 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
               </div>
             </div>
           ) : (
-            filteredTemplates.map(tmpl => (
+            <>
+            {filteredTemplates.map(tmpl => (
               <div key={tmpl.id} className="bg-card border border-border rounded-xl shadow-card p-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300 flex items-center justify-center shrink-0">
@@ -701,10 +730,21 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
                   )}
                 </div>
               </div>
-            ))
+            ))}
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => excelInputRef.current?.click()} className="gap-1.5">
+                <Icon name="FileSpreadsheet" size={13} />Загрузить из Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }} className="gap-1.5">
+                <Icon name="Plus" size={13} />Новый шаблон
+              </Button>
+            </div>
+            </>
           )}
         </div>
       )}
+
+      <input ref={excelInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleExcelUpload(e.target.files)} />
 
       {/* ─── Template Editor Modal ────────────────────────────────── */}
       {showTemplateEditor && (
