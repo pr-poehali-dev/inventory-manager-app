@@ -1,8 +1,10 @@
 import * as XLSX from 'xlsx';
 import { InvoiceTemplate, InvElement, generateId } from './store';
 
-const COL_W = 64;
-const ROW_H = 20;
+const DEFAULT_COL_WCH = 8.43;
+const DEFAULT_ROW_HPT = 15;
+const CHAR_PX = 7.5;
+const PT_PX = 1.333;
 const PAD_X = 30;
 const PAD_Y = 20;
 
@@ -16,26 +18,40 @@ function isMergeOrigin(m: MergeRange, r: number, c: number) {
   return m.s.r === r && m.s.c === c;
 }
 
+function colToPx(col: Record<string, unknown> | undefined): number {
+  if (!col) return Math.round(DEFAULT_COL_WCH * CHAR_PX);
+  if (col.wpx) return Math.round(col.wpx as number);
+  if (col.wch) return Math.round((col.wch as number) * CHAR_PX);
+  if (col.width) return Math.round((col.width as number) * CHAR_PX);
+  return Math.round(DEFAULT_COL_WCH * CHAR_PX);
+}
+
+function rowToPx(row: Record<string, unknown> | undefined): number {
+  if (!row) return Math.round(DEFAULT_ROW_HPT * PT_PX);
+  if (row.hpx) return Math.round(row.hpx as number);
+  if (row.hpt) return Math.round((row.hpt as number) * PT_PX);
+  return Math.round(DEFAULT_ROW_HPT * PT_PX);
+}
+
 export function excelToTemplate(buffer: ArrayBuffer, fileName: string): InvoiceTemplate {
-  const wb = XLSX.read(buffer, { type: 'array' });
+  const wb = XLSX.read(buffer, { type: 'array', cellStyles: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws) throw new Error('Пустой файл');
 
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
   const merges: MergeRange[] = (ws['!merges'] || []) as MergeRange[];
 
+  const customCols = (ws['!cols'] || []) as (Record<string, unknown> | undefined)[];
+  const customRows = (ws['!rows'] || []) as (Record<string, unknown> | undefined)[];
+
   const colWidths: number[] = [];
-  const customCols = ws['!cols'] || [];
   for (let c = range.s.c; c <= range.e.c; c++) {
-    const cw = customCols[c];
-    colWidths[c] = cw && cw.wpx ? cw.wpx : cw && cw.wch ? cw.wch * 7 : COL_W;
+    colWidths[c] = colToPx(customCols[c]);
   }
 
   const rowHeights: number[] = [];
-  const customRows = ws['!rows'] || [];
   for (let r = range.s.r; r <= range.e.r; r++) {
-    const rh = customRows[r];
-    rowHeights[r] = rh && rh.hpx ? rh.hpx : rh && rh.hpt ? rh.hpt * 1.33 : ROW_H;
+    rowHeights[r] = rowToPx(customRows[r]);
   }
 
   const colX: number[] = [];
@@ -97,7 +113,7 @@ export function excelToTemplate(buffer: ArrayBuffer, fileName: string): InvoiceT
         if (font) {
           if (font.bold) bold = true;
           if (font.italic) italic = true;
-          if (font.sz) fontSize = font.sz as number;
+          if (font.sz) fontSize = Math.round(font.sz as number);
         }
         const alignment = s.alignment as Record<string, unknown> | undefined;
         if (alignment?.horizontal === 'center') align = 'center';
