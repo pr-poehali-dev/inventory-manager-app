@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import Icon from '@/components/ui/icon';
 import { AppState, Receipt, WorkOrder, Attachment, InvoiceTemplate, generateId, crudAction } from '@/data/store';
 import InvoiceDesigner from './documents/InvoiceDesigner';
+import { create0504204Template } from '@/data/invoice0504204';
 
 type Props = { state: AppState; onStateChange: (s: AppState) => void };
 
@@ -608,14 +609,23 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
               <Icon name="FileSignature" size={36} className="mx-auto mb-3 opacity-30" />
               <p className="font-medium">Нет шаблонов накладных</p>
               <p className="text-sm mt-1">Создайте шаблон, чтобы быстро формировать накладные</p>
-              <Button
-                onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }}
-                variant="outline"
-                className="mt-4 gap-2"
-              >
-                <Icon name="Plus" size={14} />
-                Создать первый шаблон
-              </Button>
+              <div className="flex flex-col gap-2 mt-4 items-center">
+                <Button
+                  onClick={() => { const t = create0504204Template(); handleSaveTemplate(t); setDesignerTemplate(t); }}
+                  className="gap-2"
+                >
+                  <Icon name="FileSignature" size={14} />
+                  Создать шаблон 0504204
+                </Button>
+                <Button
+                  onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Icon name="Plus" size={14} />
+                  Пустой шаблон
+                </Button>
+              </div>
             </div>
           ) : (
             filteredTemplates.map(tmpl => (
