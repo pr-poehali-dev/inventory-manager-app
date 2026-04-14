@@ -349,15 +349,17 @@ function InvoicePreviewPage({ order, state, onClose }: { order: WorkOrder; state
 table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m th,table.m td{border:1px solid #000;padding:1pt 2pt;text-align:center;vertical-align:middle}table.m td.r{text-align:right}
 .ft{font-size:8pt;margin-top:3pt}.acc{border:1px dashed #000;padding:4pt;font-size:7.5pt}
 @media print{body{padding:4mm 6mm}@page{size:landscape;margin:6mm}}</style></head><body>
-<div class="hdr"><div style="flex:1"><div style="text-align:center;font-weight:bold;font-size:11pt;margin-bottom:2pt">ТРЕБОВАНИЕ-НАКЛАДНАЯ \u2116 <span class="u">${f.num}</span></div><div style="text-align:center;font-size:8.5pt;margin-bottom:4pt">от <span class="u" style="min-width:120px">${f.date}</span></div></div>
-<table class="codes"><tr><td colspan="2" style="text-align:center;font-weight:bold">Коды</td></tr><tr><td style="text-align:left">Форма по ОКУД</td><td>${f.okud}</td></tr><tr><td style="text-align:left">Дата</td><td>${f.dateCode}</td></tr><tr><td style="text-align:left">по ОКПО</td><td>${f.okpo}</td></tr></table></div>
-<div class="row">Учреждение <span class="u" style="min-width:400px">${f.institution}</span></div>
-<div class="row">Структурное подразделение - отправитель <span class="u" style="min-width:300px">${f.senderDept}</span></div>
-<div class="row">Структурное подразделение - получатель <span class="u" style="min-width:300px">${f.receiverDept}</span></div>
+<div class="hdr"><div style="flex:1">
+<div style="text-align:center;font-weight:bold;font-size:11pt;margin-bottom:2pt">ТРЕБОВАНИЕ-НАКЛАДНАЯ \u2116 <span class="u">${f.num}</span></div>
+<div style="text-align:center;font-size:8.5pt;margin-bottom:4pt">от <span class="u" style="min-width:120px">${f.date}</span></div>
+<div class="row">Учреждение <span class="u" style="min-width:300px">${f.institution}</span></div>
+<div class="row">Структурное подразделение - отправитель <span class="u" style="min-width:200px">${f.senderDept}</span></div>
+<div class="row">Структурное подразделение - получатель <span class="u" style="min-width:200px">${f.receiverDept}</span></div>
 <div class="row">Единица измерения: руб. (с точностью до второго десятичного знака) <span style="float:right">по ОКЕИ <span class="u">${f.okei}</span></span></div>
+</div>
+<table class="codes" style="align-self:flex-start"><tr><td colspan="2" style="text-align:center;font-weight:bold">Коды</td></tr><tr><td style="text-align:left">Форма по ОКУД</td><td>${f.okud}</td></tr><tr><td style="text-align:left">Дата</td><td>${f.dateCode}</td></tr><tr><td style="text-align:left">по ОКПО</td><td>${f.okpo}</td></tr></table></div>
 <div style="height:4pt"></div>
-<div class="row" style="display:flex;gap:20pt"><div>Затребовал <span class="u">${f.reqRank}</span> <span class="lbl">(звание)</span> <span class="u" style="min-width:80px">${f.reqName}</span> <span class="lbl">(фамилия, инициалы)</span></div>
-<div>Разрешил <span class="u">${f.appRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.appSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:80px">${f.appName}</span> <span class="lbl">(расшифровка подписи)</span></div></div>
+<div class="row">Затребовал <span class="u">${f.reqRank}</span> <span class="lbl">(звание)</span> <span class="u" style="min-width:80px">${f.reqName}</span> <span class="lbl">(фамилия, инициалы)</span> <span style="margin-left:16pt">Разрешил</span> <span class="u">${f.appRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.appSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:80px">${f.appName}</span> <span class="lbl">(расшифровка подписи)</span></div>
 <table class="m"><thead>
 <tr><th colspan="3">Материальные ценности</th><th colspan="2">номер</th><th colspan="2">Единица измерения</th><th rowspan="3">Цена</th><th colspan="2">Количество</th><th rowspan="3">Сумма<br>(без НДС)</th><th colspan="2">Корреспондирующие счета</th><th rowspan="3">Примечание</th></tr>
 <tr><th rowspan="2">наименование</th><th rowspan="2" style="font-size:6.5pt">номенкла-<br>турный</th><th rowspan="2" style="font-size:6.5pt">паспорта (иной)</th><th rowspan="2" style="font-size:6.5pt">наимено-<br>вание</th><th rowspan="2" style="font-size:6.5pt">код по<br>ОКЕИ</th><th style="font-size:6.5pt">затре-<br>бовано</th><th style="font-size:6.5pt">отпу-<br>щено</th><th rowspan="2">дебет</th><th rowspan="2">кредит</th></tr>
@@ -416,16 +418,29 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
       <div className="flex-1 overflow-auto p-4">
         <div className="bg-white mx-auto shadow-lg border border-gray-300 px-10 py-6" style={{ maxWidth: 1200, minWidth: 1000, fontSize: '9pt', ...serif }}>
 
-          <div className="flex justify-between items-start gap-4">
-            <div className="flex-1">
-              <div className="text-center font-bold" style={{ fontSize: '12pt' }}>
+          <div className="flex items-start gap-4">
+            <div className="flex-1 space-y-0.5" style={{ fontSize: '8.5pt' }}>
+              <div className="text-center font-bold mb-0.5" style={{ fontSize: '12pt' }}>
                 ТРЕБОВАНИЕ-НАКЛАДНАЯ {'\u2116'}{' '}<EF k="num" w="70px" a="center" />
               </div>
-              <div className="text-center mt-0.5" style={{ fontSize: '8.5pt' }}>
+              <div className="text-center mb-2" style={{ fontSize: '8.5pt' }}>
                 от{' '}<EF k="date" w="150px" a="center" />
               </div>
+              <div className="flex items-end gap-1">
+                <span className="whitespace-nowrap">Учреждение</span><EF k="institution" />
+              </div>
+              <div className="flex items-end gap-1">
+                <span className="whitespace-nowrap">Структурное подразделение - отправитель</span><EF k="senderDept" />
+              </div>
+              <div className="flex items-end gap-1">
+                <span className="whitespace-nowrap">Структурное подразделение - получатель</span><EF k="receiverDept" />
+              </div>
+              <div className="flex items-end justify-between">
+                <span>Единица измерения: руб. (с точностью до второго десятичного знака)</span>
+                <span className="whitespace-nowrap flex items-end gap-1">по ОКЕИ{' '}<EF k="okei" w="40px" a="center" /></span>
+              </div>
             </div>
-            <table className="border-collapse shrink-0" style={{ fontSize: '8pt', border: '1px solid #000' }}>
+            <table className="border-collapse shrink-0 self-start" style={{ fontSize: '8pt', border: '1px solid #000' }}>
               <tbody>
                 <tr><td colSpan={2} className={`${th} font-bold`}>Коды</td></tr>
                 <tr><td className={`${bb} px-2 py-0.5 text-left`}>Форма по ОКУД</td><td className={th}><EF k="okud" w="60px" a="center" /></td></tr>
@@ -435,34 +450,14 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
             </table>
           </div>
 
-          <div className="space-y-0.5 mt-2" style={{ fontSize: '8.5pt' }}>
-            <div className="flex items-end gap-1">
-              <span className="whitespace-nowrap">Учреждение</span><EF k="institution" />
-            </div>
-            <div className="flex items-end gap-1">
-              <span className="whitespace-nowrap">Структурное подразделение - отправитель</span><EF k="senderDept" />
-            </div>
-            <div className="flex items-end gap-1">
-              <span className="whitespace-nowrap">Структурное подразделение - получатель</span><EF k="receiverDept" />
-            </div>
-            <div className="flex items-end justify-between">
-              <span>Единица измерения: руб. (с точностью до второго десятичного знака)</span>
-              <span className="whitespace-nowrap flex items-end gap-1">по ОКЕИ{' '}<EF k="okei" w="40px" a="center" /></span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-6 mt-3" style={{ fontSize: '8.5pt' }}>
-            <div className="flex items-end gap-1 flex-wrap">
-              <span className="font-semibold">Затребовал</span>
-              <div className="text-center"><EF k="reqRank" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(звание)</div></div>
-              <div className="text-center"><EF k="reqName" w="130px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(фамилия, инициалы)</div></div>
-            </div>
-            <div className="flex items-end gap-1 flex-wrap">
-              <span className="font-semibold">Разрешил</span>
-              <div className="text-center"><EF k="appRole" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(должность)</div></div>
-              <div className="text-center"><EF k="appSign" w="90px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(подпись)</div></div>
-              <div className="text-center"><EF k="appName" w="130px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(расшифровка подписи)</div></div>
-            </div>
+          <div className="flex items-end gap-1 flex-wrap mt-3" style={{ fontSize: '8.5pt' }}>
+            <span className="font-semibold">Затребовал</span>
+            <div className="text-center"><EF k="reqRank" w="100px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(звание)</div></div>
+            <div className="text-center"><EF k="reqName" w="120px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(фамилия, инициалы)</div></div>
+            <span className="font-semibold ml-4">Разрешил</span>
+            <div className="text-center"><EF k="appRole" w="100px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(должность)</div></div>
+            <div className="text-center"><EF k="appSign" w="80px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(подпись)</div></div>
+            <div className="text-center"><EF k="appName" w="120px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(расшифровка подписи)</div></div>
           </div>
 
           <div className="overflow-x-auto mt-3">
