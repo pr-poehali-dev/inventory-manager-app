@@ -23,6 +23,7 @@ interface Block {
   signParts?: string[];
   signDate?: string;
   frameLabel?: string;
+  frameContent?: string;
   lineWidth?: number;
 }
 
@@ -102,7 +103,7 @@ function defaultBlocks(): Block[] {
     },
     {
       id: uid(), type: 'frame', x: 700, y: 690, w: 480, h: 120,
-      frameLabel: 'Отметка бухгалтерии',
+      frameLabel: 'Отметка бухгалтерии', frameContent: '',
     },
   ];
 }
@@ -124,6 +125,13 @@ function computeTableSum(rows: string[][], colIndex: number): string {
   return hasNum ? sum.toFixed(2) : '';
 }
 
+function isEditableElement(el: Element | null): boolean {
+  if (!el) return false;
+  if ((el as HTMLElement).isContentEditable) return true;
+  const tag = el.tagName?.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select';
+}
+
 interface Props {
   state: AppState;
   onStateChange: (s: AppState) => void;
@@ -135,7 +143,6 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ blockId: string; row: number; col: number } | null>(null);
   const [zoom, setZoom] = useState(0.8);
   const [history, setHistory] = useState<Block[][]>([]);
@@ -210,7 +217,7 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
         e.preventDefault();
         redo();
       }
-      if (e.key === 'Delete' && selectedId && !editingId && !editingCell) {
+      if (e.key === 'Delete' && selectedId && !editingCell && !isEditableElement(document.activeElement)) {
         e.preventDefault();
         const newBlocks = blocks.filter(b => b.id !== selectedId);
         setSelectedId(null);
@@ -219,7 +226,7 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo, selectedId, editingId, editingCell, blocks, updateBlocks]);
+  }, [undo, redo, selectedId, editingCell, blocks, updateBlocks]);
 
   const addBlock = (type: BlockType) => {
     const newBlock: Block = {
@@ -253,10 +260,12 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     }
     if (type === 'frame') {
       newBlock.frameLabel = 'Заголовок';
+      newBlock.frameContent = '';
     }
-
+    if (type === 'line') {
+      newBlock.lineWidth = 1;
+    }
     const newBlocks = [...blocks, newBlock];
-    setSelectedId(newBlock.id);
     updateBlocks(newBlocks);
   };
 
@@ -278,13 +287,11 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-dots')) {
       setSelectedId(null);
-      setEditingId(null);
       setEditingCell(null);
     }
   };
 
-  const handleBlockMouseDown = (e: React.MouseEvent, blockId: string) => {
-    if (editingId === blockId || editingCell?.blockId === blockId) return;
+  const handleDragHandleMouseDown = (e: React.MouseEvent, blockId: string) => {
     e.stopPropagation();
     e.preventDefault();
     const block = blocks.find(b => b.id === blockId);
@@ -295,9 +302,13 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     const mouseX = (e.clientX - rect.left) / zoom;
     const mouseY = (e.clientY - rect.top) / zoom;
     setSelectedId(blockId);
-    setEditingId(null);
     setEditingCell(null);
     setDragState({ blockId, offsetX: mouseX - block.x, offsetY: mouseY - block.y });
+  };
+
+  const handleBlockClick = (e: React.MouseEvent, blockId: string) => {
+    e.stopPropagation();
+    setSelectedId(blockId);
   };
 
   const handleResizeMouseDown = (e: React.MouseEvent, blockId: string) => {
@@ -357,7 +368,6 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   const handleClear = () => {
     const def = defaultBlocks();
     setSelectedId(null);
-    setEditingId(null);
     setEditingCell(null);
     updateBlocks(def);
   };
@@ -425,6 +435,9 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
         if (block.frameLabel) {
           html += `<div style="font-size:8pt;padding:2px 4px;border-bottom:1px solid #000;background:#fff;">${block.frameLabel}</div>`;
         }
+        if (block.frameContent) {
+          html += `<div style="font-size:9pt;padding:4px;white-space:pre-wrap;">${block.frameContent}</div>`;
+        }
         html += '</div>';
         return html;
       }
@@ -455,7 +468,7 @@ body { font-family:'Times New Roman',serif; }
   const selectedBlock = blocks.find(b => b.id === selectedId);
 
   const renderTextBlock = (block: Block) => {
-    const isEditing = editingId === block.id;
+    const isSelected = selectedId === block.id;
     return (
       <div
         style={{
@@ -469,22 +482,21 @@ body { font-family:'Times New Roman',serif; }
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
           outline: 'none',
-          cursor: isEditing ? 'text' : 'move',
+          cursor: 'text',
         }}
-        contentEditable={isEditing}
+        contentEditable={isSelected}
         suppressContentEditableWarning
-        onDoubleClick={(e) => {
+        onClick={(e) => {
           e.stopPropagation();
-          setEditingId(block.id);
-        }}
-        onBlur={(e) => {
-          if (editingId === block.id) {
-            updateBlock(block.id, { text: e.currentTarget.textContent || '' });
-            setEditingId(null);
+          if (isSelected) {
+            (e.currentTarget as HTMLElement).focus();
           }
         }}
+        onBlur={(e) => {
+          updateBlock(block.id, { text: e.currentTarget.textContent || '' });
+        }}
         onMouseDown={(e) => {
-          if (isEditing) e.stopPropagation();
+          if (isSelected) e.stopPropagation();
         }}
       >
         {block.text || ''}
@@ -532,10 +544,11 @@ body { font-family:'Times New Roman',serif; }
                     />
                   ) : (
                     <span
-                      onDoubleClick={(e) => {
+                      onClick={(e) => {
                         e.stopPropagation();
                         setEditingCell({ blockId: block.id, row: -1, col: ci });
                       }}
+                      style={{ display: 'block', minHeight: 14, cursor: 'text' }}
                     >
                       {col.label}
                     </span>
@@ -586,7 +599,7 @@ body { font-family:'Times New Roman',serif; }
                       />
                     ) : (
                       <span
-                        onDoubleClick={(e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
                           setEditingCell({ blockId: block.id, row: ri, col: ci });
                         }}
@@ -687,22 +700,22 @@ body { font-family:'Times New Roman',serif; }
 
   const renderSignatureBlock = (block: Block) => {
     const parts = block.signParts || ['должность', 'подпись', 'расшифровка подписи'];
-    const isEditing = editingId === block.id;
+    const isSelected = selectedId === block.id;
     return (
       <div style={{ fontFamily: "'Times New Roman', serif", fontSize: '10pt', width: '100%' }}>
         <div
-          style={{ marginBottom: 4, fontWeight: 'bold', cursor: isEditing ? 'text' : 'default' }}
-          contentEditable={isEditing}
-          suppressContentEditableWarning
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            setEditingId(block.id);
+          style={{
+            marginBottom: 4,
+            fontWeight: 'bold',
+            cursor: isSelected ? 'text' : 'default',
+            outline: 'none',
           }}
+          contentEditable={isSelected}
+          suppressContentEditableWarning
           onBlur={(e) => {
             updateBlock(block.id, { signLabel: e.currentTarget.textContent || '' });
-            setEditingId(null);
           }}
-          onMouseDown={(e) => { if (isEditing) e.stopPropagation(); }}
+          onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
         >
           {block.signLabel || ''}
         </div>
@@ -710,11 +723,40 @@ body { font-family:'Times New Roman',serif; }
           {parts.map((p, i) => (
             <div key={i} style={{ textAlign: 'center' }}>
               <div style={{ borderBottom: '1px solid #000', minWidth: 120, height: 18 }} />
-              <div style={{ fontSize: '7pt' }}>({p})</div>
+              <div style={{ fontSize: '7pt' }}>
+                {'('}
+                <span
+                  style={{ outline: 'none', cursor: isSelected ? 'text' : 'default' }}
+                  contentEditable={isSelected}
+                  suppressContentEditableWarning
+                  onBlur={(e) => {
+                    const newParts = [...parts];
+                    newParts[i] = e.currentTarget.textContent || '';
+                    updateBlock(block.id, { signParts: newParts });
+                  }}
+                  onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
+                >
+                  {p}
+                </span>
+                {')'}
+              </div>
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 4, fontSize: '9pt' }}>
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: '9pt',
+            outline: 'none',
+            cursor: isSelected ? 'text' : 'default',
+          }}
+          contentEditable={isSelected}
+          suppressContentEditableWarning
+          onBlur={(e) => {
+            updateBlock(block.id, { signDate: e.currentTarget.textContent || '' });
+          }}
+          onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
+        >
           {block.signDate || ''}
         </div>
       </div>
@@ -722,7 +764,7 @@ body { font-family:'Times New Roman',serif; }
   };
 
   const renderFrameBlock = (block: Block) => {
-    const isEditing = editingId === block.id;
+    const isSelected = selectedId === block.id;
     return (
       <div style={{
         width: '100%',
@@ -730,6 +772,8 @@ body { font-family:'Times New Roman',serif; }
         border: '1px solid #000',
         fontFamily: "'Times New Roman', serif",
         position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         {block.frameLabel !== undefined && (
           <div
@@ -738,24 +782,40 @@ body { font-family:'Times New Roman',serif; }
               padding: '2px 4px',
               borderBottom: '1px solid #000',
               background: '#fff',
-              cursor: isEditing ? 'text' : 'default',
+              cursor: isSelected ? 'text' : 'default',
               outline: 'none',
+              flexShrink: 0,
             }}
-            contentEditable={isEditing}
+            contentEditable={isSelected}
             suppressContentEditableWarning
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              setEditingId(block.id);
-            }}
             onBlur={(e) => {
               updateBlock(block.id, { frameLabel: e.currentTarget.textContent || '' });
-              setEditingId(null);
             }}
-            onMouseDown={(e) => { if (isEditing) e.stopPropagation(); }}
+            onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
           >
             {block.frameLabel || ''}
           </div>
         )}
+        <div
+          style={{
+            flex: 1,
+            fontSize: '9pt',
+            padding: '4px',
+            outline: 'none',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            cursor: isSelected ? 'text' : 'default',
+            overflow: 'hidden',
+          }}
+          contentEditable={isSelected}
+          suppressContentEditableWarning
+          onBlur={(e) => {
+            updateBlock(block.id, { frameContent: e.currentTarget.textContent || '' });
+          }}
+          onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
+        >
+          {block.frameContent || ''}
+        </div>
       </div>
     );
   };
@@ -1027,48 +1087,63 @@ body { font-family:'Times New Roman',serif; }
             }}
             onMouseDown={handleCanvasMouseDown}
           >
-            {blocks.map(block => (
-              <div
-                key={block.id}
-                style={{
-                  position: 'absolute',
-                  left: block.x,
-                  top: block.y,
-                  width: block.w,
-                  height: block.type === 'frame' || block.type === 'table' ? block.h : undefined,
-                  minHeight: block.type === 'line' ? 2 : undefined,
-                  cursor: editingId === block.id || editingCell?.blockId === block.id ? 'default' : 'move',
-                  outline: selectedId === block.id ? '2px solid #3b82f6' : 'none',
-                  outlineOffset: 1,
-                  zIndex: selectedId === block.id ? 10 : 1,
-                  userSelect: editingId === block.id || editingCell?.blockId === block.id ? 'text' : 'none',
-                }}
-                onMouseDown={(e) => handleBlockMouseDown(e, block.id)}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  if (block.type === 'text' || block.type === 'signature' || block.type === 'frame') {
-                    setEditingId(block.id);
-                  }
-                }}
-              >
-                {renderBlock(block)}
-                {selectedId === block.id && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      right: -4,
-                      bottom: -4,
-                      width: 8,
-                      height: 8,
-                      background: '#3b82f6',
-                      cursor: 'nwse-resize',
-                      borderRadius: 1,
-                    }}
-                    onMouseDown={(e) => handleResizeMouseDown(e, block.id)}
-                  />
-                )}
-              </div>
-            ))}
+            {blocks.map(block => {
+              const isSelected = selectedId === block.id;
+              return (
+                <div
+                  key={block.id}
+                  className="group"
+                  style={{
+                    position: 'absolute',
+                    left: block.x,
+                    top: block.y,
+                    width: block.w,
+                    height: block.type === 'frame' || block.type === 'table' ? block.h : undefined,
+                    minHeight: block.type === 'line' ? 2 : undefined,
+                    cursor: 'default',
+                    outline: isSelected ? '2px solid #3b82f6' : 'none',
+                    outlineOffset: 1,
+                    zIndex: isSelected ? 10 : 1,
+                    userSelect: isSelected ? 'text' : 'none',
+                  }}
+                  onClick={(e) => handleBlockClick(e, block.id)}
+                >
+                  {block.type !== 'line' && (
+                    <div
+                      className={`absolute -top-2 left-0 right-0 flex justify-center transition-opacity print:hidden ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                      style={{ zIndex: 20, height: 6 }}
+                    >
+                      <div
+                        style={{
+                          width: 40,
+                          height: 6,
+                          background: isSelected ? '#3b82f6' : '#9ca3af',
+                          borderRadius: 3,
+                          cursor: 'move',
+                        }}
+                        onMouseDown={(e) => handleDragHandleMouseDown(e, block.id)}
+                      />
+                    </div>
+                  )}
+                  {renderBlock(block)}
+                  {isSelected && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        right: -4,
+                        bottom: -4,
+                        width: 8,
+                        height: 8,
+                        background: '#3b82f6',
+                        cursor: 'nwse-resize',
+                        borderRadius: 1,
+                      }}
+                      onMouseDown={(e) => handleResizeMouseDown(e, block.id)}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
