@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import {
@@ -255,7 +254,7 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         {liveOrder.status === 'assembled' && <Button onClick={handleClose} className="flex-1 bg-muted text-foreground hover:bg-muted/80"><Icon name="Archive" size={14} className="mr-1.5" />Закрыть заявку</Button>}
         {(liveOrder.status === 'assembled' || liveOrder.status === 'closed') && (
           <Button variant="outline" onClick={() => setShowPrint(true)} className="flex items-center gap-1.5">
-            <Icon name="Printer" size={14} />Накладная
+            <Icon name="Eye" size={14} />Накладная
           </Button>
         )}
         {liveOrder.status === 'closed' && (
@@ -276,136 +275,519 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
       )}
 
       {showPrint && (
-        <PrintInvoiceModal
-          order={liveOrder}
-          state={state}
-          onClose={() => setShowPrint(false)}
-        />
+        <div className="fixed inset-0 z-50 bg-background">
+          <InvoicePreviewPage
+            order={liveOrder}
+            state={state}
+            onClose={() => setShowPrint(false)}
+          />
+        </div>
       )}
     </div>
   );
 }
 
-function PrintInvoiceModal({ order, state, onClose }: { order: WorkOrder; state: AppState; onClose: () => void }) {
+type InvoiceFields = {
+  docNumber: string;
+  docDate: string;
+  okpo: string;
+  institution: string;
+  senderDept: string;
+  receiverDept: string;
+  requestedByRank: string;
+  requestedByName: string;
+  approvedByRole: string;
+  approvedBySignature: string;
+  approvedByName: string;
+  releasedByRank: string;
+  releasedBySignature: string;
+  releasedByName: string;
+  responsibleRole: string;
+  responsibleSignature: string;
+  receivedByRank: string;
+  receivedBySignature: string;
+  receivedByName: string;
+  releasedDate: string;
+  receivedDate: string;
+  accountingNote: string;
+};
+
+type InvoiceRow = {
+  name: string;
+  nomenclatureNum: string;
+  passport: string;
+  unitName: string;
+  unitCode: string;
+  price: string;
+  requiredQty: string;
+  releasedQty: string;
+  sumNoVat: string;
+  debit: string;
+  credit: string;
+  note: string;
+};
+
+function InvoicePreviewPage({ order, state, onClose }: { order: WorkOrder; state: AppState; onClose: () => void }) {
   const templates: InvoiceTemplate[] = state.invoiceTemplates || [];
   const [selId, setSelId] = useState(templates[0]?.id || '');
   const tpl = templates.find(t => t.id === selId);
+  const [editing, setEditing] = useState(false);
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('ru-RU');
+
+  const initFields = (): InvoiceFields => ({
+    docNumber: order.number,
+    docDate: dateStr,
+    okpo: '',
+    institution: tpl?.companyName || '',
+    senderDept: '',
+    receiverDept: order.recipientName || '',
+    requestedByRank: '',
+    requestedByName: '',
+    approvedByRole: tpl?.signatoryRole || '',
+    approvedBySignature: '',
+    approvedByName: tpl?.signatory || '',
+    releasedByRank: '',
+    releasedBySignature: '',
+    releasedByName: '',
+    responsibleRole: '',
+    responsibleSignature: '',
+    receivedByRank: '',
+    receivedBySignature: '',
+    receivedByName: order.recipientName || '',
+    releasedDate: dateStr,
+    receivedDate: dateStr,
+    accountingNote: '',
+  });
+
+  const initRows = (): InvoiceRow[] =>
+    order.items.map(oi => {
+      const it = state.items.find(i => i.id === oi.itemId);
+      return {
+        name: it?.name || '',
+        nomenclatureNum: '',
+        passport: '',
+        unitName: it?.unit || 'шт',
+        unitCode: '',
+        price: '',
+        requiredQty: String(oi.requiredQty),
+        releasedQty: String(oi.pickedQty),
+        sumNoVat: '',
+        debit: '',
+        credit: '',
+        note: '',
+      };
+    });
+
+  const [fields, setFields] = useState<InvoiceFields>(initFields);
+  const [rows, setRows] = useState<InvoiceRow[]>(initRows);
+
+  const applyTemplate = (t: InvoiceTemplate | undefined) => {
+    setFields(prev => ({
+      ...prev,
+      institution: t?.companyName || prev.institution,
+      approvedByRole: t?.signatoryRole || prev.approvedByRole,
+      approvedByName: t?.signatory || prev.approvedByName,
+    }));
+  };
+
+  const updateField = (key: keyof InvoiceFields, value: string) => {
+    setFields(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateRow = (idx: number, key: keyof InvoiceRow, value: string) => {
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [key]: value } : r));
+  };
+
+  const totalRequired = rows.reduce((s, r) => s + (parseFloat(r.requiredQty) || 0), 0);
+  const totalReleased = rows.reduce((s, r) => s + (parseFloat(r.releasedQty) || 0), 0);
+
+  const renderField = (value: string, onChange: (v: string) => void, width?: string) => {
+    if (editing) {
+      return (
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="bg-blue-50 border border-blue-200 rounded px-1 py-0.5 text-xs w-full outline-none focus:border-blue-400"
+          style={width ? { width } : undefined}
+        />
+      );
+    }
+    return (
+      <span
+        className="border-b border-dotted border-gray-400 min-w-[40px] inline-block text-xs cursor-default"
+        style={width ? { width } : undefined}
+      >
+        {value || '\u00A0'}
+      </span>
+    );
+  };
+
+  const renderCell = (value: string, onChange: (v: string) => void) => {
+    if (editing) {
+      return (
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="bg-blue-50 border-0 text-xs w-full outline-none text-center px-0.5 py-0"
+          style={{ minWidth: 0 }}
+        />
+      );
+    }
+    return <span className="text-xs">{value || '\u00A0'}</span>;
+  };
+
+  const buildPrintHtml = () => {
+    const rowsHtml = rows.map((r, i) => `
+      <tr>
+        <td class="c">${i + 1}</td>
+        <td>${r.name}</td>
+        <td class="c">${r.nomenclatureNum}</td>
+        <td class="c">${r.passport}</td>
+        <td class="c">${r.unitName}</td>
+        <td class="c">${r.unitCode}</td>
+        <td class="r">${r.price}</td>
+        <td class="r">${r.requiredQty}</td>
+        <td class="r">${r.releasedQty}</td>
+        <td class="r">${r.sumNoVat}</td>
+        <td class="c">${r.debit}</td>
+        <td class="c">${r.credit}</td>
+        <td>${r.note}</td>
+      </tr>
+    `).join('');
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Требование-накладная ${fields.docNumber}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Times New Roman',serif;font-size:10pt;padding:8mm 10mm;color:#000}
+.top{display:flex;justify-content:space-between;margin-bottom:6pt}
+.title{text-align:center;font-size:12pt;font-weight:bold;margin:8pt 0 4pt}
+.codes{border:1px solid #000;font-size:8pt;width:180px}
+.codes td,.codes th{border:1px solid #000;padding:1pt 4pt;text-align:center}
+.field-row{font-size:9pt;margin:2pt 0}
+.field-row .underline{border-bottom:1px solid #000;min-width:100px;display:inline-block;padding:0 4pt}
+.auth{font-size:9pt;margin:6pt 0}
+table.main{width:100%;border-collapse:collapse;margin:6pt 0;font-size:8pt}
+table.main th,table.main td{border:1px solid #000;padding:2pt 3pt;text-align:left}
+table.main th{text-align:center;font-weight:bold;background:#f5f5f5}
+table.main td.c{text-align:center}
+table.main td.r{text-align:right}
+.footer-section{font-size:9pt;margin-top:10pt}
+.sign-line{display:inline-flex;align-items:flex-end;margin:0 4pt}
+.sign-line .line{border-bottom:1px solid #000;min-width:120px;display:inline-block}
+.sign-line .label{font-size:7pt;text-align:center;display:block}
+.accounting{border:1px dashed #000;padding:6pt;margin:8pt 0;min-height:40pt;font-size:9pt}
+@media print{body{padding:5mm 8mm}}
+</style></head><body>
+<div class="top">
+  <div style="flex:1">
+    <div class="field-row">Учреждение: <span class="underline">${fields.institution}</span></div>
+  </div>
+  <div>
+    <table class="codes">
+      <tr><td colspan="2" style="font-size:7pt">Коды</td></tr>
+      <tr><td style="text-align:left">Форма по ОКУД</td><td>0504204</td></tr>
+      <tr><td style="text-align:left">Дата</td><td>${fields.docDate}</td></tr>
+      <tr><td style="text-align:left">по ОКПО</td><td>${fields.okpo}</td></tr>
+    </table>
+  </div>
+</div>
+<div class="title">ТРЕБОВАНИЕ-НАКЛАДНАЯ ${'\u2116'} ${fields.docNumber}</div>
+<div style="text-align:center;font-size:9pt;margin-bottom:6pt">от ${fields.docDate}</div>
+<div class="field-row">Структурное подразделение - отправитель: <span class="underline">${fields.senderDept}</span></div>
+<div class="field-row">Структурное подразделение - получатель: <span class="underline">${fields.receiverDept}</span></div>
+<div class="field-row">Единица измерения: руб. (с точностью до второго десятичного знака) -- по ОКЕИ: 383</div>
+<div class="auth">
+  Затребовал: (звание) <span class="underline">${fields.requestedByRank}</span> (фамилия, инициалы) <span class="underline">${fields.requestedByName}</span>
+</div>
+<div class="auth">
+  Разрешил: (должность) <span class="underline">${fields.approvedByRole}</span> (подпись) <span class="underline">${fields.approvedBySignature}</span> (расшифровка подписи) <span class="underline">${fields.approvedByName}</span>
+</div>
+<table class="main">
+  <thead>
+    <tr>
+      <th rowspan="2" style="width:20px">${'\u2116'}</th>
+      <th colspan="3">Материальные ценности</th>
+      <th colspan="2">Единица измерения</th>
+      <th rowspan="2">Цена</th>
+      <th colspan="2">Количество</th>
+      <th rowspan="2">Сумма<br>(без НДС)</th>
+      <th colspan="2">Корреспондирующие счета</th>
+      <th rowspan="2">Примечание</th>
+    </tr>
+    <tr>
+      <th>наименование</th>
+      <th>номенкл.<br>номер</th>
+      <th>паспорта<br>(иной)</th>
+      <th>наимен.</th>
+      <th>код по<br>ОКЕИ</th>
+      <th>затребо-<br>вано</th>
+      <th>отпу-<br>щено</th>
+      <th>дебет</th>
+      <th>кредит</th>
+    </tr>
+    <tr><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th></tr>
+  </thead>
+  <tbody>
+    ${rowsHtml}
+    <tr style="font-weight:bold">
+      <td colspan="7" style="text-align:right">Итого</td>
+      <td class="r">${totalRequired}</td>
+      <td class="r">${totalReleased}</td>
+      <td colspan="4"></td>
+    </tr>
+  </tbody>
+</table>
+<div class="footer-section">
+  Отпустил: (звание) <span class="underline">${fields.releasedByRank}</span> (подпись) <span class="underline">${fields.releasedBySignature}</span> (расшифровка подписи) <span class="underline">${fields.releasedByName}</span>
+</div>
+<div class="footer-section" style="margin-top:6pt">
+  Ответственный исполнитель: (должность) <span class="underline">${fields.responsibleRole}</span> (подпись) <span class="underline">${fields.responsibleSignature}</span>
+</div>
+<div class="accounting">Отметка бухгалтерии: ${fields.accountingNote}</div>
+<div class="footer-section">
+  Получил: (звание) <span class="underline">${fields.receivedByRank}</span> (подпись) <span class="underline">${fields.receivedBySignature}</span> (расшифровка подписи) <span class="underline">${fields.receivedByName}</span>
+</div>
+<div class="footer-section" style="margin-top:4pt">
+  <span style="font-size:8pt">Дата отпуска: ${fields.releasedDate}</span>
+  <span style="font-size:8pt;margin-left:40pt">Дата получения: ${fields.receivedDate}</span>
+</div>
+</body></html>`;
+  };
 
   const handlePrint = () => {
-    if (!tpl) return;
-    const items = order.items.map(oi => {
-      const it = state.items.find(i => i.id === oi.itemId);
-      return { name: it?.name || '—', unit: it?.unit || 'шт', qty: oi.pickedQty, required: oi.requiredQty };
-    });
-    const now = new Date().toLocaleDateString('ru-RU');
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Накладная ${order.number}</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: 'Times New Roman', serif; font-size: 12pt; padding: 20mm; color: #000; }
-      .header { text-align: center; margin-bottom: 16pt; }
-      .header h1 { font-size: 14pt; font-weight: bold; margin-bottom: 4pt; }
-      .meta { display: flex; justify-content: space-between; margin-bottom: 12pt; font-size: 10pt; }
-      .meta-col { max-width: 48%; }
-      table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-      th, td { border: 1px solid #000; padding: 4pt 6pt; text-align: left; font-size: 10pt; }
-      th { background: #f0f0f0; font-weight: bold; text-align: center; }
-      td.num { text-align: center; }
-      td.qty { text-align: right; }
-      .footer { margin-top: 24pt; font-size: 10pt; }
-      .sign-row { display: flex; justify-content: space-between; margin-top: 40pt; }
-      .sign-col { text-align: center; min-width: 200px; }
-      .sign-line { border-top: 1px solid #000; margin-top: 30pt; padding-top: 4pt; }
-      @media print { body { padding: 10mm; } }
-    </style></head><body>
-    <div class="header">
-      <h1>${tpl.headerText || 'ТОВАРНАЯ НАКЛАДНАЯ'}</h1>
-      <div>№ ${order.number} от ${now}</div>
-    </div>
-    <div class="meta">
-      <div class="meta-col">
-        <b>Отправитель:</b><br>${tpl.companyName}
-        ${tpl.companyAddress ? '<br>' + tpl.companyAddress : ''}
-        ${tpl.companyInn ? '<br>ИНН: ' + tpl.companyInn : ''}${tpl.companyKpp ? ' КПП: ' + tpl.companyKpp : ''}
-      </div>
-      <div class="meta-col">
-        <b>Получатель:</b><br>${order.recipientName || '—'}
-        ${order.comment ? '<br>' + order.comment : ''}
-      </div>
-    </div>
-    <table>
-      <thead><tr><th style="width:30px">№</th><th>Наименование</th><th style="width:50px">Ед.</th><th style="width:60px">Кол-во</th></tr></thead>
-      <tbody>
-        ${items.map((it, i) => `<tr><td class="num">${i+1}</td><td>${it.name}</td><td class="num">${it.unit}</td><td class="qty">${it.qty}</td></tr>`).join('')}
-      </tbody>
-    </table>
-    <div><b>Итого позиций:</b> ${items.length}, <b>единиц:</b> ${items.reduce((s, it) => s + it.qty, 0)}</div>
-    ${tpl.footerText ? '<div class="footer">' + tpl.footerText + '</div>' : ''}
-    ${tpl.bankDetails ? '<div class="footer" style="margin-top:8pt;font-size:9pt;color:#555">' + tpl.bankDetails.replace(/\n/g, '<br>') + '</div>' : ''}
-    <div class="sign-row">
-      <div class="sign-col">
-        <div class="sign-line">Отпустил${tpl.signatory ? ': ' + tpl.signatory : ''}</div>
-        ${tpl.signatoryRole ? '<div style="font-size:9pt;color:#555">' + tpl.signatoryRole + '</div>' : ''}
-      </div>
-      <div class="sign-col">
-        <div class="sign-line">Получил</div>
-      </div>
-    </div>
-    </body></html>`);
+    w.document.write(buildPrintHtml());
     w.document.close();
     setTimeout(() => w.print(), 300);
-    onClose();
   };
 
   return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-sm animate-scale-in">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Icon name="Printer" size={16} className="text-primary" />Печать накладной
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          {templates.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              <Icon name="FileText" size={28} className="mx-auto mb-2 opacity-30" />
-              <p>Нет шаблонов накладных</p>
-              <p className="mt-1">Создайте шаблон во вкладке <b>Документы → Шаблоны накладных</b></p>
+    <div className="h-full flex flex-col bg-gray-100 overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 shrink-0">
+        <Button variant="outline" size="sm" onClick={onClose} className="gap-1.5">
+          <Icon name="ArrowLeft" size={14} />
+          Назад
+        </Button>
+        {templates.length > 1 && (
+          <select
+            value={selId}
+            onChange={e => { setSelId(e.target.value); applyTemplate(templates.find(t => t.id === e.target.value)); }}
+            className="h-8 px-2 text-xs rounded border border-gray-300 bg-white"
+          >
+            {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
+        <div className="flex-1" />
+        <Button
+          variant={editing ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setEditing(prev => !prev)}
+          className="gap-1.5"
+        >
+          <Icon name="Pencil" size={14} />
+          {editing ? 'Просмотр' : 'Редактировать'}
+        </Button>
+        <Button size="sm" onClick={handlePrint} className="gap-1.5">
+          <Icon name="Printer" size={14} />
+          Печать
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-auto p-4">
+        <div
+          className="bg-white mx-auto shadow-lg border border-gray-300 p-8 min-w-[900px]"
+          style={{ maxWidth: 1100, fontFamily: "'Times New Roman', 'PT Serif', Georgia, serif" }}
+        >
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center gap-2 text-xs">
+                <span>Учреждение:</span>
+                {renderField(fields.institution, v => updateField('institution', v), '300px')}
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Шаблон</label>
-                <select value={selId} onChange={e => setSelId(e.target.value)}
-                  className="w-full h-9 px-3 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                  {templates.map(t => <option key={t.id} value={t.id}>{t.name} — {t.companyName}</option>)}
-                </select>
-              </div>
-              {tpl && (
-                <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground space-y-0.5">
-                  <div><b className="text-foreground">{tpl.companyName}</b></div>
-                  {tpl.companyAddress && <div>{tpl.companyAddress}</div>}
-                  {tpl.companyInn && <div>ИНН: {tpl.companyInn}</div>}
-                  {tpl.signatory && <div>Подписант: {tpl.signatory}</div>}
-                </div>
+            <div className="shrink-0">
+              <table className="border-collapse text-[9px]" style={{ border: '1px solid #000' }}>
+                <tbody>
+                  <tr>
+                    <td colSpan={2} className="text-center border border-black px-2 py-0.5 font-bold">Коды</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-0.5 text-left">Форма по ОКУД</td>
+                    <td className="border border-black px-2 py-0.5 text-center font-mono">0504204</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-0.5 text-left">Дата</td>
+                    <td className="border border-black px-2 py-0.5 text-center">
+                      {renderField(fields.docDate, v => updateField('docDate', v))}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-0.5 text-left">по ОКПО</td>
+                    <td className="border border-black px-2 py-0.5 text-center">
+                      {renderField(fields.okpo, v => updateField('okpo', v))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="text-center font-bold text-sm my-3">
+            ТРЕБОВАНИЕ-НАКЛАДНАЯ {'\u2116'} {renderField(fields.docNumber, v => updateField('docNumber', v), '60px')}
+          </div>
+          <div className="text-center text-xs mb-3">
+            от {renderField(fields.docDate, v => updateField('docDate', v), '80px')}
+          </div>
+
+          <div className="space-y-1 text-xs mb-3">
+            <div className="flex items-center gap-1">
+              <span className="whitespace-nowrap">Структурное подразделение - отправитель:</span>
+              {renderField(fields.senderDept, v => updateField('senderDept', v), '400px')}
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="whitespace-nowrap">Структурное подразделение - получатель:</span>
+              {renderField(fields.receiverDept, v => updateField('receiverDept', v), '400px')}
+            </div>
+            <div>Единица измерения: руб. (с точностью до второго десятичного знака) -- по ОКЕИ: 383</div>
+          </div>
+
+          <div className="space-y-1 text-xs mb-3">
+            <div className="flex items-center gap-1 flex-wrap">
+              <span>Затребовал:</span>
+              <span className="text-[10px] text-gray-500">(звание)</span>
+              {renderField(fields.requestedByRank, v => updateField('requestedByRank', v), '150px')}
+              <span className="text-[10px] text-gray-500">(фамилия, инициалы)</span>
+              {renderField(fields.requestedByName, v => updateField('requestedByName', v), '200px')}
+            </div>
+            <div className="flex items-center gap-1 flex-wrap">
+              <span>Разрешил:</span>
+              <span className="text-[10px] text-gray-500">(должность)</span>
+              {renderField(fields.approvedByRole, v => updateField('approvedByRole', v), '150px')}
+              <span className="text-[10px] text-gray-500">(подпись)</span>
+              {renderField(fields.approvedBySignature, v => updateField('approvedBySignature', v), '120px')}
+              <span className="text-[10px] text-gray-500">(расшифровка подписи)</span>
+              {renderField(fields.approvedByName, v => updateField('approvedByName', v), '180px')}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[9px]" style={{ border: '1px solid #000' }}>
+              <thead>
+                <tr>
+                  <th rowSpan={2} className="border border-black px-1 py-0.5 text-center align-middle" style={{ width: 24 }}>{'\u2116'}</th>
+                  <th colSpan={3} className="border border-black px-1 py-0.5 text-center">Материальные ценности</th>
+                  <th colSpan={2} className="border border-black px-1 py-0.5 text-center">Единица измерения</th>
+                  <th rowSpan={2} className="border border-black px-1 py-0.5 text-center align-middle">Цена</th>
+                  <th colSpan={2} className="border border-black px-1 py-0.5 text-center">Количество</th>
+                  <th rowSpan={2} className="border border-black px-1 py-0.5 text-center align-middle">Сумма<br/>(без НДС)</th>
+                  <th colSpan={2} className="border border-black px-1 py-0.5 text-center">Корресп. счета</th>
+                  <th rowSpan={2} className="border border-black px-1 py-0.5 text-center align-middle">Примечание</th>
+                </tr>
+                <tr>
+                  <th className="border border-black px-1 py-0.5 text-center">наименование</th>
+                  <th className="border border-black px-1 py-0.5 text-center">номенкл.<br/>номер</th>
+                  <th className="border border-black px-1 py-0.5 text-center">паспорта<br/>(иной)</th>
+                  <th className="border border-black px-1 py-0.5 text-center">наимен.</th>
+                  <th className="border border-black px-1 py-0.5 text-center">код по<br/>ОКЕИ</th>
+                  <th className="border border-black px-1 py-0.5 text-center">затребо-<br/>вано</th>
+                  <th className="border border-black px-1 py-0.5 text-center">отпу-<br/>щено</th>
+                  <th className="border border-black px-1 py-0.5 text-center">дебет</th>
+                  <th className="border border-black px-1 py-0.5 text-center">кредит</th>
+                </tr>
+                <tr>
+                  {['1','2','3','4','5','6','7','8','9','10','11','12','13'].map(n => (
+                    <th key={n} className="border border-black px-1 py-0.5 text-center text-[8px] text-gray-500">{n}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, idx) => (
+                  <tr key={idx}>
+                    <td className="border border-black px-1 py-0.5 text-center">{idx + 1}</td>
+                    <td className="border border-black px-1 py-0.5">{renderCell(row.name, v => updateRow(idx, 'name', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.nomenclatureNum, v => updateRow(idx, 'nomenclatureNum', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.passport, v => updateRow(idx, 'passport', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.unitName, v => updateRow(idx, 'unitName', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.unitCode, v => updateRow(idx, 'unitCode', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-right">{renderCell(row.price, v => updateRow(idx, 'price', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-right">{renderCell(row.requiredQty, v => updateRow(idx, 'requiredQty', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-right">{renderCell(row.releasedQty, v => updateRow(idx, 'releasedQty', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-right">{renderCell(row.sumNoVat, v => updateRow(idx, 'sumNoVat', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.debit, v => updateRow(idx, 'debit', v))}</td>
+                    <td className="border border-black px-1 py-0.5 text-center">{renderCell(row.credit, v => updateRow(idx, 'credit', v))}</td>
+                    <td className="border border-black px-1 py-0.5">{renderCell(row.note, v => updateRow(idx, 'note', v))}</td>
+                  </tr>
+                ))}
+                <tr className="font-bold">
+                  <td colSpan={7} className="border border-black px-1 py-0.5 text-right">Итого</td>
+                  <td className="border border-black px-1 py-0.5 text-right">{totalRequired}</td>
+                  <td className="border border-black px-1 py-0.5 text-right">{totalReleased}</td>
+                  <td colSpan={4} className="border border-black px-1 py-0.5"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="space-y-3 mt-5 text-xs">
+            <div className="flex items-center gap-1 flex-wrap">
+              <span>Отпустил:</span>
+              <span className="text-[10px] text-gray-500">(звание)</span>
+              {renderField(fields.releasedByRank, v => updateField('releasedByRank', v), '150px')}
+              <span className="text-[10px] text-gray-500">(подпись)</span>
+              {renderField(fields.releasedBySignature, v => updateField('releasedBySignature', v), '120px')}
+              <span className="text-[10px] text-gray-500">(расшифровка подписи)</span>
+              {renderField(fields.releasedByName, v => updateField('releasedByName', v), '180px')}
+            </div>
+            <div className="flex items-center gap-1 flex-wrap">
+              <span>Ответственный исполнитель:</span>
+              <span className="text-[10px] text-gray-500">(должность)</span>
+              {renderField(fields.responsibleRole, v => updateField('responsibleRole', v), '180px')}
+              <span className="text-[10px] text-gray-500">(подпись)</span>
+              {renderField(fields.responsibleSignature, v => updateField('responsibleSignature', v), '180px')}
+            </div>
+
+            <div className="border border-dashed border-gray-400 rounded p-3 min-h-[50px]">
+              <div className="text-[10px] text-gray-500 mb-1">Отметка бухгалтерии:</div>
+              {editing ? (
+                <textarea
+                  value={fields.accountingNote}
+                  onChange={e => updateField('accountingNote', e.target.value)}
+                  className="w-full bg-blue-50 border border-blue-200 rounded px-1 py-0.5 text-xs outline-none resize-none"
+                  rows={2}
+                />
+              ) : (
+                <span className="text-xs">{fields.accountingNote || '\u00A0'}</span>
               )}
-              <div className="p-3 bg-muted/50 rounded-lg text-sm">
-                <div className="font-semibold">Заявка {order.number}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  {order.items.length} позиций · получатель: {order.recipientName || '—'}
-                </div>
+            </div>
+
+            <div className="flex items-center gap-1 flex-wrap">
+              <span>Получил:</span>
+              <span className="text-[10px] text-gray-500">(звание)</span>
+              {renderField(fields.receivedByRank, v => updateField('receivedByRank', v), '150px')}
+              <span className="text-[10px] text-gray-500">(подпись)</span>
+              {renderField(fields.receivedBySignature, v => updateField('receivedBySignature', v), '120px')}
+              <span className="text-[10px] text-gray-500">(расшифровка подписи)</span>
+              {renderField(fields.receivedByName, v => updateField('receivedByName', v), '180px')}
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-gray-500">Дата отпуска:</span>
+                {renderField(fields.releasedDate, v => updateField('releasedDate', v), '80px')}
               </div>
-            </>
-          )}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
-            <Button onClick={handlePrint} disabled={!tpl} className="flex-1 gap-1.5">
-              <Icon name="Printer" size={14} />Печать
-            </Button>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-gray-500">Дата получения:</span>
+                {renderField(fields.receivedDate, v => updateField('receivedDate', v), '80px')}
+              </div>
+            </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
