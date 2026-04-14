@@ -207,6 +207,54 @@ export default function InvoiceDesigner({ template, onSave, onClose }: Props) {
         </div>
       );
     }
+
+    if (el.type === 'grid' && el.gridCells && el.gridCols && el.gridRows) {
+      return (
+        <div key={el.id} className="absolute cursor-move select-none" style={{ left: el.x, top: el.y, outline }}
+          onMouseDown={e => onMouseDown(e, el.id)}>
+          <table className="border-collapse" style={{ fontFamily: "'Times New Roman', serif", fontSize: 10, tableLayout: 'fixed', width: el.gridCols.reduce((a, b) => a + b, 0) }}>
+            <colgroup>
+              {el.gridCols.map((w, i) => <col key={i} style={{ width: w }} />)}
+            </colgroup>
+            <tbody>
+              {el.gridCells.map((row, ri) => (
+                <tr key={ri} style={{ height: el.gridRows![ri] }}>
+                  {row.map((cell, ci) => {
+                    if (cell.skip) return null;
+                    const bd = cell.border;
+                    return (
+                      <td key={ci}
+                        colSpan={cell.colspan}
+                        rowSpan={cell.rowspan}
+                        style={{
+                          fontSize: cell.fontSize || 10,
+                          fontWeight: cell.bold ? 'bold' : 'normal',
+                          fontStyle: cell.italic ? 'italic' : 'normal',
+                          textAlign: cell.align || 'left',
+                          verticalAlign: cell.valign || 'top',
+                          borderTop: bd?.top ? '1px solid #000' : '1px solid transparent',
+                          borderRight: bd?.right ? '1px solid #000' : '1px solid transparent',
+                          borderBottom: bd?.bottom ? '1px solid #000' : '1px solid transparent',
+                          borderLeft: bd?.left ? '1px solid #000' : '1px solid transparent',
+                          padding: '1px 3px',
+                          overflow: 'hidden',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.2,
+                        }}>
+                        {cell.text}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {isSel && <div className="absolute -right-1 -bottom-1 w-3 h-3 bg-blue-500 cursor-se-resize rounded-sm" onMouseDown={e => onResizeDown(e, el.id, 'rb')} />}
+        </div>
+      );
+    }
+
     return null;
   };
 

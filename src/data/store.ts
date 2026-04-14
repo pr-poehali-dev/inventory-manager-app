@@ -208,9 +208,22 @@ export type InvoiceTemplate = {
   canvasHeight?: number;
 };
 
-export type InvElementType = 'text' | 'table' | 'line' | 'frame';
+export type InvElementType = 'text' | 'table' | 'line' | 'frame' | 'grid';
 
 export type InvTableCol = { key: string; label: string; width: number; source?: string };
+
+export type InvGridCell = {
+  text: string;
+  colspan?: number;
+  rowspan?: number;
+  bold?: boolean;
+  italic?: boolean;
+  fontSize?: number;
+  align?: 'left' | 'center' | 'right';
+  valign?: 'top' | 'middle' | 'bottom';
+  border?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
+  skip?: boolean;
+};
 
 export type InvElement = {
   id: string;
@@ -230,6 +243,9 @@ export type InvElement = {
   lineWidth?: number;
   frameLabel?: string;
   vertical?: boolean;
+  gridCols?: number[];
+  gridRows?: number[];
+  gridCells?: InvGridCell[][];
 };
 
 // ─── Technician Documents (база данных документов и вложений) ─────────────────

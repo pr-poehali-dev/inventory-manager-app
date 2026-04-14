@@ -129,6 +129,29 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
         if (el.frameLabel) html += `<div style="text-align:center;font-weight:bold;font-size:9pt">${el.frameLabel}</div>`;
         html += '</div>';
       }
+      if (el.type === 'grid' && el.gridCells && el.gridCols && el.gridRows) {
+        const tw = el.gridCols.reduce((a, b) => a + b, 0);
+        html += `<div class="el" style="left:${el.x}px;top:${el.y}px"><table style="border-collapse:collapse;table-layout:fixed;width:${tw}px;font-size:10pt">`;
+        html += '<colgroup>';
+        el.gridCols.forEach(w => { html += `<col style="width:${w}px">`; });
+        html += '</colgroup><tbody>';
+        el.gridCells.forEach((row, ri) => {
+          html += `<tr style="height:${el.gridRows![ri]}px">`;
+          row.forEach(cell => {
+            if (cell.skip) return;
+            const bd = cell.border;
+            const bt = bd?.top ? '1px solid #000' : 'none';
+            const br = bd?.right ? '1px solid #000' : 'none';
+            const bb = bd?.bottom ? '1px solid #000' : 'none';
+            const bl = bd?.left ? '1px solid #000' : 'none';
+            const cs = cell.colspan ? ` colspan="${cell.colspan}"` : '';
+            const rs = cell.rowspan ? ` rowspan="${cell.rowspan}"` : '';
+            html += `<td${cs}${rs} style="font-size:${cell.fontSize || 10}pt;font-weight:${cell.bold ? 'bold' : 'normal'};font-style:${cell.italic ? 'italic' : 'normal'};text-align:${cell.align || 'left'};vertical-align:${cell.valign || 'top'};border-top:${bt};border-right:${br};border-bottom:${bb};border-left:${bl};padding:1px 3px;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.2">${cell.text}</td>`;
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+      }
     });
 
     html += '</body></html>';
@@ -214,6 +237,52 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
         </div>
       );
     }
+
+    if (el.type === 'grid' && el.gridCells && el.gridCols && el.gridRows) {
+      return (
+        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y }}>
+          <table className="border-collapse" style={{ fontFamily: "'Times New Roman', serif", fontSize: 10, tableLayout: 'fixed', width: el.gridCols.reduce((a, b) => a + b, 0) }}>
+            <colgroup>
+              {el.gridCols.map((w, i) => <col key={i} style={{ width: w }} />)}
+            </colgroup>
+            <tbody>
+              {el.gridCells.map((row, ri) => (
+                <tr key={ri} style={{ height: el.gridRows![ri] }}>
+                  {row.map((cell, ci) => {
+                    if (cell.skip) return null;
+                    const bd = cell.border;
+                    return (
+                      <td key={ci}
+                        colSpan={cell.colspan}
+                        rowSpan={cell.rowspan}
+                        style={{
+                          fontSize: cell.fontSize || 10,
+                          fontWeight: cell.bold ? 'bold' : 'normal',
+                          fontStyle: cell.italic ? 'italic' : 'normal',
+                          textAlign: cell.align || 'left',
+                          verticalAlign: cell.valign || 'top',
+                          borderTop: bd?.top ? '1px solid #000' : '1px solid transparent',
+                          borderRight: bd?.right ? '1px solid #000' : '1px solid transparent',
+                          borderBottom: bd?.bottom ? '1px solid #000' : '1px solid transparent',
+                          borderLeft: bd?.left ? '1px solid #000' : '1px solid transparent',
+                          padding: '1px 3px',
+                          overflow: 'hidden',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.2,
+                        }}>
+                        {cell.text}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
     return null;
   };
 
