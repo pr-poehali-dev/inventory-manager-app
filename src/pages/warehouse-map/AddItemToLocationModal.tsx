@@ -42,9 +42,12 @@ export function AddItemToLocationModal({
   const alreadyHere = itemId
     ? (state.locationStocks || []).find(ls => ls.itemId === itemId && ls.locationId === locationId)?.quantity || 0
     : 0;
+  const whLocationIds = new Set(
+    state.locations.filter(l => l.warehouseId === warehouseId).map(l => l.id)
+  );
   const distributedOnShelf = itemId
     ? (state.locationStocks || [])
-        .filter(ls => ls.itemId === itemId)
+        .filter(ls => ls.itemId === itemId && whLocationIds.has(ls.locationId))
         .reduce((s, ls) => s + ls.quantity, 0)
     : 0;
   const freeToPlace = Math.max(0, whAvailable - distributedOnShelf + alreadyHere);
@@ -99,7 +102,7 @@ export function AddItemToLocationModal({
                 ) : warehouseItems.map(ws => {
                   const cat = state.categories.find(c => c.id === ws.item!.categoryId);
                   const onShelf = (state.locationStocks || []).find(ls => ls.itemId === ws.itemId && ls.locationId === locationId)?.quantity || 0;
-                  const distributed = (state.locationStocks || []).filter(ls => ls.itemId === ws.itemId).reduce((s, ls) => s + ls.quantity, 0);
+                  const distributed = (state.locationStocks || []).filter(ls => ls.itemId === ws.itemId && whLocationIds.has(ls.locationId)).reduce((s, ls) => s + ls.quantity, 0);
                   const free = Math.max(0, ws.quantity - distributed + onShelf);
                   return (
                     <button key={ws.itemId}

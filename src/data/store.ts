@@ -523,9 +523,11 @@ export function guardState(p: AppState): AppState {
       })),
     }));
   }
-  if (Array.isArray(p.warehouseStocks) && p.warehouseStocks.length > 0 && Array.isArray(p.items)) {
-    p.items = p.items.map(item => {
-      const whTotal = p.warehouseStocks
+  if (Array.isArray(p.warehouseStocks) && Array.isArray(p.items)) {
+    const synced = syncWarehouseStocksFromLocations(p as AppState);
+    p.warehouseStocks = synced.warehouseStocks;
+    p.items = (synced.items as typeof p.items).map(item => {
+      const whTotal = (p.warehouseStocks || [])
         .filter(ws => ws.itemId === item.id)
         .reduce((s, ws) => s + ws.quantity, 0);
       if (whTotal > 0 && item.quantity !== whTotal) {
@@ -610,11 +612,76 @@ export function updateLocationStock(state: AppState, itemId: string, locationId:
   } else {
     next = state.locationStocks;
   }
-  return { ...state, locationStocks: next };
+  let result: AppState = { ...state, locationStocks: next };
+  const location = state.locations.find(l => l.id === locationId);
+  if (location?.warehouseId && delta > 0) {
+    const whId = location.warehouseId;
+    const whStock = (result.warehouseStocks || []).find(ws => ws.itemId === itemId && ws.warehouseId === whId);
+    const locTotal = next
+      .filter(ls => ls.itemId === itemId && state.locations.some(l => l.id === ls.locationId && l.warehouseId === whId))
+      .reduce((s, ls) => s + ls.quantity, 0);
+    if (!whStock) {
+      result = { ...result, warehouseStocks: [...(result.warehouseStocks || []), { itemId, warehouseId: whId, quantity: locTotal }] };
+    } else if (whStock.quantity < locTotal) {
+      result = { ...result, warehouseStocks: (result.warehouseStocks || []).map(ws =>
+        ws.itemId === itemId && ws.warehouseId === whId ? { ...ws, quantity: locTotal } : ws
+      )};
+    }
+  }
+  return result;
 }
 
 export function getWarehouseStock(state: AppState, itemId: string, warehouseId: string): number {
   return (state.warehouseStocks || []).find(ws => ws.itemId === itemId && ws.warehouseId === warehouseId)?.quantity ?? 0;
+}
+
+export function syncWarehouseStocksFromLocations(state: AppState): AppState {
+  const locStocks = state.locationStocks || [];
+  const locations = state.locations || [];
+  const whStocks = [...(state.warehouseStocks || [])];
+
+  const locWhMap: Record<string, string> = {};
+  for (const loc of locations) {
+    if (loc.warehouseId) locWhMap[loc.id] = loc.warehouseId;
+  }
+
+  const locSums: Record<string, number> = {};
+  for (const ls of locStocks) {
+    if (ls.quantity <= 0) continue;
+    const whId = locWhMap[ls.locationId];
+    if (!whId) continue;
+    const key = `${ls.itemId}::${whId}`;
+    locSums[key] = (locSums[key] || 0) + ls.quantity;
+  }
+
+  let changed = false;
+  for (const [key, locSum] of Object.entries(locSums)) {
+    const [itemId, warehouseId] = key.split('::');
+    const wsIdx = whStocks.findIndex(ws => ws.itemId === itemId && ws.warehouseId === warehouseId);
+    if (wsIdx >= 0) {
+      if (whStocks[wsIdx].quantity < locSum) {
+        whStocks[wsIdx] = { ...whStocks[wsIdx], quantity: locSum };
+        changed = true;
+      }
+    } else {
+      whStocks.push({ itemId, warehouseId, quantity: locSum });
+      changed = true;
+    }
+  }
+
+  if (!changed) return state;
+
+  const items = state.items.map(item => {
+    const total = whStocks
+      .filter(ws => ws.itemId === item.id)
+      .reduce((s, ws) => s + ws.quantity, 0);
+    if (total > 0 && item.quantity !== total) {
+      return { ...item, quantity: total };
+    }
+    return item;
+  });
+
+  return { ...state, warehouseStocks: whStocks, items };
 }
 
 export function updateWarehouseStock(state: AppState, itemId: string, warehouseId: string, delta: number): AppState {
