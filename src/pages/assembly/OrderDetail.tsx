@@ -556,7 +556,7 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
             </div>
           </div>
 
-          <div className="mt-4 space-y-1" style={{ fontSize: '8.5pt' }}>
+          <div className="mt-2 space-y-1" style={{ fontSize: '8.5pt' }}>
             <div className="flex items-end gap-1.5">
               <span className="font-bold">Получил</span>
               <div className="text-center"><EF k="recRank" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(звание)</div></div>
