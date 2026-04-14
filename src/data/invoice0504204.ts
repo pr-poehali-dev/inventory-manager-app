@@ -129,7 +129,7 @@ export function create0504204Template(): InvoiceTemplate {
     createdAt: now,
     updatedAt: now,
     elements,
-    canvasWidth: 1000,
-    canvasHeight: 1414,
+    canvasWidth: 1414,
+    canvasHeight: 1000,
   };
 }

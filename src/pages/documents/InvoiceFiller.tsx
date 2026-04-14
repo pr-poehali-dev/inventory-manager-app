@@ -43,8 +43,8 @@ function resolveItemSource(source: string, oi: WorkOrder['items'][0], state: App
 
 export default function InvoiceFiller({ template, order, state, onClose }: Props) {
   const elements = template.elements || [];
-  const CW = template.canvasWidth || 1000;
-  const CH = template.canvasHeight || 1414;
+  const CW = template.canvasWidth || 1414;
+  const CH = template.canvasHeight || 1000;
 
   const initValues = (): Record<string, string> => {
     const v: Record<string, string> = {};
@@ -89,7 +89,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Накладная ${order.number}</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:${serif};position:relative;width:${CW}px;height:${CH}px;padding:0}
 .el{position:absolute}.tbl{border-collapse:collapse;width:100%}.tbl th,.tbl td{border:1px solid #000;padding:2pt 4pt;font-size:9pt}
-@media print{@page{size:A4;margin:8mm}body{width:100%}}</style></head><body>`;
+@media print{@page{size:landscape;margin:6mm}body{width:100%;height:auto}}</style></head><body>`;
 
     elements.forEach(el => {
       if (el.type === 'text') {

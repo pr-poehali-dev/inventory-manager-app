@@ -9,10 +9,11 @@ type Props = {
   onClose: () => void;
 };
 
-const CANVAS_W = 1000;
-const CANVAS_H = 1414;
+const CANVAS_W = 1414;
+const CANVAS_H = 1000;
 const GRID = 8;
 const snap = (v: number) => Math.round(v / GRID) * GRID;
+const RULER_SIZE = 20;
 
 const SOURCES = [
   { value: '', label: 'Вручную' },
@@ -219,6 +220,7 @@ export default function InvoiceDesigner({ template, onSave, onClose }: Props) {
           <Button variant="outline" size="sm" onClick={() => add('frame')} className="gap-1 text-xs"><Icon name="Square" size={13} />Рамка</Button>
         </div>
         <div className="flex-1" />
+        {sel && <span className="text-[10px] text-gray-400 font-mono">X:{sel.x} Y:{sel.y} {sel.w}×{sel.h}</span>}
         <div className="flex items-center gap-1 text-xs text-gray-500">
           <Button variant="ghost" size="sm" onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}><Icon name="ZoomOut" size={14} /></Button>
           <span>{Math.round(zoom * 100)}%</span>
@@ -228,11 +230,40 @@ export default function InvoiceDesigner({ template, onSave, onClose }: Props) {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-auto p-4" onClick={() => setSelected(null)}>
-          <div ref={canvasRef} className="bg-white shadow-lg border border-gray-300 relative mx-auto"
-            style={{ width: CANVAS_W * zoom, height: CANVAS_H * zoom, transformOrigin: '0 0' }}>
-            <div style={{ transform: `scale(${zoom})`, transformOrigin: '0 0', width: CANVAS_W, height: CANVAS_H, position: 'relative' }}>
-              {elements.map(renderElement)}
+        <div className="flex-1 overflow-auto" onClick={() => setSelected(null)}>
+          <div className="inline-block p-4" style={{ minWidth: 'fit-content' }}>
+            <div style={{ position: 'relative', width: (CANVAS_W * zoom) + RULER_SIZE, height: (CANVAS_H * zoom) + RULER_SIZE }}>
+              <svg className="absolute top-0 left-0" width={CANVAS_W * zoom + RULER_SIZE} height={RULER_SIZE} style={{ zIndex: 2 }}>
+                <rect x={0} y={0} width={RULER_SIZE} height={RULER_SIZE} fill="#e5e7eb" />
+                <rect x={RULER_SIZE} y={0} width={CANVAS_W * zoom} height={RULER_SIZE} fill="#f3f4f6" />
+                {Array.from({ length: Math.ceil(CANVAS_W / 50) + 1 }, (_, i) => {
+                  const px = i * 50 * zoom;
+                  const isMajor = i % 2 === 0;
+                  return <g key={i}>
+                    <line x1={RULER_SIZE + px} y1={isMajor ? 0 : 10} x2={RULER_SIZE + px} y2={RULER_SIZE} stroke="#9ca3af" strokeWidth={isMajor ? 1 : 0.5} />
+                    {isMajor && <text x={RULER_SIZE + px + 2} y={10} fontSize={8} fill="#6b7280">{i * 50}</text>}
+                  </g>;
+                })}
+                <line x1={RULER_SIZE} y1={RULER_SIZE - 0.5} x2={RULER_SIZE + CANVAS_W * zoom} y2={RULER_SIZE - 0.5} stroke="#d1d5db" />
+              </svg>
+              <svg className="absolute top-0 left-0" width={RULER_SIZE} height={CANVAS_H * zoom + RULER_SIZE} style={{ zIndex: 2 }}>
+                <rect x={0} y={RULER_SIZE} width={RULER_SIZE} height={CANVAS_H * zoom} fill="#f3f4f6" />
+                {Array.from({ length: Math.ceil(CANVAS_H / 50) + 1 }, (_, i) => {
+                  const py = i * 50 * zoom;
+                  const isMajor = i % 2 === 0;
+                  return <g key={i}>
+                    <line y1={RULER_SIZE + py} x1={isMajor ? 0 : 10} y2={RULER_SIZE + py} x2={RULER_SIZE} stroke="#9ca3af" strokeWidth={isMajor ? 1 : 0.5} />
+                    {isMajor && <text x={2} y={RULER_SIZE + py + 10} fontSize={8} fill="#6b7280">{i * 50}</text>}
+                  </g>;
+                })}
+                <line y1={RULER_SIZE} x1={RULER_SIZE - 0.5} y2={RULER_SIZE + CANVAS_H * zoom} x2={RULER_SIZE - 0.5} stroke="#d1d5db" />
+              </svg>
+              <div ref={canvasRef} className="bg-white shadow-lg border border-gray-300 absolute"
+                style={{ left: RULER_SIZE, top: RULER_SIZE, width: CANVAS_W * zoom, height: CANVAS_H * zoom }}>
+                <div style={{ transform: `scale(${zoom})`, transformOrigin: '0 0', width: CANVAS_W, height: CANVAS_H, position: 'relative' }}>
+                  {elements.map(renderElement)}
+                </div>
+              </div>
             </div>
           </div>
         </div>
