@@ -368,7 +368,6 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
 <div style="display:flex;gap:8pt;margin-top:8pt;align-items:flex-start">
 <div style="flex:1"><div class="ft"><b>Отпустил</b></div>
 <div class="ft"><span class="u">${f.relRank}</span> <span class="lbl">(звание)</span> <span class="u">${f.relSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:80px">${f.relName}</span> <span class="lbl">(расшифровка подписи)</span></div>
-<div class="ft" style="margin-left:16pt"><b>Фио</b> <span class="u" style="min-width:100px">${f.relFio}</span> <span class="lbl">(расшифровка подписи)</span></div>
 <div class="ft" style="margin-left:16pt">${f.date}</div></div>
 <div style="flex:1"><div class="ft"><b>Ответственный исполнитель</b></div>
 <div class="ft"><span class="u">${f.respRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.respSign}</span> <span class="lbl">(подпись)</span></div>
@@ -528,10 +527,6 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
                 <div className="text-center"><EF k="relRank" w="90px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(звание)</div></div>
                 <div className="text-center"><EF k="relSign" w="80px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
                 <div className="text-center"><EF k="relName" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
-              </div>
-              <div className="flex items-end gap-1.5 pl-4">
-                <span className="font-bold">Фио</span>
-                <div className="text-center"><EF k="relFio" w="140px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
               </div>
               <div className="pl-4"><EF k="date" w="130px" /></div>
             </div>
