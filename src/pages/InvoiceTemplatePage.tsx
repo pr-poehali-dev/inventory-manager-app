@@ -1,110 +1,127 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 import { AppState } from '@/data/store';
-import * as XLSX from 'xlsx';
 
-const STORAGE_KEY = 'invoice_template_data';
+type BlockType = 'text' | 'table' | 'signature' | 'frame' | 'line';
 
-interface InvoiceRow {
-  name: string;
-  nomNumber: string;
-  passport: string;
-  unit: string;
-  okeiCode: string;
-  price: number;
-  qtyRequested: number;
-  qtyReleased: number;
-  debit: string;
-  credit: string;
-  note: string;
+interface Block {
+  id: string;
+  type: BlockType;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text?: string;
+  fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  align?: 'left' | 'center' | 'right';
+  columns?: { label: string; width: number }[];
+  rows?: string[][];
+  signLabel?: string;
+  signParts?: string[];
+  signDate?: string;
+  frameLabel?: string;
+  lineWidth?: number;
 }
 
-interface FormData {
-  invoiceNumber: string;
-  invoiceDate: string;
-  institution: string;
-  senderDivision: string;
-  receiverDivision: string;
-  okeiCode: string;
-  requestedByRank: string;
-  requestedByName: string;
-  approvedByPosition: string;
-  approvedByName: string;
-  rows: InvoiceRow[];
-  releasedByRank: string;
-  releasedByName: string;
-  releasedByDate: string;
-  responsiblePosition: string;
-  responsibleName: string;
-  responsibleDate: string;
-  accountingJournalPeriod: string;
-  accountingExecutorPosition: string;
-  accountingExecutorName: string;
-  accountingDate: string;
-  receivedByRank: string;
-  receivedByName: string;
-  receivedByDate: string;
-  okudCode: string;
-  okpoCode: string;
-  headerDate: string;
+const STORAGE_KEY = 'invoice_builder_blocks';
+const CANVAS_W = 1200;
+const CANVAS_H = 850;
+const GRID_SIZE = 10;
+const MAX_HISTORY = 50;
+
+function uid(): string {
+  return Math.random().toString(36).slice(2, 9);
 }
 
-function formatTodayRussian(): string {
-  const months = [
-    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+function snap(v: number): number {
+  return Math.round(v / GRID_SIZE) * GRID_SIZE;
+}
+
+function defaultBlocks(): Block[] {
+  return [
+    {
+      id: uid(), type: 'text', x: 300, y: 30, w: 600, h: 30,
+      text: 'ТРЕБОВАНИЕ-НАКЛАДНАЯ №', fontSize: 14, bold: true, align: 'center',
+    },
+    {
+      id: uid(), type: 'text', x: 720, y: 30, w: 150, h: 30,
+      text: '22-ЧТ', fontSize: 14, bold: true, align: 'left',
+    },
+    {
+      id: uid(), type: 'text', x: 450, y: 55, w: 250, h: 20,
+      text: 'от _________________ г.', fontSize: 10, bold: false, align: 'left',
+    },
+    {
+      id: uid(), type: 'table', x: 1020, y: 20, w: 170, h: 80,
+      columns: [{ label: '', width: 100 }, { label: 'Коды', width: 70 }],
+      rows: [['Форма по ОКУД', '0504204'], ['Дата', ''], ['по ОКПО', '']],
+    },
+    {
+      id: uid(), type: 'text', x: 30, y: 100, w: 500, h: 20,
+      text: 'Учреждение _______________', fontSize: 10, bold: false, align: 'left',
+    },
+    {
+      id: uid(), type: 'text', x: 30, y: 120, w: 500, h: 20,
+      text: 'Структурное подразделение — отправитель', fontSize: 10, bold: false, align: 'left',
+    },
+    {
+      id: uid(), type: 'text', x: 30, y: 140, w: 500, h: 20,
+      text: 'Структурное подразделение — получатель', fontSize: 10, bold: false, align: 'left',
+    },
+    {
+      id: uid(), type: 'table', x: 30, y: 220, w: 1140, h: 400,
+      columns: [
+        { label: '№ п/п', width: 40 },
+        { label: 'Наименование', width: 160 },
+        { label: 'Номенкл. №', width: 70 },
+        { label: 'Ед. изм.', width: 50 },
+        { label: 'Код ОКЕИ', width: 50 },
+        { label: 'Цена, руб.', width: 70 },
+        { label: 'Затребовано', width: 75 },
+        { label: 'Отпущено', width: 75 },
+        { label: 'Сумма, руб.', width: 80 },
+        { label: 'Дебет', width: 70 },
+        { label: 'Кредит', width: 70 },
+        { label: 'Срок годн.', width: 70 },
+        { label: 'Примечание', width: 100 },
+      ],
+      rows: Array.from({ length: 11 }, () => Array(13).fill('')),
+    },
+    {
+      id: uid(), type: 'signature', x: 30, y: 700, w: 500, h: 70,
+      signLabel: 'Отпустил', signParts: ['должность', 'подпись', 'расшифровка подписи'],
+      signDate: '«__» _________ 20__ г.',
+    },
+    {
+      id: uid(), type: 'signature', x: 30, y: 780, w: 500, h: 70,
+      signLabel: 'Получил', signParts: ['должность', 'подпись', 'расшифровка подписи'],
+      signDate: '«__» _________ 20__ г.',
+    },
+    {
+      id: uid(), type: 'frame', x: 700, y: 690, w: 480, h: 120,
+      frameLabel: 'Отметка бухгалтерии',
+    },
   ];
-  const d = new Date();
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} г.`;
 }
 
-function emptyRow(): InvoiceRow {
-  return {
-    name: '',
-    nomNumber: '',
-    passport: '',
-    unit: 'шт.',
-    okeiCode: '',
-    price: 0,
-    qtyRequested: 0,
-    qtyReleased: 0,
-    debit: '',
-    credit: '',
-    note: '',
-  };
+function cloneBlocks(blocks: Block[]): Block[] {
+  return JSON.parse(JSON.stringify(blocks));
 }
 
-function defaultFormData(): FormData {
-  return {
-    invoiceNumber: '22-ЧТ',
-    invoiceDate: formatTodayRussian(),
-    institution: '',
-    senderDivision: '',
-    receiverDivision: '',
-    okeiCode: '383',
-    requestedByRank: '',
-    requestedByName: '',
-    approvedByPosition: '',
-    approvedByName: '',
-    rows: Array.from({ length: 11 }, () => emptyRow()),
-    releasedByRank: '',
-    releasedByName: '',
-    releasedByDate: '',
-    responsiblePosition: '',
-    responsibleName: '',
-    responsibleDate: '',
-    accountingJournalPeriod: '',
-    accountingExecutorPosition: '',
-    accountingExecutorName: '',
-    accountingDate: '',
-    receivedByRank: 'лейтенант',
-    receivedByName: '',
-    receivedByDate: '',
-    okudCode: '0504204',
-    okpoCode: '',
-    headerDate: '',
-  };
+function computeTableSum(rows: string[][], colIndex: number): string {
+  let sum = 0;
+  let hasNum = false;
+  for (const row of rows) {
+    const val = parseFloat(row[colIndex]);
+    if (!isNaN(val)) {
+      sum += val;
+      hasNum = true;
+    }
+  }
+  return hasNum ? sum.toFixed(2) : '';
 }
 
 interface Props {
@@ -116,955 +133,946 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   void state;
   void onStateChange;
 
-  const [form, setForm] = useState<FormData>(defaultFormData);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingCell, setEditingCell] = useState<{ blockId: string; row: number; col: number } | null>(null);
+  const [zoom, setZoom] = useState(0.8);
+  const [history, setHistory] = useState<Block[][]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [dragState, setDragState] = useState<{ blockId: string; offsetX: number; offsetY: number } | null>(null);
+  const [resizeState, setResizeState] = useState<{ blockId: string; startX: number; startY: number; startW: number; startH: number } | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  const pushHistory = useCallback((newBlocks: Block[]) => {
+    setHistory(prev => {
+      const trimmed = prev.slice(0, historyIndex + 1);
+      const next = [...trimmed, cloneBlocks(newBlocks)];
+      if (next.length > MAX_HISTORY) next.shift();
+      return next;
+    });
+    setHistoryIndex(prev => Math.min(prev + 1, MAX_HISTORY - 1));
+  }, [historyIndex]);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as FormData;
-        setForm(parsed);
+        const parsed = JSON.parse(raw) as Block[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setBlocks(parsed);
+          setHistory([cloneBlocks(parsed)]);
+          setHistoryIndex(0);
+          return;
+        }
       }
-    } catch {
-      /* ignore */
+    } catch { /* ignore */ }
+    const def = defaultBlocks();
+    setBlocks(def);
+    setHistory([cloneBlocks(def)]);
+    setHistoryIndex(0);
+  }, []);
+
+  const updateBlocks = useCallback((newBlocks: Block[], addToHistory = true) => {
+    setBlocks(newBlocks);
+    if (addToHistory) {
+      pushHistory(newBlocks);
     }
-  }, []);
+  }, [pushHistory]);
 
-  const updateField = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
-    setForm(prev => ({ ...prev, [key]: value }));
-  }, []);
-
-  const updateRow = useCallback((index: number, key: keyof InvoiceRow, value: string | number) => {
-    setForm(prev => {
-      const rows = [...prev.rows];
-      rows[index] = { ...rows[index], [key]: value };
-      return { ...prev, rows };
-    });
-  }, []);
-
-  const addRow = useCallback(() => {
-    setForm(prev => ({ ...prev, rows: [...prev.rows, emptyRow()] }));
-  }, []);
-
-  const removeRow = useCallback((index: number) => {
-    setForm(prev => ({
-      ...prev,
-      rows: prev.rows.filter((_, i) => i !== index),
-    }));
-  }, []);
-
-  const totals = useMemo(() => {
-    let qtyRequested = 0;
-    let qtyReleased = 0;
-    let sum = 0;
-    for (const r of form.rows) {
-      qtyRequested += Number(r.qtyRequested) || 0;
-      qtyReleased += Number(r.qtyReleased) || 0;
-      sum += (Number(r.price) || 0) * (Number(r.qtyReleased) || 0);
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setBlocks(cloneBlocks(history[newIndex]));
     }
-    return { qtyRequested, qtyReleased, sum };
-  }, [form.rows]);
+  }, [history, historyIndex]);
+
+  const redo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setBlocks(cloneBlocks(history[newIndex]));
+    }
+  }, [history, historyIndex]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      }
+      if (e.key === 'Z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      }
+      if (e.key === 'Delete' && selectedId && !editingId && !editingCell) {
+        e.preventDefault();
+        const newBlocks = blocks.filter(b => b.id !== selectedId);
+        setSelectedId(null);
+        updateBlocks(newBlocks);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo, redo, selectedId, editingId, editingCell, blocks, updateBlocks]);
+
+  const addBlock = (type: BlockType) => {
+    const newBlock: Block = {
+      id: uid(),
+      type,
+      x: 100,
+      y: 100,
+      w: type === 'line' ? 300 : type === 'table' ? 600 : type === 'signature' ? 500 : type === 'frame' ? 300 : 200,
+      h: type === 'line' ? 2 : type === 'table' ? 200 : type === 'signature' ? 70 : type === 'frame' ? 150 : 30,
+    };
+
+    if (type === 'text') {
+      newBlock.text = 'Новый текст';
+      newBlock.fontSize = 10;
+      newBlock.bold = false;
+      newBlock.italic = false;
+      newBlock.align = 'left';
+    }
+    if (type === 'table') {
+      newBlock.columns = [
+        { label: 'Столбец 1', width: 150 },
+        { label: 'Столбец 2', width: 150 },
+        { label: 'Столбец 3', width: 150 },
+      ];
+      newBlock.rows = [['', '', ''], ['', '', ''], ['', '', '']];
+    }
+    if (type === 'signature') {
+      newBlock.signLabel = 'Подпись';
+      newBlock.signParts = ['должность', 'подпись', 'расшифровка подписи'];
+      newBlock.signDate = '«__» _________ 20__ г.';
+    }
+    if (type === 'frame') {
+      newBlock.frameLabel = 'Заголовок';
+    }
+
+    const newBlocks = [...blocks, newBlock];
+    setSelectedId(newBlock.id);
+    updateBlocks(newBlocks);
+  };
+
+  const updateBlock = (id: string, updates: Partial<Block>, addToHistory = true) => {
+    const newBlocks = blocks.map(b => b.id === id ? { ...b, ...updates } : b);
+    if (addToHistory) {
+      updateBlocks(newBlocks);
+    } else {
+      setBlocks(newBlocks);
+    }
+  };
+
+  const deleteBlock = (id: string) => {
+    const newBlocks = blocks.filter(b => b.id !== id);
+    setSelectedId(null);
+    updateBlocks(newBlocks);
+  };
+
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-dots')) {
+      setSelectedId(null);
+      setEditingId(null);
+      setEditingCell(null);
+    }
+  };
+
+  const handleBlockMouseDown = (e: React.MouseEvent, blockId: string) => {
+    if (editingId === blockId || editingCell?.blockId === blockId) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+    const rect = canvasEl.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left) / zoom;
+    const mouseY = (e.clientY - rect.top) / zoom;
+    setSelectedId(blockId);
+    setEditingId(null);
+    setEditingCell(null);
+    setDragState({ blockId, offsetX: mouseX - block.x, offsetY: mouseY - block.y });
+  };
+
+  const handleResizeMouseDown = (e: React.MouseEvent, blockId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    setResizeState({ blockId, startX: e.clientX, startY: e.clientY, startW: block.w, startH: block.h });
+  };
+
+  useEffect(() => {
+    if (!dragState && !resizeState) return;
+
+    const handleMove = (e: MouseEvent) => {
+      if (dragState) {
+        const canvasEl = canvasRef.current;
+        if (!canvasEl) return;
+        const rect = canvasEl.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left) / zoom;
+        const mouseY = (e.clientY - rect.top) / zoom;
+        const newX = snap(Math.max(0, Math.min(CANVAS_W - 20, mouseX - dragState.offsetX)));
+        const newY = snap(Math.max(0, Math.min(CANVAS_H - 20, mouseY - dragState.offsetY)));
+        setBlocks(prev => prev.map(b => b.id === dragState.blockId ? { ...b, x: newX, y: newY } : b));
+      }
+      if (resizeState) {
+        const dx = (e.clientX - resizeState.startX) / zoom;
+        const dy = (e.clientY - resizeState.startY) / zoom;
+        const newW = snap(Math.max(30, resizeState.startW + dx));
+        const newH = snap(Math.max(10, resizeState.startH + dy));
+        setBlocks(prev => prev.map(b => b.id === resizeState.blockId ? { ...b, w: newW, h: newH } : b));
+      }
+    };
+
+    const handleUp = () => {
+      if (dragState || resizeState) {
+        setBlocks(prev => {
+          pushHistory(prev);
+          return prev;
+        });
+      }
+      setDragState(null);
+      setResizeState(null);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [dragState, resizeState, zoom, pushHistory]);
 
   const handleSave = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
   };
 
   const handleClear = () => {
-    setForm(defaultFormData());
-    localStorage.removeItem(STORAGE_KEY);
+    const def = defaultBlocks();
+    setSelectedId(null);
+    setEditingId(null);
+    setEditingCell(null);
+    updateBlocks(def);
   };
 
   const handlePrint = () => {
     const w = window.open('', '_blank');
     if (!w) return;
 
-    const rowsHtml = form.rows
-      .map((r, i) => {
-        const sum = (Number(r.price) || 0) * (Number(r.qtyReleased) || 0);
-        return `<tr>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;">${i + 1}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;">${r.name}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;">${r.nomNumber}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;">${r.passport}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;">${r.unit}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;">${r.okeiCode}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:right;">${r.price || ''}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;">${r.qtyRequested || ''}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;">${r.qtyReleased || ''}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:right;">${sum ? sum.toFixed(2) : ''}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;">${r.debit}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;">${r.credit}</td>
-          <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;">${r.note}</td>
-        </tr>`;
-      })
-      .join('');
+    const renderBlockHtml = (block: Block): string => {
+      const baseStyle = `position:absolute;left:${block.x}px;top:${block.y}px;width:${block.w}px;font-family:'Times New Roman',serif;`;
 
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Требование-накладная №${form.invoiceNumber}</title>
+      if (block.type === 'text') {
+        const fs = block.fontSize || 10;
+        const fw = block.bold ? 'bold' : 'normal';
+        const fst = block.italic ? 'italic' : 'normal';
+        const ta = block.align || 'left';
+        return `<div style="${baseStyle}font-size:${fs}pt;font-weight:${fw};font-style:${fst};text-align:${ta};white-space:pre-wrap;">${block.text || ''}</div>`;
+      }
+
+      if (block.type === 'table') {
+        const cols = block.columns || [];
+        const rows = block.rows || [];
+        let html = `<div style="${baseStyle}"><table style="border-collapse:collapse;width:100%;font-size:8pt;font-family:'Times New Roman',serif;">`;
+        html += '<thead><tr>';
+        for (const col of cols) {
+          html += `<th style="border:1px solid #000;padding:2px 3px;font-weight:normal;text-align:center;">${col.label}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+        for (let ri = 0; ri < rows.length; ri++) {
+          html += '<tr>';
+          for (let ci = 0; ci < cols.length; ci++) {
+            html += `<td style="border:1px solid #000;padding:2px 3px;text-align:center;">${rows[ri]?.[ci] || ''}</td>`;
+          }
+          html += '</tr>';
+        }
+        const sumRow = cols.map((_, ci) => computeTableSum(rows, ci));
+        const hasAnySum = sumRow.some(s => s !== '');
+        if (hasAnySum) {
+          html += '<tr>';
+          for (let ci = 0; ci < cols.length; ci++) {
+            html += `<td style="border:1px solid #000;padding:2px 3px;text-align:center;font-weight:bold;">${ci === 0 ? 'Итого' : sumRow[ci]}</td>`;
+          }
+          html += '</tr>';
+        }
+        html += '</tbody></table></div>';
+        return html;
+      }
+
+      if (block.type === 'signature') {
+        const parts = block.signParts || ['должность', 'подпись', 'расшифровка подписи'];
+        let html = `<div style="${baseStyle}font-size:10pt;">`;
+        html += `<div style="margin-bottom:6px;font-weight:bold;">${block.signLabel || ''}</div>`;
+        html += '<div style="display:flex;gap:30px;">';
+        for (const p of parts) {
+          html += `<div style="text-align:center;"><div style="border-bottom:1px solid #000;min-width:120px;height:18px;"></div><div style="font-size:7pt;">(${p})</div></div>`;
+        }
+        html += '</div>';
+        html += `<div style="margin-top:4px;font-size:9pt;">${block.signDate || ''}</div>`;
+        html += '</div>';
+        return html;
+      }
+
+      if (block.type === 'frame') {
+        let html = `<div style="${baseStyle}height:${block.h}px;border:1px solid #000;position:absolute;">`;
+        if (block.frameLabel) {
+          html += `<div style="font-size:8pt;padding:2px 4px;border-bottom:1px solid #000;background:#fff;">${block.frameLabel}</div>`;
+        }
+        html += '</div>';
+        return html;
+      }
+
+      if (block.type === 'line') {
+        return `<div style="${baseStyle}height:0;border-top:1px solid #000;"></div>`;
+      }
+
+      return '';
+    };
+
+    const allHtml = blocks.map(renderBlockHtml).join('\n');
+
+    w.document.write(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Печать накладной</title>
 <style>
-  @page { size: landscape; margin: 6mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Times New Roman', serif; font-size: 10pt; }
-  table.main { border-collapse: collapse; width: 100%; }
-  table.main th, table.main td { border: 1px solid #000; padding: 2px 4px; font-size: 9pt; }
-  table.main th { font-weight: normal; text-align: center; }
-  .codes-table { border-collapse: collapse; float: right; }
-  .codes-table td { border: 1px solid #000; padding: 1px 6px; font-size: 8pt; text-align: center; }
-  .underline-input { border-bottom: 1px solid #000; min-width: 100px; display: inline-block; padding: 0 4px; }
-  .sign-line { display: inline-block; border-bottom: 1px solid #000; min-width: 120px; text-align: center; }
-  .small-label { font-size: 7pt; text-align: center; display: block; }
-</style>
-</head>
-<body>
-<div style="position:relative;">
-  <table class="codes-table" style="position:absolute;right:0;top:0;">
-    <tr><td colspan="2" style="font-size:8pt;">Коды</td></tr>
-    <tr><td style="text-align:left;">Форма по ОКУД</td><td>${form.okudCode}</td></tr>
-    <tr><td style="text-align:left;">Дата</td><td>${form.headerDate}</td></tr>
-    <tr><td style="text-align:left;">по ОКПО</td><td>${form.okpoCode}</td></tr>
-  </table>
-  <div style="text-align:center;margin-top:10px;">
-    <b style="font-size:12pt;">ТРЕБОВАНИЕ-НАКЛАДНАЯ № ${form.invoiceNumber}</b><br>
-    <span>от ${form.invoiceDate}</span>
-  </div>
-</div>
-<div style="margin-top:12px;">
-  <div style="margin-bottom:4px;">Учреждение: <span class="underline-input" style="width:90%;">${form.institution}</span></div>
-  <div style="margin-bottom:4px;">Структурное подразделение — отправитель: <span class="underline-input" style="width:70%;">${form.senderDivision}</span></div>
-  <div style="margin-bottom:4px;">Структурное подразделение — получатель: <span class="underline-input" style="width:70%;">${form.receiverDivision}</span></div>
-  <div style="margin-bottom:4px;">Единица измерения: руб. (с точностью до второго десятичного знака) <span style="float:right;">по ОКЕИ <span class="underline-input">${form.okeiCode}</span></span></div>
-</div>
-<div style="margin-top:8px;margin-bottom:8px;display:flex;gap:20px;flex-wrap:wrap;">
-  <div>Затребовал <span class="sign-line">${form.requestedByRank}</span> <span class="small-label">(звание)</span> <span class="sign-line"></span> <span class="small-label">(подпись)</span> <span class="sign-line">${form.requestedByName}</span> <span class="small-label">(Фамилия, инициалы)</span></div>
-  <div style="margin-top:4px;">Разрешил НЦ (БнС) <span class="sign-line">${form.approvedByPosition}</span> <span class="small-label">(должность)</span> <span class="sign-line"></span> <span class="small-label">(подпись)</span> <span class="sign-line">${form.approvedByName}</span> <span class="small-label">(расшифровка подписи)</span></div>
-</div>
-<table class="main" style="margin-top:4px;">
-  <thead>
-    <tr>
-      <th rowspan="2" style="width:3%;">№ п/п</th>
-      <th colspan="3">Материальные ценности</th>
-      <th rowspan="2" style="width:5%;">номер</th>
-      <th colspan="2">Единица измерения</th>
-      <th rowspan="2" style="width:6%;">Цена</th>
-      <th colspan="2">Количество</th>
-      <th rowspan="2" style="width:8%;">Сумма<br>(без НДС)</th>
-      <th colspan="2">Корреспондирующие счета</th>
-      <th rowspan="2" style="width:8%;">Примечание</th>
-    </tr>
-    <tr>
-      <th>наименование</th>
-      <th>номенкл.</th>
-      <th>паспорта (иной)</th>
-      <th>наименование</th>
-      <th>код по ОКЕИ</th>
-      <th>затребовано</th>
-      <th>отпущено</th>
-      <th>дебет</th>
-      <th>кредит</th>
-    </tr>
-    <tr>
-      <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${rowsHtml}
-    <tr>
-      <td colspan="7" style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:right;font-weight:bold;">Итого</td>
-      <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;font-weight:bold;">${totals.qtyRequested || ''}</td>
-      <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:center;font-weight:bold;">${totals.qtyReleased || ''}</td>
-      <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;text-align:right;font-weight:bold;">${totals.sum ? totals.sum.toFixed(2) : ''}</td>
-      <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;"></td>
-      <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;"></td>
-      <td style="border:1px solid #000;padding:2px 4px;font-size:9pt;"></td>
-    </tr>
-  </tbody>
-</table>
-<div style="margin-top:14px;display:flex;gap:14px;">
-  <div style="flex:1;">
-    <div style="margin-bottom:4px;font-weight:bold;">Отпустил</div>
-    <div>(звание) <span class="sign-line">${form.releasedByRank}</span> (подпись) <span class="sign-line"></span> (расшифровка подписи) <span class="sign-line">${form.releasedByName}</span></div>
-    <div style="margin-top:4px;">${form.releasedByDate}</div>
-  </div>
-  <div style="flex:1;">
-    <div style="margin-bottom:4px;font-weight:bold;">Ответственный исполнитель</div>
-    <div>(должность) <span class="sign-line">${form.responsiblePosition}</span> (подпись) <span class="sign-line"></span> (расш. подп.) <span class="sign-line">${form.responsibleName}</span></div>
-    <div style="margin-top:4px;">${form.responsibleDate}</div>
-  </div>
-  <div style="flex:1;border:1px solid #000;padding:6px;">
-    <div style="margin-bottom:4px;font-weight:bold;">Отметка бухгалтерии</div>
-    <div style="font-size:8pt;">Корреспонденция счетов (графы 10, 11) отражена в журнале операций за <span class="underline-input">${form.accountingJournalPeriod}</span> г.</div>
-    <div style="margin-top:4px;">Исполнитель (должность) <span class="sign-line">${form.accountingExecutorPosition}</span> (подпись) <span class="sign-line"></span> (расшифровка подписи) <span class="sign-line">${form.accountingExecutorName}</span></div>
-    <div style="margin-top:4px;">${form.accountingDate}</div>
-  </div>
-</div>
-<div style="margin-top:14px;">
-  <div style="font-weight:bold;">Получил</div>
-  <div>(звание) <span class="sign-line">${form.receivedByRank}</span> (подпись) <span class="sign-line"></span> (расшифровка подписи) <span class="sign-line">${form.receivedByName}</span></div>
-  <div style="margin-top:4px;">${form.receivedByDate}</div>
-</div>
-</body>
-</html>`;
-
-    w.document.write(html);
+@page { size: landscape; margin: 6mm; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Times New Roman',serif; }
+.canvas { position:relative; width:${CANVAS_W}px; height:${CANVAS_H}px; }
+</style></head><body>
+<div class="canvas">${allHtml}</div>
+</body></html>`);
     w.document.close();
-    setTimeout(() => w.print(), 400);
+    setTimeout(() => w.print(), 300);
   };
 
-  const handleExcelExport = () => {
-    const headerRows = [
-      ['ТРЕБОВАНИЕ-НАКЛАДНАЯ №', form.invoiceNumber],
-      ['от', form.invoiceDate],
-      [],
-      ['Учреждение', form.institution],
-      ['Структурное подразделение — отправитель', form.senderDivision],
-      ['Структурное подразделение — получатель', form.receiverDivision],
-      [],
-      [
-        '№ п/п',
-        'Наименование',
-        'Номенклатурный',
-        'Паспорта (иной)',
-        'Ед.изм. наименование',
-        'Код по ОКЕИ',
-        'Цена',
-        'Затребовано',
-        'Отпущено',
-        'Сумма (без НДС)',
-        'Дебет',
-        'Кредит',
-        'Примечание',
-      ],
-    ];
+  const selectedBlock = blocks.find(b => b.id === selectedId);
 
-    const dataRows = form.rows.map((r, i) => [
-      i + 1,
-      r.name,
-      r.nomNumber,
-      r.passport,
-      r.unit,
-      r.okeiCode,
-      r.price || '',
-      r.qtyRequested || '',
-      r.qtyReleased || '',
-      (Number(r.price) || 0) * (Number(r.qtyReleased) || 0) || '',
-      r.debit,
-      r.credit,
-      r.note,
-    ]);
-
-    const totalRow = [
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      'Итого',
-      totals.qtyRequested || '',
-      totals.qtyReleased || '',
-      totals.sum ? totals.sum.toFixed(2) : '',
-      '',
-      '',
-      '',
-    ];
-
-    const allRows = [...headerRows, ...dataRows, totalRow];
-    const ws = XLSX.utils.aoa_to_sheet(allRows);
-    ws['!cols'] = [
-      { wch: 6 },
-      { wch: 30 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 12 },
-      { wch: 10 },
-      { wch: 10 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 10 },
-      { wch: 10 },
-      { wch: 16 },
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Накладная');
-    XLSX.writeFile(wb, `Накладная_${form.invoiceNumber}.xlsx`);
-  };
-
-  const cellStyle: React.CSSProperties = {
-    border: '1px solid #000',
-    padding: '2px 4px',
-    fontSize: '9pt',
-    fontFamily: "'Times New Roman', serif",
-  };
-
-  const cellInputStyle: React.CSSProperties = {
-    border: 'none',
-    outline: 'none',
-    background: 'transparent',
-    width: '100%',
-    fontFamily: "'Times New Roman', serif",
-    fontSize: '9pt',
-    padding: 0,
-    margin: 0,
-  };
-
-  const underlineInputStyle: React.CSSProperties = {
-    border: 'none',
-    borderBottom: '1px solid #000',
-    outline: 'none',
-    background: 'transparent',
-    fontFamily: "'Times New Roman', serif",
-    fontSize: '10pt',
-    padding: '0 4px',
-    minWidth: '80px',
-  };
-
-  return (
-    <div className="flex flex-col h-full">
+  const renderTextBlock = (block: Block) => {
+    const isEditing = editingId === block.id;
+    return (
       <div
-        className="flex items-center justify-between px-4 py-2 bg-white border-b shrink-0"
-        style={{ fontFamily: 'system-ui, sans-serif' }}
+        style={{
+          width: '100%',
+          minHeight: 20,
+          fontSize: `${block.fontSize || 10}pt`,
+          fontWeight: block.bold ? 'bold' : 'normal',
+          fontStyle: block.italic ? 'italic' : 'normal',
+          textAlign: block.align || 'left',
+          fontFamily: "'Times New Roman', serif",
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          outline: 'none',
+          cursor: isEditing ? 'text' : 'move',
+        }}
+        contentEditable={isEditing}
+        suppressContentEditableWarning
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          setEditingId(block.id);
+        }}
+        onBlur={(e) => {
+          if (editingId === block.id) {
+            updateBlock(block.id, { text: e.currentTarget.textContent || '' });
+            setEditingId(null);
+          }
+        }}
+        onMouseDown={(e) => {
+          if (isEditing) e.stopPropagation();
+        }}
       >
-        <h1 className="text-lg font-semibold">Шаблон накладной</h1>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleClear}>
-            <Icon name="Trash2" size={16} />
-            Очистить форму
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleSave}>
-            <Icon name="Save" size={16} />
-            Сохранить
-          </Button>
-          <Button variant="outline" size="sm" onClick={handlePrint}>
-            <Icon name="Printer" size={16} />
-            Печать
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExcelExport}>
-            <Icon name="FileSpreadsheet" size={16} />
-            Экспорт Excel
+        {block.text || ''}
+      </div>
+    );
+  };
+
+  const renderTableBlock = (block: Block) => {
+    const cols = block.columns || [];
+    const rows = block.rows || [];
+    const isSelected = selectedId === block.id;
+    return (
+      <div style={{ width: '100%', fontFamily: "'Times New Roman', serif", fontSize: '8pt' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <thead>
+            <tr>
+              {cols.map((col, ci) => (
+                <th
+                  key={ci}
+                  style={{
+                    border: '1px solid #000',
+                    padding: '2px 3px',
+                    fontWeight: 'normal',
+                    textAlign: 'center',
+                    fontSize: '7pt',
+                    minWidth: 30,
+                  }}
+                >
+                  {editingCell?.blockId === block.id && editingCell.row === -1 && editingCell.col === ci ? (
+                    <input
+                      autoFocus
+                      className="w-full border-none bg-blue-50 text-center outline-none"
+                      style={{ fontSize: '7pt', fontFamily: "'Times New Roman', serif" }}
+                      defaultValue={col.label}
+                      onBlur={(e) => {
+                        const newCols = [...cols];
+                        newCols[ci] = { ...newCols[ci], label: e.target.value };
+                        updateBlock(block.id, { columns: newCols });
+                        setEditingCell(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setEditingCell({ blockId: block.id, row: -1, col: ci });
+                      }}
+                    >
+                      {col.label}
+                    </span>
+                  )}
+                </th>
+              ))}
+              {isSelected && <th style={{ border: 'none', width: 20 }} />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri}>
+                {cols.map((_, ci) => (
+                  <td
+                    key={ci}
+                    style={{
+                      border: '1px solid #000',
+                      padding: '1px 3px',
+                      textAlign: 'center',
+                      minWidth: 30,
+                    }}
+                  >
+                    {editingCell?.blockId === block.id && editingCell.row === ri && editingCell.col === ci ? (
+                      <input
+                        autoFocus
+                        className="w-full border-none bg-blue-50 text-center outline-none"
+                        style={{ fontSize: '8pt', fontFamily: "'Times New Roman', serif" }}
+                        defaultValue={row[ci] || ''}
+                        onBlur={(e) => {
+                          const newRows = rows.map(r => [...r]);
+                          newRows[ri][ci] = e.target.value;
+                          updateBlock(block.id, { rows: newRows });
+                          setEditingCell(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                          if (e.key === 'Tab') {
+                            e.preventDefault();
+                            (e.target as HTMLInputElement).blur();
+                            const nextCi = ci + 1 < cols.length ? ci + 1 : 0;
+                            const nextRi = ci + 1 < cols.length ? ri : ri + 1;
+                            if (nextRi < rows.length) {
+                              setEditingCell({ blockId: block.id, row: nextRi, col: nextCi });
+                            }
+                          }
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCell({ blockId: block.id, row: ri, col: ci });
+                        }}
+                        style={{ display: 'block', minHeight: 14, cursor: 'text' }}
+                      >
+                        {row[ci] || ''}
+                      </span>
+                    )}
+                  </td>
+                ))}
+                {isSelected && (
+                  <td style={{ border: 'none', padding: 0, width: 20, verticalAlign: 'middle' }}>
+                    <button
+                      className="flex h-4 w-4 items-center justify-center rounded bg-red-100 text-red-600 hover:bg-red-200"
+                      style={{ fontSize: '9px', lineHeight: 1 }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newRows = rows.filter((_, i) => i !== ri);
+                        updateBlock(block.id, { rows: newRows });
+                      }}
+                    >
+                      x
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+            {(() => {
+              const sumRow = cols.map((_, ci) => computeTableSum(rows, ci));
+              const hasAny = sumRow.some(s => s !== '');
+              if (!hasAny) return null;
+              return (
+                <tr>
+                  {cols.map((_, ci) => (
+                    <td
+                      key={ci}
+                      style={{
+                        border: '1px solid #000',
+                        padding: '1px 3px',
+                        textAlign: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '8pt',
+                      }}
+                    >
+                      {ci === 0 ? 'Итого' : sumRow[ci]}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })()}
+          </tbody>
+        </table>
+        {isSelected && (
+          <div className="mt-1 flex gap-1" onMouseDown={(e) => e.stopPropagation()}>
+            <button
+              className="rounded bg-gray-100 px-2 py-0.5 text-xs hover:bg-gray-200"
+              style={{ fontFamily: 'system-ui' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                const newRows = [...rows, Array(cols.length).fill('')];
+                updateBlock(block.id, { rows: newRows });
+              }}
+            >
+              + строка
+            </button>
+            <button
+              className="rounded bg-gray-100 px-2 py-0.5 text-xs hover:bg-gray-200"
+              style={{ fontFamily: 'system-ui' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                const newCols = [...cols, { label: 'Новый', width: 80 }];
+                const newRows = rows.map(r => [...r, '']);
+                updateBlock(block.id, { columns: newCols, rows: newRows });
+              }}
+            >
+              + столбец
+            </button>
+            {cols.length > 1 && (
+              <button
+                className="rounded bg-red-50 px-2 py-0.5 text-xs text-red-600 hover:bg-red-100"
+                style={{ fontFamily: 'system-ui' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const newCols = cols.slice(0, -1);
+                  const newRows = rows.map(r => r.slice(0, -1));
+                  updateBlock(block.id, { columns: newCols, rows: newRows });
+                }}
+              >
+                - столбец
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderSignatureBlock = (block: Block) => {
+    const parts = block.signParts || ['должность', 'подпись', 'расшифровка подписи'];
+    const isEditing = editingId === block.id;
+    return (
+      <div style={{ fontFamily: "'Times New Roman', serif", fontSize: '10pt', width: '100%' }}>
+        <div
+          style={{ marginBottom: 4, fontWeight: 'bold', cursor: isEditing ? 'text' : 'default' }}
+          contentEditable={isEditing}
+          suppressContentEditableWarning
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setEditingId(block.id);
+          }}
+          onBlur={(e) => {
+            updateBlock(block.id, { signLabel: e.currentTarget.textContent || '' });
+            setEditingId(null);
+          }}
+          onMouseDown={(e) => { if (isEditing) e.stopPropagation(); }}
+        >
+          {block.signLabel || ''}
+        </div>
+        <div style={{ display: 'flex', gap: 30 }}>
+          {parts.map((p, i) => (
+            <div key={i} style={{ textAlign: 'center' }}>
+              <div style={{ borderBottom: '1px solid #000', minWidth: 120, height: 18 }} />
+              <div style={{ fontSize: '7pt' }}>({p})</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 4, fontSize: '9pt' }}>
+          {block.signDate || ''}
+        </div>
+      </div>
+    );
+  };
+
+  const renderFrameBlock = (block: Block) => {
+    const isEditing = editingId === block.id;
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        border: '1px solid #000',
+        fontFamily: "'Times New Roman', serif",
+        position: 'relative',
+      }}>
+        {block.frameLabel !== undefined && (
+          <div
+            style={{
+              fontSize: '8pt',
+              padding: '2px 4px',
+              borderBottom: '1px solid #000',
+              background: '#fff',
+              cursor: isEditing ? 'text' : 'default',
+              outline: 'none',
+            }}
+            contentEditable={isEditing}
+            suppressContentEditableWarning
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setEditingId(block.id);
+            }}
+            onBlur={(e) => {
+              updateBlock(block.id, { frameLabel: e.currentTarget.textContent || '' });
+              setEditingId(null);
+            }}
+            onMouseDown={(e) => { if (isEditing) e.stopPropagation(); }}
+          >
+            {block.frameLabel || ''}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderLineBlock = () => {
+    return (
+      <div style={{ width: '100%', height: 0, borderTop: '1px solid #000' }} />
+    );
+  };
+
+  const renderBlock = (block: Block) => {
+    switch (block.type) {
+      case 'text': return renderTextBlock(block);
+      case 'table': return renderTableBlock(block);
+      case 'signature': return renderSignatureBlock(block);
+      case 'frame': return renderFrameBlock(block);
+      case 'line': return renderLineBlock();
+      default: return null;
+    }
+  };
+
+  const renderPropertyPanel = () => {
+    if (!selectedBlock) return null;
+    const b = selectedBlock;
+    return (
+      <div
+        className="flex w-[200px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-gray-200 bg-white p-3"
+        style={{ fontFamily: 'system-ui', fontSize: '12px' }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="text-xs font-semibold uppercase text-gray-400">
+          {b.type === 'text' ? 'Текст' : b.type === 'table' ? 'Таблица' : b.type === 'signature' ? 'Подпись' : b.type === 'frame' ? 'Рамка' : 'Линия'}
+        </div>
+
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[10px] text-gray-500">X</span>
+          <input
+            type="number"
+            className="rounded border border-gray-200 px-2 py-1 text-xs"
+            value={b.x}
+            onChange={(e) => updateBlock(b.id, { x: Number(e.target.value) })}
+          />
+        </label>
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[10px] text-gray-500">Y</span>
+          <input
+            type="number"
+            className="rounded border border-gray-200 px-2 py-1 text-xs"
+            value={b.y}
+            onChange={(e) => updateBlock(b.id, { y: Number(e.target.value) })}
+          />
+        </label>
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[10px] text-gray-500">Ширина</span>
+          <input
+            type="number"
+            className="rounded border border-gray-200 px-2 py-1 text-xs"
+            value={b.w}
+            onChange={(e) => updateBlock(b.id, { w: Number(e.target.value) })}
+          />
+        </label>
+        {(b.type === 'frame' || b.type === 'table') && (
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] text-gray-500">Высота</span>
+            <input
+              type="number"
+              className="rounded border border-gray-200 px-2 py-1 text-xs"
+              value={b.h}
+              onChange={(e) => updateBlock(b.id, { h: Number(e.target.value) })}
+            />
+          </label>
+        )}
+
+        {b.type === 'text' && (
+          <>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-[10px] text-gray-500">Размер шрифта</span>
+              <input
+                type="number"
+                min={8}
+                max={24}
+                className="rounded border border-gray-200 px-2 py-1 text-xs"
+                value={b.fontSize || 10}
+                onChange={(e) => updateBlock(b.id, { fontSize: Number(e.target.value) })}
+              />
+            </label>
+            <div className="flex gap-1">
+              <button
+                className={`rounded border px-2 py-1 text-xs font-bold ${b.bold ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
+                onClick={() => updateBlock(b.id, { bold: !b.bold })}
+              >
+                B
+              </button>
+              <button
+                className={`rounded border px-2 py-1 text-xs italic ${b.italic ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
+                onClick={() => updateBlock(b.id, { italic: !b.italic })}
+              >
+                I
+              </button>
+            </div>
+            <div className="flex gap-1">
+              {(['left', 'center', 'right'] as const).map(a => (
+                <button
+                  key={a}
+                  className={`rounded border px-2 py-1 text-xs ${b.align === a ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
+                  onClick={() => updateBlock(b.id, { align: a })}
+                >
+                  {a === 'left' ? 'Л' : a === 'center' ? 'Ц' : 'П'}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {b.type === 'signature' && (
+          <>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-[10px] text-gray-500">Подпись</span>
+              <input
+                className="rounded border border-gray-200 px-2 py-1 text-xs"
+                value={b.signLabel || ''}
+                onChange={(e) => updateBlock(b.id, { signLabel: e.target.value })}
+              />
+            </label>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-[10px] text-gray-500">Дата</span>
+              <input
+                className="rounded border border-gray-200 px-2 py-1 text-xs"
+                value={b.signDate || ''}
+                onChange={(e) => updateBlock(b.id, { signDate: e.target.value })}
+              />
+            </label>
+            {(b.signParts || []).map((part, i) => (
+              <label key={i} className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-gray-500">Часть {i + 1}</span>
+                <input
+                  className="rounded border border-gray-200 px-2 py-1 text-xs"
+                  value={part}
+                  onChange={(e) => {
+                    const newParts = [...(b.signParts || [])];
+                    newParts[i] = e.target.value;
+                    updateBlock(b.id, { signParts: newParts });
+                  }}
+                />
+              </label>
+            ))}
+          </>
+        )}
+
+        {b.type === 'frame' && (
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] text-gray-500">Заголовок</span>
+            <input
+              className="rounded border border-gray-200 px-2 py-1 text-xs"
+              value={b.frameLabel || ''}
+              onChange={(e) => updateBlock(b.id, { frameLabel: e.target.value })}
+            />
+          </label>
+        )}
+
+        {b.type === 'table' && (
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-gray-500">Столбцов: {(b.columns || []).length}</span>
+            <span className="text-[10px] text-gray-500">Строк: {(b.rows || []).length}</span>
+          </div>
+        )}
+
+        <div className="mt-auto pt-2">
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-full"
+            onClick={() => deleteBlock(b.id)}
+          >
+            <Icon name="Trash2" size={14} />
+            Удалить
           </Button>
         </div>
       </div>
+    );
+  };
 
-      <div className="flex-1 overflow-auto bg-gray-300 p-6">
-        <div
-          className="mx-auto bg-white shadow-lg"
-          style={{
-            width: '1200px',
-            minHeight: '800px',
-            padding: '24px 32px',
-            fontFamily: "'Times New Roman', serif",
-            fontSize: '10pt',
-          }}
-        >
-          <div style={{ position: 'relative', marginBottom: '16px' }}>
-            <table
-              style={{
-                borderCollapse: 'collapse',
-                position: 'absolute',
-                right: 0,
-                top: 0,
-              }}
+  const dotPattern = `radial-gradient(circle, #d1d5db 0.5px, transparent 0.5px)`;
+
+  return (
+    <div className="flex h-screen flex-col" style={{ fontFamily: 'system-ui' }}>
+      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
+        <div className="text-sm font-semibold text-gray-700">Шаблон накладной</div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={undo}
+            disabled={historyIndex <= 0}
+            title="Отменить (Ctrl+Z)"
+          >
+            <Icon name="Undo2" size={16} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={redo}
+            disabled={historyIndex >= history.length - 1}
+            title="Повторить (Ctrl+Shift+Z)"
+          >
+            <Icon name="Redo2" size={16} />
+          </Button>
+          <div className="mx-1 h-5 w-px bg-gray-200" />
+          <Button variant="ghost" size="sm" onClick={() => addBlock('text')} title="Текст">
+            <Icon name="Type" size={16} />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => addBlock('table')} title="Таблица">
+            <Icon name="Table" size={16} />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => addBlock('signature')} title="Подпись">
+            <Icon name="PenLine" size={16} />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => addBlock('frame')} title="Рамка">
+            <Icon name="Square" size={16} />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => addBlock('line')} title="Линия">
+            <Icon name="Minus" size={16} />
+          </Button>
+          <div className="mx-1 h-5 w-px bg-gray-200" />
+          <Button variant="ghost" size="sm" onClick={handleClear} title="Очистить">
+            <Icon name="Trash2" size={16} />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleSave} title="Сохранить">
+            <Icon name="Save" size={16} />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handlePrint} title="Печать">
+            <Icon name="Printer" size={16} />
+          </Button>
+          <div className="mx-1 h-5 w-px bg-gray-200" />
+          <div className="flex items-center gap-1">
+            <button
+              className="rounded px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+              onClick={() => setZoom(z => Math.max(0.5, z - 0.1))}
             >
-              <tbody>
-                <tr>
-                  <td
-                    colSpan={2}
-                    style={{
-                      border: '1px solid #000',
-                      padding: '1px 8px',
-                      fontSize: '8pt',
-                      textAlign: 'center',
-                    }}
-                  >
-                    Коды
-                  </td>
-                </tr>
-                <tr>
-                  <td
-                    style={{
-                      border: '1px solid #000',
-                      padding: '1px 8px',
-                      fontSize: '8pt',
-                    }}
-                  >
-                    Форма по ОКУД
-                  </td>
-                  <td
-                    style={{
-                      border: '1px solid #000',
-                      padding: '1px 8px',
-                      fontSize: '8pt',
-                      textAlign: 'center',
-                      minWidth: '60px',
-                    }}
-                  >
-                    <input
-                      style={{ ...underlineInputStyle, borderBottom: 'none', fontSize: '8pt', width: '60px', textAlign: 'center' }}
-                      value={form.okudCode}
-                      onChange={e => updateField('okudCode', e.target.value)}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td
-                    style={{
-                      border: '1px solid #000',
-                      padding: '1px 8px',
-                      fontSize: '8pt',
-                    }}
-                  >
-                    Дата
-                  </td>
-                  <td
-                    style={{
-                      border: '1px solid #000',
-                      padding: '1px 8px',
-                      fontSize: '8pt',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <input
-                      style={{ ...underlineInputStyle, borderBottom: 'none', fontSize: '8pt', width: '60px', textAlign: 'center' }}
-                      value={form.headerDate}
-                      onChange={e => updateField('headerDate', e.target.value)}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td
-                    style={{
-                      border: '1px solid #000',
-                      padding: '1px 8px',
-                      fontSize: '8pt',
-                    }}
-                  >
-                    по ОКПО
-                  </td>
-                  <td
-                    style={{
-                      border: '1px solid #000',
-                      padding: '1px 8px',
-                      fontSize: '8pt',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <input
-                      style={{ ...underlineInputStyle, borderBottom: 'none', fontSize: '8pt', width: '60px', textAlign: 'center' }}
-                      value={form.okpoCode}
-                      onChange={e => updateField('okpoCode', e.target.value)}
-                    />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div style={{ textAlign: 'center', paddingTop: '4px' }}>
-              <span style={{ fontSize: '14pt', fontWeight: 'bold' }}>
-                ТРЕБОВАНИЕ-НАКЛАДНАЯ №{' '}
-              </span>
-              <input
-                style={{
-                  ...underlineInputStyle,
-                  fontSize: '14pt',
-                  fontWeight: 'bold',
-                  width: '100px',
-                  textAlign: 'center',
-                }}
-                value={form.invoiceNumber}
-                onChange={e => updateField('invoiceNumber', e.target.value)}
-              />
-            </div>
-            <div style={{ textAlign: 'center', marginTop: '4px' }}>
-              <span>от </span>
-              <input
-                style={{
-                  ...underlineInputStyle,
-                  width: '200px',
-                  textAlign: 'center',
-                }}
-                value={form.invoiceDate}
-                onChange={e => updateField('invoiceDate', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-            <span style={{ whiteSpace: 'nowrap' }}>Учреждение</span>
-            <input
-              style={{ ...underlineInputStyle, flex: 1 }}
-              value={form.institution}
-              onChange={e => updateField('institution', e.target.value)}
-            />
-          </div>
-          <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-            <span style={{ whiteSpace: 'nowrap' }}>Структурное подразделение — отправитель</span>
-            <input
-              style={{ ...underlineInputStyle, flex: 1 }}
-              value={form.senderDivision}
-              onChange={e => updateField('senderDivision', e.target.value)}
-            />
-          </div>
-          <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-            <span style={{ whiteSpace: 'nowrap' }}>Структурное подразделение — получатель</span>
-            <input
-              style={{ ...underlineInputStyle, flex: 1 }}
-              value={form.receiverDivision}
-              onChange={e => updateField('receiverDivision', e.target.value)}
-            />
-          </div>
-          <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <span>Единица измерения: руб. (с точностью до второго десятичного знака)</span>
-            <span style={{ whiteSpace: 'nowrap' }}>
-              по ОКЕИ{' '}
-              <input
-                style={{ ...underlineInputStyle, width: '50px', textAlign: 'center' }}
-                value={form.okeiCode}
-                onChange={e => updateField('okeiCode', e.target.value)}
-              />
-            </span>
-          </div>
-
-          <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'flex-end', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ whiteSpace: 'nowrap' }}>Затребовал</span>
-            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-              <input
-                style={{ ...underlineInputStyle, width: '140px', textAlign: 'center' }}
-                value={form.requestedByRank}
-                onChange={e => updateField('requestedByRank', e.target.value)}
-              />
-              <span style={{ fontSize: '7pt', color: '#555' }}>(звание)</span>
-            </div>
-            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span style={{ borderBottom: '1px solid #000', display: 'inline-block', minWidth: '140px', height: '16px' }}>&nbsp;</span>
-              <span style={{ fontSize: '7pt', color: '#555' }}>(подпись)</span>
-            </div>
-            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-              <input
-                style={{ ...underlineInputStyle, width: '180px', textAlign: 'center' }}
-                value={form.requestedByName}
-                onChange={e => updateField('requestedByName', e.target.value)}
-              />
-              <span style={{ fontSize: '7pt', color: '#555' }}>(Фамилия, инициалы)</span>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'flex-end', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ whiteSpace: 'nowrap' }}>Разрешил</span>
-            <span style={{ whiteSpace: 'nowrap', fontSize: '9pt' }}>НЦ (БнС)</span>
-            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-              <input
-                style={{ ...underlineInputStyle, width: '140px', textAlign: 'center' }}
-                value={form.approvedByPosition}
-                onChange={e => updateField('approvedByPosition', e.target.value)}
-              />
-              <span style={{ fontSize: '7pt', color: '#555' }}>(должность)</span>
-            </div>
-            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span style={{ borderBottom: '1px solid #000', display: 'inline-block', minWidth: '140px', height: '16px' }}>&nbsp;</span>
-              <span style={{ fontSize: '7pt', color: '#555' }}>(подпись)</span>
-            </div>
-            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-              <input
-                style={{ ...underlineInputStyle, width: '180px', textAlign: 'center' }}
-                value={form.approvedByName}
-                onChange={e => updateField('approvedByName', e.target.value)}
-              />
-              <span style={{ fontSize: '7pt', color: '#555' }}>(расшифровка подписи)</span>
-            </div>
-          </div>
-
-          <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: '6px' }}>
-            <thead>
-              <tr>
-                <th rowSpan={3} style={{ ...cellStyle, width: '28px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  № п/п
-                </th>
-                <th colSpan={3} style={{ ...cellStyle, textAlign: 'center', fontWeight: 'normal' }}>
-                  Материальные ценности
-                </th>
-                <th rowSpan={2} style={{ ...cellStyle, width: '50px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  номер
-                </th>
-                <th colSpan={2} style={{ ...cellStyle, textAlign: 'center', fontWeight: 'normal' }}>
-                  Единица измерения
-                </th>
-                <th rowSpan={2} style={{ ...cellStyle, width: '62px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  Цена
-                </th>
-                <th colSpan={2} style={{ ...cellStyle, textAlign: 'center', fontWeight: 'normal' }}>
-                  Количество
-                </th>
-                <th rowSpan={2} style={{ ...cellStyle, width: '72px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  Сумма<br />(без НДС)
-                </th>
-                <th colSpan={2} style={{ ...cellStyle, textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  Корреспондирующие счета
-                </th>
-                <th rowSpan={2} style={{ ...cellStyle, width: '70px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  Примечание
-                </th>
-              </tr>
-              <tr>
-                <th style={{ ...cellStyle, textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  наименование
-                </th>
-                <th style={{ ...cellStyle, width: '70px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  номенклатурный
-                </th>
-                <th style={{ ...cellStyle, width: '70px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  паспорта (иной)
-                </th>
-                <th style={{ ...cellStyle, width: '50px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  наименование
-                </th>
-                <th style={{ ...cellStyle, width: '46px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  код по ОКЕИ
-                </th>
-                <th style={{ ...cellStyle, width: '64px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  затребовано
-                </th>
-                <th style={{ ...cellStyle, width: '64px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  отпущено
-                </th>
-                <th style={{ ...cellStyle, width: '54px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  дебет
-                </th>
-                <th style={{ ...cellStyle, width: '54px', textAlign: 'center', fontWeight: 'normal', fontSize: '8pt' }}>
-                  кредит
-                </th>
-              </tr>
-              <tr>
-                {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map(n => (
-                  <th
-                    key={n}
-                    style={{
-                      ...cellStyle,
-                      textAlign: 'center',
-                      fontWeight: 'normal',
-                      fontSize: '7pt',
-                      padding: '1px',
-                    }}
-                  >
-                    {n}
-                  </th>
-                ))}
-                <th
-                  style={{
-                    ...cellStyle,
-                    textAlign: 'center',
-                    fontWeight: 'normal',
-                    fontSize: '7pt',
-                    padding: '1px',
-                  }}
-                >
-                  13
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {form.rows.map((row, idx) => {
-                const rowSum = (Number(row.price) || 0) * (Number(row.qtyReleased) || 0);
-                return (
-                  <tr key={idx}>
-                    <td style={{ ...cellStyle, textAlign: 'center', fontSize: '8pt' }}>{idx + 1}</td>
-                    <td style={cellStyle}>
-                      <input
-                        style={cellInputStyle}
-                        value={row.name}
-                        onChange={e => updateRow(idx, 'name', e.target.value)}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        style={{ ...cellInputStyle, textAlign: 'center' }}
-                        value={row.nomNumber}
-                        onChange={e => updateRow(idx, 'nomNumber', e.target.value)}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        style={{ ...cellInputStyle, textAlign: 'center' }}
-                        value={row.passport}
-                        onChange={e => updateRow(idx, 'passport', e.target.value)}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        style={{ ...cellInputStyle, textAlign: 'center' }}
-                        value={row.unit}
-                        onChange={e => updateRow(idx, 'unit', e.target.value)}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        style={{ ...cellInputStyle, textAlign: 'center' }}
-                        value={row.okeiCode}
-                        onChange={e => updateRow(idx, 'okeiCode', e.target.value)}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        style={{ ...cellInputStyle, textAlign: 'right' }}
-                        type="number"
-                        value={row.price || ''}
-                        onChange={e => updateRow(idx, 'price', parseFloat(e.target.value) || 0)}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        style={{ ...cellInputStyle, textAlign: 'center' }}
-                        type="number"
-                        value={row.qtyRequested || ''}
-                        onChange={e => updateRow(idx, 'qtyRequested', parseFloat(e.target.value) || 0)}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        style={{ ...cellInputStyle, textAlign: 'center' }}
-                        type="number"
-                        value={row.qtyReleased || ''}
-                        onChange={e => updateRow(idx, 'qtyReleased', parseFloat(e.target.value) || 0)}
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, textAlign: 'right', fontSize: '8pt' }}>
-                      {rowSum ? rowSum.toFixed(2) : ''}
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        style={{ ...cellInputStyle, textAlign: 'center' }}
-                        value={row.debit}
-                        onChange={e => updateRow(idx, 'debit', e.target.value)}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        style={{ ...cellInputStyle, textAlign: 'center' }}
-                        value={row.credit}
-                        onChange={e => updateRow(idx, 'credit', e.target.value)}
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, position: 'relative' }}>
-                      <input
-                        style={{ ...cellInputStyle, paddingRight: '16px' }}
-                        value={row.note}
-                        onChange={e => updateRow(idx, 'note', e.target.value)}
-                      />
-                      <button
-                        onClick={() => removeRow(idx)}
-                        style={{
-                          position: 'absolute',
-                          right: '2px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: '#c00',
-                          fontSize: '12px',
-                          lineHeight: 1,
-                          padding: '0 2px',
-                          fontFamily: 'system-ui',
-                        }}
-                        title="Удалить строку"
-                      >
-                        <Icon name="X" size={12} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              <tr>
-                <td
-                  colSpan={7}
-                  style={{
-                    ...cellStyle,
-                    textAlign: 'right',
-                    fontWeight: 'bold',
-                    fontSize: '9pt',
-                  }}
-                >
-                  Итого
-                </td>
-                <td style={{ ...cellStyle, textAlign: 'center', fontWeight: 'bold' }}>
-                  {totals.qtyRequested || ''}
-                </td>
-                <td style={{ ...cellStyle, textAlign: 'center', fontWeight: 'bold' }}>
-                  {totals.qtyReleased || ''}
-                </td>
-                <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 'bold' }}>
-                  {totals.sum ? totals.sum.toFixed(2) : ''}
-                </td>
-                <td style={cellStyle}></td>
-                <td style={cellStyle}></td>
-                <td style={cellStyle}></td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div style={{ marginBottom: '12px' }}>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addRow}
-              style={{ fontFamily: 'system-ui, sans-serif', fontSize: '12px' }}
+              -
+            </button>
+            <span className="w-10 text-center text-xs text-gray-500">{Math.round(zoom * 100)}%</span>
+            <button
+              className="rounded px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+              onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}
             >
-              <Icon name="Plus" size={14} />
-              Добавить строку
-            </Button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '14px', marginTop: '16px', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Отпустил</div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <input
-                    style={{ ...underlineInputStyle, width: '110px', textAlign: 'center' }}
-                    value={form.releasedByRank}
-                    onChange={e => updateField('releasedByRank', e.target.value)}
-                  />
-                  <span style={{ fontSize: '7pt', color: '#555' }}>(звание)</span>
-                </div>
-                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <span style={{ borderBottom: '1px solid #000', display: 'inline-block', minWidth: '100px', height: '16px' }}>&nbsp;</span>
-                  <span style={{ fontSize: '7pt', color: '#555' }}>(подпись)</span>
-                </div>
-                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <input
-                    style={{ ...underlineInputStyle, width: '130px', textAlign: 'center' }}
-                    value={form.releasedByName}
-                    onChange={e => updateField('releasedByName', e.target.value)}
-                  />
-                  <span style={{ fontSize: '7pt', color: '#555' }}>(расшифровка подписи)</span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '4px' }}>
-                <input
-                  style={{ ...underlineInputStyle, width: '160px' }}
-                  value={form.releasedByDate}
-                  onChange={e => updateField('releasedByDate', e.target.value)}
-                  placeholder="«__» __________ 20__ г."
-                />
-              </div>
-            </div>
-
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Ответственный исполнитель</div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <input
-                    style={{ ...underlineInputStyle, width: '110px', textAlign: 'center' }}
-                    value={form.responsiblePosition}
-                    onChange={e => updateField('responsiblePosition', e.target.value)}
-                  />
-                  <span style={{ fontSize: '7pt', color: '#555' }}>(должность)</span>
-                </div>
-                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <span style={{ borderBottom: '1px solid #000', display: 'inline-block', minWidth: '100px', height: '16px' }}>&nbsp;</span>
-                  <span style={{ fontSize: '7pt', color: '#555' }}>(подпись)</span>
-                </div>
-                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <input
-                    style={{ ...underlineInputStyle, width: '130px', textAlign: 'center' }}
-                    value={form.responsibleName}
-                    onChange={e => updateField('responsibleName', e.target.value)}
-                  />
-                  <span style={{ fontSize: '7pt', color: '#555' }}>(расш. подп.)</span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '4px' }}>
-                <input
-                  style={{ ...underlineInputStyle, width: '160px' }}
-                  value={form.responsibleDate}
-                  onChange={e => updateField('responsibleDate', e.target.value)}
-                  placeholder="«__» __________ 20__ г."
-                />
-              </div>
-            </div>
-
-            <div style={{ flex: 1, border: '1px solid #000', padding: '8px' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Отметка бухгалтерии</div>
-              <div style={{ fontSize: '8pt', marginBottom: '6px' }}>
-                Корреспонденция счетов (графы 10, 11) отражена в журнале операций за{' '}
-                <input
-                  style={{ ...underlineInputStyle, width: '80px', fontSize: '8pt', textAlign: 'center' }}
-                  value={form.accountingJournalPeriod}
-                  onChange={e => updateField('accountingJournalPeriod', e.target.value)}
-                />
-                {' '}г.
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', flexWrap: 'wrap', fontSize: '8pt', marginBottom: '4px' }}>
-                <span>Исполнитель</span>
-                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <input
-                    style={{ ...underlineInputStyle, width: '80px', fontSize: '8pt', textAlign: 'center' }}
-                    value={form.accountingExecutorPosition}
-                    onChange={e => updateField('accountingExecutorPosition', e.target.value)}
-                  />
-                  <span style={{ fontSize: '6pt', color: '#555' }}>(должность)</span>
-                </div>
-                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <span style={{ borderBottom: '1px solid #000', display: 'inline-block', minWidth: '70px', height: '14px' }}>&nbsp;</span>
-                  <span style={{ fontSize: '6pt', color: '#555' }}>(подпись)</span>
-                </div>
-                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <input
-                    style={{ ...underlineInputStyle, width: '90px', fontSize: '8pt', textAlign: 'center' }}
-                    value={form.accountingExecutorName}
-                    onChange={e => updateField('accountingExecutorName', e.target.value)}
-                  />
-                  <span style={{ fontSize: '6pt', color: '#555' }}>(расшифровка подписи)</span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '4px' }}>
-                <input
-                  style={{ ...underlineInputStyle, width: '140px', fontSize: '8pt' }}
-                  value={form.accountingDate}
-                  onChange={e => updateField('accountingDate', e.target.value)}
-                  placeholder="«__» __________ 20__ г."
-                />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: '16px', paddingTop: '8px' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Получил</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
-              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                <input
-                  style={{ ...underlineInputStyle, width: '140px', textAlign: 'center' }}
-                  value={form.receivedByRank}
-                  onChange={e => updateField('receivedByRank', e.target.value)}
-                />
-                <span style={{ fontSize: '7pt', color: '#555' }}>(звание)</span>
-              </div>
-              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ borderBottom: '1px solid #000', display: 'inline-block', minWidth: '140px', height: '16px' }}>&nbsp;</span>
-                <span style={{ fontSize: '7pt', color: '#555' }}>(подпись)</span>
-              </div>
-              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                <input
-                  style={{ ...underlineInputStyle, width: '180px', textAlign: 'center' }}
-                  value={form.receivedByName}
-                  onChange={e => updateField('receivedByName', e.target.value)}
-                />
-                <span style={{ fontSize: '7pt', color: '#555' }}>(расшифровка подписи)</span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '4px' }}>
-              <input
-                style={{ ...underlineInputStyle, width: '200px' }}
-                value={form.receivedByDate}
-                onChange={e => updateField('receivedByDate', e.target.value)}
-                placeholder="«__» __________ 20__ г."
-              />
-            </div>
+              +
+            </button>
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        <div
+          className="flex-1 overflow-auto bg-gray-100"
+          style={{ padding: 40 }}
+          onMouseDown={handleCanvasMouseDown}
+        >
+          <div
+            ref={canvasRef}
+            className="relative mx-auto bg-white shadow-lg"
+            style={{
+              width: CANVAS_W,
+              height: CANVAS_H,
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top left',
+              backgroundImage: dotPattern,
+              backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+            }}
+            onMouseDown={handleCanvasMouseDown}
+          >
+            {blocks.map(block => (
+              <div
+                key={block.id}
+                style={{
+                  position: 'absolute',
+                  left: block.x,
+                  top: block.y,
+                  width: block.w,
+                  height: block.type === 'frame' || block.type === 'table' ? block.h : undefined,
+                  minHeight: block.type === 'line' ? 2 : undefined,
+                  cursor: editingId === block.id || editingCell?.blockId === block.id ? 'default' : 'move',
+                  outline: selectedId === block.id ? '2px solid #3b82f6' : 'none',
+                  outlineOffset: 1,
+                  zIndex: selectedId === block.id ? 10 : 1,
+                  userSelect: editingId === block.id || editingCell?.blockId === block.id ? 'text' : 'none',
+                }}
+                onMouseDown={(e) => handleBlockMouseDown(e, block.id)}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  if (block.type === 'text' || block.type === 'signature' || block.type === 'frame') {
+                    setEditingId(block.id);
+                  }
+                }}
+              >
+                {renderBlock(block)}
+                {selectedId === block.id && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: -4,
+                      bottom: -4,
+                      width: 8,
+                      height: 8,
+                      background: '#3b82f6',
+                      cursor: 'nwse-resize',
+                      borderRadius: 1,
+                    }}
+                    onMouseDown={(e) => handleResizeMouseDown(e, block.id)}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {renderPropertyPanel()}
       </div>
     </div>
   );
