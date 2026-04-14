@@ -378,8 +378,7 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
 <div style="margin-top:3pt"><b>Исполнитель</b></div>
 <div><span class="u">${f.accExecRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.accExecSign}</span> <span class="lbl">(подпись)</span> <span class="u">${f.accExecName}</span> <span class="lbl">(расшифровка подписи)</span></div>
 <div><span class="lbl">"</span><span class="u">${f.accExecDay}</span><span class="lbl">" </span><span class="u">${f.accExecMonth}</span><span class="lbl"> 20</span><span class="u">${f.accExecYear}</span><span class="lbl"> г.</span></div></div></div>
-<div style="margin-top:8pt"><div class="ft"><b>Получил</b> <span class="u">${f.recRank}</span> <span class="lbl">(звание)</span></div>
-<div class="ft"><span class="u">${f.recSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:120px">${f.recName}</span> <span class="lbl">(расшифровка подписи)</span></div>
+<div style="margin-top:8pt"><div class="ft"><b>Получил</b> <span class="u">${f.recRank}</span> <span class="lbl">(звание)</span> <span class="u">${f.recSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:120px">${f.recName}</span> <span class="lbl">(расшифровка подписи)</span></div>
 <div class="ft">${f.date}</div></div>
 </body></html>`;
     const w = window.open('', '_blank');
@@ -567,8 +566,6 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
             <div className="flex items-end gap-1.5">
               <span className="font-bold">Получил</span>
               <div className="text-center"><EF k="recRank" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(звание)</div></div>
-            </div>
-            <div className="flex items-end gap-1.5 pl-14">
               <div className="text-center"><EF k="recSign" w="100px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
               <div className="text-center"><EF k="recName" w="160px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
             </div>
