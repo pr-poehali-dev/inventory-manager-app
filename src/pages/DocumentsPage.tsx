@@ -1,18 +1,13 @@
 import { useState, useRef, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import Icon from '@/components/ui/icon';
-import { AppState, Receipt, WorkOrder, Attachment, InvoiceTemplate, generateId, crudAction, saveState } from '@/data/store';
-import InvoiceDesigner from './documents/InvoiceDesigner';
-import { create0504204Template } from '@/data/invoice0504204';
-import { excelToTemplate } from '@/data/excelImport';
+import { AppState, Attachment, generateId, crudAction } from '@/data/store';
+
 
 type Props = { state: AppState; onStateChange: (s: AppState) => void };
 
-type TabKey = 'receipts' | 'expenses' | 'templates';
+type TabKey = 'receipts' | 'expenses';
 
 const formatBytes = (b: number) =>
   b < 1024 ? `${b} Б` : b < 1048576 ? `${(b / 1024).toFixed(1)} КБ` : `${(b / 1048576).toFixed(1)} МБ`;
@@ -37,144 +32,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-/* ─── Template Editor Modal ─────────────────────────────────────────────── */
-
-function TemplateEditorModal({
-  template,
-  onSave,
-  onClose,
-}: {
-  template: InvoiceTemplate | null;
-  onSave: (t: InvoiceTemplate) => void;
-  onClose: () => void;
-}) {
-  const isEdit = !!template;
-  const [name, setName] = useState(template?.name || '');
-  const [companyName, setCompanyName] = useState(template?.companyName || '');
-  const [companyAddress, setCompanyAddress] = useState(template?.companyAddress || '');
-  const [companyInn, setCompanyInn] = useState(template?.companyInn || '');
-  const [companyKpp, setCompanyKpp] = useState(template?.companyKpp || '');
-  const [bankDetails, setBankDetails] = useState(template?.bankDetails || '');
-  const [headerText, setHeaderText] = useState(template?.headerText || '');
-  const [footerText, setFooterText] = useState(template?.footerText || '');
-  const [signatory, setSignatory] = useState(template?.signatory || '');
-  const [signatoryRole, setSignatoryRole] = useState(template?.signatoryRole || '');
-
-  const canSave = name.trim() && companyName.trim();
-
-  const handleSave = () => {
-    if (!canSave) return;
-    const now = new Date().toISOString();
-    const t: InvoiceTemplate = {
-      id: template?.id || generateId(),
-      name: name.trim(),
-      companyName: companyName.trim(),
-      companyAddress: companyAddress.trim() || undefined,
-      companyInn: companyInn.trim() || undefined,
-      companyKpp: companyKpp.trim() || undefined,
-      bankDetails: bankDetails.trim() || undefined,
-      headerText: headerText.trim() || undefined,
-      footerText: footerText.trim() || undefined,
-      signatory: signatory.trim() || undefined,
-      signatoryRole: signatoryRole.trim() || undefined,
-      createdAt: template?.createdAt || now,
-      updatedAt: now,
-    };
-    onSave(t);
-  };
-
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto animate-scale-in">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
-              <Icon name="FileSignature" size={15} />
-            </div>
-            {isEdit ? 'Редактировать шаблон' : 'Новый шаблон накладной'}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-3 pt-2">
-          {/* Name */}
-          <div className="space-y-1.5">
-            <Label>Название шаблона *</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Например: Основная накладная" />
-          </div>
-
-          {/* Company Name */}
-          <div className="space-y-1.5">
-            <Label>Название организации *</Label>
-            <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder='ООО "Компания"' />
-          </div>
-
-          {/* Address */}
-          <div className="space-y-1.5">
-            <Label>Адрес</Label>
-            <Input value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} placeholder="г. Москва, ул. Примерная, 1" />
-          </div>
-
-          {/* INN + KPP */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>ИНН</Label>
-              <Input value={companyInn} onChange={e => setCompanyInn(e.target.value)} placeholder="1234567890" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>КПП</Label>
-              <Input value={companyKpp} onChange={e => setCompanyKpp(e.target.value)} placeholder="123456789" />
-            </div>
-          </div>
-
-          {/* Bank details */}
-          <div className="space-y-1.5">
-            <Label>Банковские реквизиты</Label>
-            <Textarea
-              value={bankDetails}
-              onChange={e => setBankDetails(e.target.value)}
-              placeholder={"р/с 40702810...\nБИК 044525...\nБанк: ..."}
-              rows={3}
-            />
-          </div>
-
-          {/* Header text */}
-          <div className="space-y-1.5">
-            <Label>Текст в шапке</Label>
-            <Input value={headerText} onChange={e => setHeaderText(e.target.value)} placeholder="Товарная накладная" />
-          </div>
-
-          {/* Footer text */}
-          <div className="space-y-1.5">
-            <Label>Текст внизу</Label>
-            <Input value={footerText} onChange={e => setFooterText(e.target.value)} placeholder="Основание: договор поставки" />
-          </div>
-
-          {/* Signatory */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Подписант</Label>
-              <Input value={signatory} onChange={e => setSignatory(e.target.value)} placeholder="Иванов И.И." />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Должность подписанта</Label>
-              <Input value={signatoryRole} onChange={e => setSignatoryRole(e.target.value)} placeholder="Генеральный директор" />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 pt-2">
-            <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
-            <Button disabled={!canSave} onClick={handleSave} className="flex-1">
-              <Icon name="Save" size={14} className="mr-1.5" />
-              {isEdit ? 'Сохранить' : 'Создать'}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /* ─── Main Component ────────────────────────────────────────────────────── */
 
 export default function DocumentsPage({ state, onStateChange }: Props) {
@@ -184,42 +41,8 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
 
-  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<InvoiceTemplate | null>(null);
-  const [deleteTemplateConfirm, setDeleteTemplateConfirm] = useState<string | null>(null);
-  const [designerTemplate, setDesignerTemplate] = useState<InvoiceTemplate | null>(null);
-  const excelInputRef = useRef<HTMLInputElement>(null);
-
-  const handleExcelUpload = (files: FileList | null) => {
-    const file = files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const buf = ev.target?.result as ArrayBuffer;
-        const tpl = excelToTemplate(buf, file.name);
-        const exists = (state.invoiceTemplates || []).some(x => x.id === tpl.id);
-        const next = {
-          ...state,
-          invoiceTemplates: exists
-            ? (state.invoiceTemplates || []).map(x => x.id === tpl.id ? tpl : x)
-            : [...(state.invoiceTemplates || []), tpl],
-        };
-        onStateChange(next);
-        saveState(next);
-        setTab('templates');
-        setDesignerTemplate(tpl);
-      } catch (err) {
-        console.error('Excel import error:', err);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    if (excelInputRef.current) excelInputRef.current.value = '';
-  };
-
   const receipts = state.receipts || [];
   const workOrders = state.workOrders || [];
-  const templates = state.invoiceTemplates || [];
 
   /* ─── Filtered lists ──────────────────────────────────────────────── */
 
@@ -243,15 +66,6 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
       (o.recipientName || '').toLowerCase().includes(q)
     );
   }, [workOrders, search]);
-
-  const filteredTemplates = useMemo(() => {
-    if (!search.trim()) return templates;
-    const q = search.toLowerCase();
-    return templates.filter(t =>
-      t.name.toLowerCase().includes(q) ||
-      t.companyName.toLowerCase().includes(q)
-    );
-  }, [templates, search]);
 
   /* ─── Stats ───────────────────────────────────────────────────────── */
 
@@ -299,35 +113,11 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
     setTimeout(() => fileInputRef.current?.click(), 50);
   };
 
-  /* ─── Template actions ────────────────────────────────────────────── */
-
-  const handleSaveTemplate = (t: InvoiceTemplate) => {
-    const exists = templates.some(x => x.id === t.id);
-    const next = {
-      ...state,
-      invoiceTemplates: exists
-        ? templates.map(x => x.id === t.id ? t : x)
-        : [...templates, t],
-    };
-    onStateChange(next);
-    saveState(next);
-    setShowTemplateEditor(false);
-    setEditingTemplate(null);
-  };
-
-  const handleDeleteTemplate = (id: string) => {
-    const next = { ...state, invoiceTemplates: templates.filter(t => t.id !== id) };
-    onStateChange(next);
-    saveState(next);
-    setDeleteTemplateConfirm(null);
-  };
-
   /* ─── Tab config ──────────────────────────────────────────────────── */
 
   const TABS: { key: TabKey; label: string; icon: string; count: number }[] = [
     { key: 'receipts',  label: 'Приходы',            icon: 'PackageCheck', count: receiptDocs.length },
     { key: 'expenses',  label: 'Расходы',            icon: 'PackageMinus', count: expenseOrders.length },
-    { key: 'templates', label: 'Шаблоны накладных',  icon: 'FileSignature', count: templates.length },
   ];
 
   /* ─── Render helpers ──────────────────────────────────────────────── */
@@ -362,27 +152,17 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Документы</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {postedCount} приходов · {assembledCount} расходов · {totalReceiptAttachments} вложений · {templates.length} шаблонов
+            {postedCount} приходов · {assembledCount} расходов · {totalReceiptAttachments} вложений
           </p>
         </div>
-        {tab === 'templates' && (
-          <Button
-            onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-          >
-            <Icon name="Plus" size={16} />
-            Создать шаблон
-          </Button>
-        )}
       </div>
 
       {/* ─── Stats row ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {[
           { label: 'Приходы',      value: postedCount,             icon: 'PackageCheck',  color: 'text-emerald-600 dark:text-emerald-400' },
           { label: 'Расходы',      value: assembledCount,          icon: 'PackageMinus',  color: 'text-blue-600 dark:text-blue-400' },
           { label: 'Вложений',     value: totalReceiptAttachments, icon: 'Paperclip',     color: 'text-amber-600 dark:text-amber-400' },
-          { label: 'Шаблонов',     value: templates.length,        icon: 'FileSignature', color: 'text-violet-600 dark:text-violet-400' },
         ].map(s => (
           <div key={s.label} className="bg-card border border-border rounded-xl p-3 shadow-card text-center">
             <Icon name={s.icon} size={16} className={`mx-auto mb-1 ${s.color}`} />
@@ -421,8 +201,7 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
           onChange={e => setSearch(e.target.value)}
           placeholder={
             tab === 'receipts' ? 'Поиск по номеру или поставщику...'
-            : tab === 'expenses' ? 'Поиск по номеру, названию или получателю...'
-            : 'Поиск по названию шаблона...'
+            : 'Поиск по номеру, названию или получателю...'
           }
           className="pl-9"
         />
@@ -629,176 +408,6 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
               );
             })
           )}
-        </div>
-      )}
-
-      {/* ─── Tab: Templates ───────────────────────────────────────── */}
-      {tab === 'templates' && (
-        <div className="space-y-2">
-          {filteredTemplates.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <Icon name="FileSignature" size={36} className="mx-auto mb-3 opacity-30" />
-              <p className="font-medium">Нет шаблонов накладных</p>
-              <p className="text-sm mt-1">Создайте шаблон, чтобы быстро формировать накладные</p>
-              <div className="flex flex-col gap-2 mt-4 items-center">
-                <Button
-                  onClick={() => excelInputRef.current?.click()}
-                  className="gap-2"
-                >
-                  <Icon name="FileSpreadsheet" size={14} />
-                  Загрузить из Excel
-                </Button>
-                <Button
-                  onClick={() => { const t = create0504204Template(); handleSaveTemplate(t); setDesignerTemplate(t); }}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <Icon name="FileSignature" size={14} />
-                  Шаблон 0504204
-                </Button>
-                <Button
-                  onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }}
-                  variant="ghost"
-                  className="gap-2 text-xs"
-                >
-                  <Icon name="Plus" size={14} />
-                  Пустой шаблон
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-            {filteredTemplates.map(tmpl => (
-              <div key={tmpl.id} className="bg-card border border-border rounded-xl shadow-card p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300 flex items-center justify-center shrink-0">
-                    <Icon name="FileSignature" size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm">{tmpl.name}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {tmpl.companyName}
-                      {tmpl.companyInn && <span className="ml-2">ИНН {tmpl.companyInn}</span>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => setDesignerTemplate(tmpl)}
-                      className="p-2 rounded-lg hover:bg-primary/10 transition-colors text-primary"
-                      title="Конструктор"
-                    >
-                      <Icon name="PenTool" size={14} />
-                    </button>
-                    <button
-                      onClick={() => { setEditingTemplate(tmpl); setShowTemplateEditor(true); }}
-                      className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                      title="Реквизиты"
-                    >
-                      <Icon name="Pencil" size={14} />
-                    </button>
-                    <button
-                      onClick={() => setDeleteTemplateConfirm(tmpl.id)}
-                      className="p-2 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
-                      title="Удалить"
-                    >
-                      <Icon name="Trash2" size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Template details */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 mt-3 text-sm">
-                  {tmpl.companyAddress && (
-                    <div className="col-span-2 sm:col-span-3">
-                      <span className="text-muted-foreground text-xs">Адрес: </span>
-                      <span className="text-xs">{tmpl.companyAddress}</span>
-                    </div>
-                  )}
-                  {tmpl.headerText && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Шапка: </span>
-                      <span className="text-xs">{tmpl.headerText}</span>
-                    </div>
-                  )}
-                  {tmpl.signatory && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Подписант: </span>
-                      <span className="text-xs">{tmpl.signatory}</span>
-                    </div>
-                  )}
-                  {tmpl.signatoryRole && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Должность: </span>
-                      <span className="text-xs">{tmpl.signatoryRole}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-[11px] text-muted-foreground mt-2 flex items-center gap-3">
-                  <span>Обновлен: {new Date(tmpl.updatedAt).toLocaleDateString('ru-RU')}</span>
-                  {tmpl.elements && tmpl.elements.length > 0 && (
-                    <span className="flex items-center gap-1"><Icon name="LayoutGrid" size={10} />{tmpl.elements.length} элементов</span>
-                  )}
-                </div>
-              </div>
-            ))}
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => excelInputRef.current?.click()} className="gap-1.5">
-                <Icon name="FileSpreadsheet" size={13} />Загрузить из Excel
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }} className="gap-1.5">
-                <Icon name="Plus" size={13} />Новый шаблон
-              </Button>
-            </div>
-            </>
-          )}
-        </div>
-      )}
-
-      <input ref={excelInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleExcelUpload(e.target.files)} />
-
-      {/* ─── Template Editor Modal ────────────────────────────────── */}
-      {showTemplateEditor && (
-        <TemplateEditorModal
-          template={editingTemplate}
-          onSave={handleSaveTemplate}
-          onClose={() => { setShowTemplateEditor(false); setEditingTemplate(null); }}
-        />
-      )}
-
-      {/* ─── Delete Template Confirm ──────────────────────────────── */}
-      {deleteTemplateConfirm && (
-        <Dialog open onOpenChange={() => setDeleteTemplateConfirm(null)}>
-          <DialogContent className="max-w-xs animate-scale-in">
-            <DialogHeader>
-              <DialogTitle>Удалить шаблон?</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-muted-foreground">
-              Шаблон будет удален без возможности восстановления.
-            </p>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" onClick={() => setDeleteTemplateConfirm(null)} className="flex-1">
-                Отмена
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => handleDeleteTemplate(deleteTemplateConfirm)}
-                className="flex-1"
-              >
-                Удалить
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {designerTemplate && (
-        <div className="fixed inset-0 z-50 bg-background">
-          <InvoiceDesigner
-            template={designerTemplate}
-            onSave={(t) => { handleSaveTemplate(t); setDesignerTemplate(null); }}
-            onClose={() => setDesignerTemplate(null)}
-          />
         </div>
       )}
     </div>

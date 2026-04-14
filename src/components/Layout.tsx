@@ -4,7 +4,7 @@ import { AppState, crudAction } from '@/data/store';
 import QRScanner from '@/components/QRScanner';
 import { useAuth } from '@/data/auth';
 
-export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'documents' | 'technician' | 'partners' | 'history' | 'settings' | 'dashboard' | 'inventory' | 'labels' | 'audit';
+export type Page = 'catalog' | 'nomenclature' | 'assembly' | 'warehouse' | 'receipts' | 'documents' | 'technician' | 'partners' | 'history' | 'settings' | 'dashboard' | 'inventory' | 'labels' | 'audit' | 'invoice';
 
 type LayoutProps = {
   state: AppState;
@@ -80,6 +80,7 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     { id: 'warehouse',     label: 'Склады',          icon: 'Map' },
     { id: 'receipts',      label: 'Приёмка',         icon: 'PackagePlus' },
     { id: 'documents',     label: 'Документы',       icon: 'FileText' },
+    { id: 'invoice',       label: 'Накладная',       icon: 'FileSignature' },
     { id: 'dashboard',     label: 'Аналитика',       icon: 'BarChart3' },
     { id: 'nomenclature',  label: 'Номенклатура',    icon: 'List' },
     { id: 'inventory',     label: 'Инвентаризация',  icon: 'ClipboardCheck' },
@@ -91,8 +92,8 @@ export default function Layout({ state, onStateChange, activePage, onPageChange,
     { id: 'settings',      label: 'Настройки',       icon: 'Settings' },
   ];
 
-  const desktopNavVisible = navItems.slice(0, 7);
-  const desktopNavHidden = navItems.slice(7);
+  const desktopNavVisible = navItems.slice(0, 8);
+  const desktopNavHidden = navItems.slice(8);
   const desktopMoreIsActive = desktopNavHidden.some(n => n.id === activePage);
 
   // Mobile bottom nav — 4 primary + "Ещё" button
