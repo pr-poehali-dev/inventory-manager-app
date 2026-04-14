@@ -359,21 +359,29 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
 <div class="row" style="display:flex;gap:20pt"><div>Затребовал <span class="u">${f.reqRank}</span> <span class="lbl">(звание)</span> <span class="u" style="min-width:80px">${f.reqName}</span> <span class="lbl">(фамилия, инициалы)</span></div>
 <div>Разрешил <span class="u">${f.appRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.appSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:80px">${f.appName}</span> <span class="lbl">(расшифровка подписи)</span></div></div>
 <table class="m"><thead>
-<tr><th rowspan="2" colspan="2" style="min-width:130px">Материальные ценности</th><th colspan="2">номер</th><th colspan="2">Единица измерения</th><th rowspan="2">Цена</th><th colspan="2">Количество</th><th rowspan="2">Сумма<br>(без НДС)</th><th colspan="2">Корреспондирующие счета</th><th rowspan="2">Примечание</th></tr>
-<tr><th>наименование</th><th style="font-size:6.5pt">номенкла-<br>турный</th><th style="font-size:6.5pt">паспорта (иной)</th><th style="font-size:6.5pt">наимено-<br>вание</th><th style="font-size:6.5pt">код по ОКЕИ</th><th style="font-size:6.5pt">затре-<br>бовано</th><th style="font-size:6.5pt">отпу-<br>щено</th><th>дебет</th><th>кредит</th></tr>
+<tr><th colspan="3">Материальные ценности</th><th colspan="2">номер</th><th colspan="2">Единица измерения</th><th rowspan="3">Цена</th><th colspan="2">Количество</th><th rowspan="3">Сумма<br>(без НДС)</th><th colspan="2">Корреспондирующие счета</th><th rowspan="3">Примечание</th></tr>
+<tr><th rowspan="2">наименование</th><th rowspan="2" style="font-size:6.5pt">номенкла-<br>турный</th><th rowspan="2" style="font-size:6.5pt">паспорта (иной)</th><th rowspan="2" style="font-size:6.5pt">наимено-<br>вание</th><th rowspan="2" style="font-size:6.5pt">код по<br>ОКЕИ</th><th style="font-size:6.5pt">затре-<br>бовано</th><th style="font-size:6.5pt">отпу-<br>щено</th><th rowspan="2">дебет</th><th rowspan="2">кредит</th></tr>
+<tr></tr>
 <tr><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th></tr>
 </thead><tbody>${rh}
 <tr style="font-weight:bold"><td colspan="6" style="text-align:right">Итого</td><td class="r">${totReq}</td><td class="r">${totRel}</td><td colspan="4"></td></tr></tbody></table>
-<div style="display:flex;gap:8pt;margin-top:6pt;align-items:flex-start">
-<div style="flex:1"><div class="ft"><b>Отпустил</b></div><div class="ft"><span class="u">${f.relRank}</span> <span class="lbl">(звание)</span> <span class="u">${f.relSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:80px">${f.relName}</span> <span class="lbl">(расшифровка подписи)</span></div>
-<div class="ft" style="margin-left:16pt"><b>Фио</b> <span class="u" style="min-width:100px">${f.relFio}</span> <span class="lbl">(расшифровка подписи)</span></div><div class="ft" style="margin-left:16pt">${f.date}</div></div>
-<div style="flex:1"><div class="ft"><b>Ответственный исполнитель</b></div><div class="ft"><span class="u">${f.respRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.respSign}</span> <span class="lbl">(подпись)</span></div>
+<div style="display:flex;gap:8pt;margin-top:8pt;align-items:flex-start">
+<div style="flex:1"><div class="ft"><b>Отпустил</b></div>
+<div class="ft"><span class="u">${f.relRank}</span> <span class="lbl">(звание)</span> <span class="u">${f.relSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:80px">${f.relName}</span> <span class="lbl">(расшифровка подписи)</span></div>
+<div class="ft" style="margin-left:16pt"><b>Фио</b> <span class="u" style="min-width:100px">${f.relFio}</span> <span class="lbl">(расшифровка подписи)</span></div>
+<div class="ft" style="margin-left:16pt">${f.date}</div></div>
+<div style="flex:1"><div class="ft"><b>Ответственный исполнитель</b></div>
+<div class="ft"><span class="u">${f.respRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.respSign}</span> <span class="lbl">(подпись)</span></div>
+<div class="ft"><span class="u">${f.respSignName}</span> <span class="lbl">(расшифровка подписи)</span></div>
 <div class="ft"><span class="lbl">"</span><span class="u">${f.relDay}</span><span class="lbl">" </span><span class="u">${f.relMonth}</span><span class="lbl"> 20</span><span class="u">${f.relYear}</span><span class="lbl"> г.</span></div></div>
-<div class="acc" style="min-width:220px"><div style="text-align:center;font-weight:bold;margin-bottom:2pt">Отметка бухгалтерии</div><div>Корреспонденция счетов (графы 10, 11) отражена</div><div>в журнале операций за <span class="u">${f.accJournalMonth}</span> 20<span class="u">${f.accYear}</span> г.</div>
-<div style="margin-top:3pt"><b>Исполнитель</b></div><div><span class="u">${f.accExecRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.accExecSign}</span> <span class="lbl">(подпись)</span> <span class="u">${f.accExecName}</span> <span class="lbl">(расшифровка подписи)</span></div>
+<div class="acc" style="min-width:220px"><div style="text-align:center;font-weight:bold;margin-bottom:2pt">Отметка бухгалтерии</div>
+<div>Корреспонденция счетов (графы 10, 11) отражена</div><div>в журнале операций за <span class="u">${f.accJournalMonth}</span> 20<span class="u">${f.accYear}</span> г.</div>
+<div style="margin-top:3pt"><b>Исполнитель</b></div>
+<div><span class="u">${f.accExecRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.accExecSign}</span> <span class="lbl">(подпись)</span> <span class="u">${f.accExecName}</span> <span class="lbl">(расшифровка подписи)</span></div>
 <div><span class="lbl">"</span><span class="u">${f.accExecDay}</span><span class="lbl">" </span><span class="u">${f.accExecMonth}</span><span class="lbl"> 20</span><span class="u">${f.accExecYear}</span><span class="lbl"> г.</span></div></div></div>
-<div style="margin-top:6pt"><div class="ft"><b>Получил</b> <span class="u">${f.recRank}</span> <span class="lbl">(звание)</span></div>
-<div class="ft"><span class="u">${f.recSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:120px">${f.recName}</span> <span class="lbl">(расшифровка подписи)</span></div><div class="ft">${f.date}</div></div>
+<div style="margin-top:8pt"><div class="ft"><b>Получил</b> <span class="u">${f.recRank}</span> <span class="lbl">(звание)</span></div>
+<div class="ft"><span class="u">${f.recSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:120px">${f.recName}</span> <span class="lbl">(расшифровка подписи)</span></div>
+<div class="ft">${f.date}</div></div>
 </body></html>`;
     const w = window.open('', '_blank');
     if (!w) return;
@@ -463,26 +471,27 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
             <table className="w-full border-collapse" style={{ fontSize: '7.5pt', border: '1px solid #000' }}>
               <thead>
                 <tr>
-                  <th rowSpan={2} colSpan={2} className={`${bb} px-1 py-0.5`} style={{ minWidth: 140 }}>Материальные ценности</th>
+                  <th colSpan={3} className={`${bb} px-1 py-0.5`}>Материальные ценности</th>
                   <th colSpan={2} className={`${bb} px-1 py-0.5`}>номер</th>
                   <th colSpan={2} className={`${bb} px-1 py-0.5`}>Единица<br/>измерения</th>
-                  <th rowSpan={2} className={`${bb} px-1 py-0.5 align-middle`} style={{ width: 46 }}>Цена</th>
+                  <th rowSpan={3} className={`${bb} px-1 py-0.5 align-middle`} style={{ width: 46 }}>Цена</th>
                   <th colSpan={2} className={`${bb} px-1 py-0.5`}>Количество</th>
-                  <th rowSpan={2} className={`${bb} px-1 py-0.5 align-middle`} style={{ width: 52 }}>Сумма<br/>(без НДС)</th>
+                  <th rowSpan={3} className={`${bb} px-1 py-0.5 align-middle`} style={{ width: 52 }}>Сумма<br/>(без НДС)</th>
                   <th colSpan={2} className={`${bb} px-1 py-0.5`}>Корреспондирующие счета</th>
-                  <th rowSpan={2} className={`${bb} px-1 py-0.5 align-middle`} style={{ width: 66 }}>Примечание</th>
+                  <th rowSpan={3} className={`${bb} px-1 py-0.5 align-middle`} style={{ width: 66 }}>Примечание</th>
                 </tr>
                 <tr>
-                  <th className={`${bb} px-1 py-0.5`}>наименование</th>
-                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>номенкла-<br/>турный</th>
-                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>паспорта<br/>(иной)</th>
-                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>наимено-<br/>вание</th>
-                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>код по<br/>ОКЕИ</th>
-                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>затре-<br/>бовано</th>
-                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt' }}>отпу-<br/>щено</th>
-                  <th className={`${bb} px-1 py-0.5`}>дебет</th>
-                  <th className={`${bb} px-1 py-0.5`}>кредит</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5`} style={{ minWidth: 120 }}>наименование</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt', width: 52 }}>номенкла-<br/>турный</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt', width: 60 }}>паспорта<br/>(иной)</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt', width: 44 }}>наимено-<br/>вание</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt', width: 38 }}>код по<br/>ОКЕИ</th>
+                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt', width: 48 }}>затре-<br/>бовано</th>
+                  <th className={`${bb} px-1 py-0.5`} style={{ fontSize: '6.5pt', width: 48 }}>отпу-<br/>щено</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5`} style={{ width: 50 }}>дебет</th>
+                  <th rowSpan={2} className={`${bb} px-1 py-0.5`} style={{ width: 50 }}>кредит</th>
                 </tr>
+                <tr></tr>
                 <tr>{['1','2','3','4','5','6','7','8','9','10','11','12'].map(n => <th key={n} className={`${bb} px-1 py-0 font-normal text-gray-500`} style={{ fontSize: '6.5pt' }}>{n}</th>)}</tr>
               </thead>
               <tbody>
@@ -532,6 +541,9 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
               <div className="flex items-end gap-1.5 flex-wrap">
                 <div className="text-center"><EF k="respRole" w="90px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(должность)</div></div>
                 <div className="text-center"><EF k="respSign" w="80px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
+              </div>
+              <div className="flex items-end gap-1.5">
+                <div className="text-center"><EF k="respSignName" w="140px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
               </div>
               <div className="flex items-center gap-0.5" style={{ fontSize: '7.5pt' }}>
                 <span>{'" '}</span><EF k="relDay" w="24px" a="center" /><span>{' " '}</span><EF k="relMonth" w="60px" a="center" /><span> 20</span><EF k="relYear" w="20px" a="center" /><span> г.</span>
