@@ -198,7 +198,14 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
       try {
         const buf = ev.target?.result as ArrayBuffer;
         const tpl = excelToTemplate(buf, file.name);
-        handleSaveTemplate(tpl);
+        const exists = (state.invoiceTemplates || []).some(x => x.id === tpl.id);
+        onStateChange({
+          ...state,
+          invoiceTemplates: exists
+            ? (state.invoiceTemplates || []).map(x => x.id === tpl.id ? tpl : x)
+            : [...(state.invoiceTemplates || []), tpl],
+        });
+        setTab('templates');
         setDesignerTemplate(tpl);
       } catch (err) {
         console.error('Excel import error:', err);
