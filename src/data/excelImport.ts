@@ -1,9 +1,7 @@
 import * as XLSX from 'xlsx';
 import { InvoiceTemplate, InvElement, InvGridCell, generateId } from './store';
 
-const DEFAULT_COL_WCH = 8.43;
 const DEFAULT_ROW_HPT = 15;
-const CHAR_PX = 7.5;
 const PT_PX = 1.333;
 const PAD_X = 20;
 const PAD_Y = 20;
@@ -11,17 +9,23 @@ const PAD_Y = 20;
 type MergeRange = { s: { r: number; c: number }; e: { r: number; c: number } };
 
 function colToPx(col: Record<string, unknown> | undefined): number {
-  if (!col) return Math.round(DEFAULT_COL_WCH * CHAR_PX);
-  if (col.wpx) return Math.round(col.wpx as number);
-  if (col.wch) return Math.round((col.wch as number) * CHAR_PX);
-  if (col.width) return Math.round((col.width as number) * CHAR_PX);
-  return Math.round(DEFAULT_COL_WCH * CHAR_PX);
+  if (!col) return 64;
+  if (typeof col.wpx === 'number') return Math.round(col.wpx);
+  if (typeof col.wch === 'number') {
+    const wch = col.wch;
+    if (wch <= 0) return 2;
+    return Math.max(2, Math.round(Math.trunc((wch * 7 + 5) / 7 * 256) / 256 * 7));
+  }
+  if (typeof col.width === 'number') {
+    return Math.max(2, Math.round(col.width as number));
+  }
+  return 64;
 }
 
 function rowToPx(row: Record<string, unknown> | undefined): number {
   if (!row) return Math.round(DEFAULT_ROW_HPT * PT_PX);
-  if (row.hpx) return Math.round(row.hpx as number);
-  if (row.hpt) return Math.round((row.hpt as number) * PT_PX);
+  if (typeof row.hpx === 'number') return Math.max(2, Math.round(row.hpx));
+  if (typeof row.hpt === 'number') return Math.max(2, Math.round((row.hpt as number) * PT_PX));
   return Math.round(DEFAULT_ROW_HPT * PT_PX);
 }
 
@@ -45,18 +49,25 @@ export function excelToTemplate(buffer: ArrayBuffer, fileName: string): InvoiceT
 
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
   const merges: MergeRange[] = (ws['!merges'] || []) as MergeRange[];
-  const customCols = (ws['!cols'] || []) as (Record<string, unknown> | undefined)[];
-  const customRows = (ws['!rows'] || []) as (Record<string, unknown> | undefined)[];
+  const rawCols = (ws['!cols'] || []) as (Record<string, unknown> | undefined)[];
+  const rawRows = (ws['!rows'] || []) as (Record<string, unknown> | undefined)[];
+
+  console.log('[Excel Import] cols raw:', rawCols.slice(0, 20).map((c, i) => ({ i, ...c })));
+  console.log('[Excel Import] rows raw:', rawRows.slice(0, 10).map((r, i) => ({ i, ...r })));
 
   const gridCols: number[] = [];
   for (let c = range.s.c; c <= range.e.c; c++) {
-    gridCols.push(colToPx(customCols[c]));
+    gridCols.push(colToPx(rawCols[c]));
   }
 
   const gridRows: number[] = [];
   for (let r = range.s.r; r <= range.e.r; r++) {
-    gridRows.push(rowToPx(customRows[r]));
+    gridRows.push(rowToPx(rawRows[r]));
   }
+
+  console.log('[Excel Import] gridCols (px):', gridCols);
+  console.log('[Excel Import] gridRows (px):', gridRows.slice(0, 20));
+  console.log('[Excel Import] total:', gridCols.reduce((a, b) => a + b, 0), 'x', gridRows.reduce((a, b) => a + b, 0));
 
   const skipSet = new Set<string>();
   merges.forEach(m => {
