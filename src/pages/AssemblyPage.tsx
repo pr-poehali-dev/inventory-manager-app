@@ -139,12 +139,11 @@ export default function AssemblyPage({ state, onStateChange, initialOrderId }: P
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <span className="font-mono text-xs text-muted-foreground">{order.number}</span>
+                      <span className="font-semibold text-foreground group-hover:text-primary transition-colors">{'\u2116'}{order.number}</span>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getOrderStatusColor(order.status)}`}>{getOrderStatusLabel(order.status)}</span>
                       {hasShortage && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-destructive/12 text-destructive flex items-center gap-1"><Icon name="AlertTriangle" size={10} />Нехватка</span>}
                       {isReopenable && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-warning/12 text-warning flex items-center gap-1"><Icon name="RotateCcw" size={10} />Возобновить</span>}
                     </div>
-                    <div className="font-semibold text-foreground group-hover:text-primary transition-colors">{order.title}</div>
                     {order.recipientName && (
                       <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                         <Icon name="User" size={10} />{order.recipientName}

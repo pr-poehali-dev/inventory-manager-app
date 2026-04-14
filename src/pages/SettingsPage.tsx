@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import { AppState, crudAction, getEmptyState, saveState } from '@/data/store';
+import { AppState, crudAction, getEmptyState, saveState, guardState } from '@/data/store';
 import { useAuth } from '@/data/auth';
 import { ProfileSection, AlertsSection, TelegramSection } from './settings/ProfileSections';
 import { WarehousesSection, CategoriesSection, LocationsSection } from './settings/EntitySections';
@@ -20,6 +20,7 @@ export default function SettingsPage({ state, onStateChange }: Props) {
   const [threshold, setThreshold] = useState(String(state.defaultLowStockThreshold));
   const [saved, setSaved] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ label: string; onConfirm: () => void } | null>(null);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const saveProfile = () => {
     const next = { ...state, currentUser: userName, defaultLowStockThreshold: parseInt(threshold) || 5 };
@@ -107,55 +108,144 @@ export default function SettingsPage({ state, onStateChange }: Props) {
           {activeSection === 'users' && isAdmin && <UsersSection />}
 
           {activeSection === 'data' && (
-            <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
-              <h2 className="font-semibold text-foreground">Управление данными</h2>
-              <p className="text-sm text-muted-foreground">
-                Полная очистка удалит все товары, операции, заявки, приходы, категории, склады и локации. Пользователь и настройки темы сохранятся.
-              </p>
-              <div className="p-3 bg-destructive/8 border border-destructive/20 rounded-lg flex items-start gap-2.5">
-                <Icon name="AlertTriangle" size={16} className="text-destructive mt-0.5 shrink-0" />
-                <span className="text-sm text-destructive font-medium">Это действие нельзя отменить. Все данные будут удалены безвозвратно.</span>
+            <div className="space-y-4">
+              <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+                <h2 className="font-semibold text-foreground flex items-center gap-2">
+                  <Icon name="Download" size={16} className="text-primary" />
+                  Резервное копирование
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Экспортируйте все данные в файл для сохранения резервной копии. Этот файл можно будет загрузить обратно для восстановления.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => {
+                      const data = JSON.stringify(state, null, 2);
+                      const blob = new Blob([data], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      const d = new Date();
+                      a.href = url;
+                      a.download = `backup_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}-${String(d.getMinutes()).padStart(2,'0')}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    <Icon name="Download" size={14} className="mr-1.5" />
+                    Создать резервную копию
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.json';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          try {
+                            const parsed = JSON.parse(ev.target?.result as string);
+                            if (!parsed.items || !Array.isArray(parsed.items)) {
+                              setImportStatus('error');
+                              setTimeout(() => setImportStatus('idle'), 3000);
+                              return;
+                            }
+                            handleDeleteConfirm('текущие данные и заменить их на данные из резервной копии', () => {
+                              const restored = guardState(parsed as AppState);
+                              onStateChange(restored);
+                              saveState(restored);
+                              setUserName(restored.currentUser);
+                              setThreshold(String(restored.defaultLowStockThreshold));
+                              setImportStatus('success');
+                              setTimeout(() => setImportStatus('idle'), 3000);
+                            });
+                          } catch {
+                            setImportStatus('error');
+                            setTimeout(() => setImportStatus('idle'), 3000);
+                          }
+                        };
+                        reader.readAsText(file);
+                      };
+                      input.click();
+                    }}
+                  >
+                    <Icon name="Upload" size={14} className="mr-1.5" />
+                    Загрузить резервную копию
+                  </Button>
+                </div>
+                {importStatus === 'success' && (
+                  <div className="p-3 bg-success/10 border border-success/20 rounded-lg flex items-center gap-2">
+                    <Icon name="CheckCircle" size={16} className="text-success shrink-0" />
+                    <span className="text-sm text-success font-medium">Данные успешно восстановлены из резервной копии</span>
+                  </div>
+                )}
+                {importStatus === 'error' && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2">
+                    <Icon name="XCircle" size={16} className="text-destructive shrink-0" />
+                    <span className="text-sm text-destructive font-medium">Ошибка: файл повреждён или имеет неверный формат</span>
+                  </div>
+                )}
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Icon name="Info" size={12} />
+                  Текущий объём данных: {(JSON.stringify(state).length / 1024).toFixed(1)} КБ · {state.items.length} товаров · {state.workOrders.length} заявок · {state.operations.length} операций
+                </div>
               </div>
-              <div className="flex flex-col gap-2">
-                <Button
-                  variant="outline"
-                  className="justify-start border-warning/40 text-warning hover:bg-warning/10"
-                  onClick={() => handleDeleteConfirm('историю, приходы, расходы, документы и остатки (номенклатура сохранится)', () => {
-                    const next: AppState = {
-                      ...state,
-                      operations: [],
-                      receipts: [],
-                      workOrders: [],
-                      techDocs: [],
-                      orderCounter: 1,
-                      receiptCounter: 1,
-                      taskCounter: 1,
-                      items: state.items.map(i => ({ ...i, quantity: 0 })),
-                      locationStocks: [],
-                      warehouseStocks: [],
-                    };
-                    onStateChange(next);
-                    saveState(next);
-                  })}
-                >
-                  <Icon name="Eraser" size={14} className="mr-1.5" />
-                  Очистить историю и остатки
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="justify-start"
-                  onClick={() => handleDeleteConfirm('все данные приложения', () => {
-                    const empty = getEmptyState(state.currentUser);
-                    empty.darkMode = state.darkMode;
-                    onStateChange(empty);
-                    saveState(empty);
-                    setUserName(empty.currentUser);
-                    setThreshold(String(empty.defaultLowStockThreshold));
-                  })}
-                >
-                  <Icon name="Trash2" size={14} className="mr-1.5" />
-                  Очистить все данные
-                </Button>
+
+              <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+                <h2 className="font-semibold text-foreground flex items-center gap-2">
+                  <Icon name="Trash2" size={16} className="text-destructive" />
+                  Очистка данных
+                </h2>
+                <div className="p-3 bg-destructive/8 border border-destructive/20 rounded-lg flex items-start gap-2.5">
+                  <Icon name="AlertTriangle" size={16} className="text-destructive mt-0.5 shrink-0" />
+                  <span className="text-sm text-destructive font-medium">Рекомендуем сначала создать резервную копию. Удалённые данные нельзя восстановить.</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    className="justify-start border-warning/40 text-warning hover:bg-warning/10"
+                    onClick={() => handleDeleteConfirm('историю, приходы, расходы, документы и остатки (номенклатура сохранится)', () => {
+                      const next: AppState = {
+                        ...state,
+                        operations: [],
+                        receipts: [],
+                        workOrders: [],
+                        techDocs: [],
+                        orderCounter: 1,
+                        receiptCounter: 1,
+                        taskCounter: 1,
+                        items: state.items.map(i => ({ ...i, quantity: 0 })),
+                        locationStocks: [],
+                        warehouseStocks: [],
+                      };
+                      onStateChange(next);
+                      saveState(next);
+                    })}
+                  >
+                    <Icon name="Eraser" size={14} className="mr-1.5" />
+                    Очистить историю и остатки
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="justify-start"
+                    onClick={() => handleDeleteConfirm('все данные приложения', () => {
+                      const empty = getEmptyState(state.currentUser);
+                      empty.darkMode = state.darkMode;
+                      onStateChange(empty);
+                      saveState(empty);
+                      setUserName(empty.currentUser);
+                      setThreshold(String(empty.defaultLowStockThreshold));
+                    })}
+                  >
+                    <Icon name="Trash2" size={14} className="mr-1.5" />
+                    Очистить все данные
+                  </Button>
+                </div>
               </div>
             </div>
           )}

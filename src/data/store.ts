@@ -445,8 +445,7 @@ export async function crudAction(action: string, payload: Record<string, unknown
   }
 }
 
-/** Применить guard-проверки к загруженному состоянию. */
-function guardState(p: AppState): AppState {
+export function guardState(p: AppState): AppState {
   if (!Array.isArray(p.items))          p.items = initialState.items;
   if (!Array.isArray(p.categories))     p.categories = initialState.categories;
   if (!Array.isArray(p.locations))      p.locations = initialState.locations;

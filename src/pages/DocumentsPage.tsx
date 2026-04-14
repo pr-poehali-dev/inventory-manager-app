@@ -567,7 +567,7 @@ export default function DocumentsPage({ state, onStateChange }: Props) {
                         <StatusBadge status={order.status} />
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {order.title}
+                        {order.recipientName || `${order.items.length} позиций`}
                       </div>
                     </div>
                   </div>
