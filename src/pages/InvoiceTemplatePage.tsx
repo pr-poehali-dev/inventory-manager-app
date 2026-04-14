@@ -5,6 +5,21 @@ import { AppState } from '@/data/store';
 
 type BlockType = 'text' | 'table' | 'signature' | 'frame' | 'line';
 
+type ChildType = 'label' | 'sign-fields' | 'date-text' | 'line-separator' | 'free-text';
+
+interface BlockChild {
+  id: string;
+  type: ChildType;
+  text?: string;
+  fontSize?: number;
+  bold?: boolean;
+  parts?: string[];
+  lineStyle?: 'solid' | 'dashed';
+  align?: 'left' | 'center' | 'right';
+  gap?: number;
+  minWidth?: number;
+}
+
 interface Block {
   id: string;
   type: BlockType;
@@ -25,6 +40,7 @@ interface Block {
   frameLabel?: string;
   frameContent?: string;
   lineWidth?: number;
+  children?: BlockChild[];
 }
 
 const STORAGE_KEY = 'invoice_builder_blocks';
@@ -39,6 +55,39 @@ function uid(): string {
 
 function snap(v: number): number {
   return Math.round(v / GRID_SIZE) * GRID_SIZE;
+}
+
+function makeSignatureChildren(label: string, parts: string[], date: string): BlockChild[] {
+  return [
+    { id: uid(), type: 'label', text: label, fontSize: 10, bold: true },
+    { id: uid(), type: 'sign-fields', parts: [...parts], gap: 30, minWidth: 120 },
+    { id: uid(), type: 'date-text', text: date, fontSize: 9 },
+  ];
+}
+
+function makeFrameChildren(label: string, _content: string): BlockChild[] {
+  return [
+    { id: uid(), type: 'label', text: label, fontSize: 8 },
+    { id: uid(), type: 'free-text', text: _content, fontSize: 9 },
+  ];
+}
+
+function ensureChildren(block: Block): BlockChild[] {
+  if (block.children && block.children.length > 0) return block.children;
+  if (block.type === 'signature') {
+    return makeSignatureChildren(
+      block.signLabel || '',
+      block.signParts || ['должность', 'подпись', 'расшифровка подписи'],
+      block.signDate || '«__» _________ 20__ г.'
+    );
+  }
+  if (block.type === 'frame') {
+    return makeFrameChildren(
+      block.frameLabel || '',
+      block.frameContent || ''
+    );
+  }
+  return [];
 }
 
 function defaultBlocks(): Block[] {
@@ -93,17 +142,15 @@ function defaultBlocks(): Block[] {
     },
     {
       id: uid(), type: 'signature', x: 30, y: 700, w: 500, h: 70,
-      signLabel: 'Отпустил', signParts: ['должность', 'подпись', 'расшифровка подписи'],
-      signDate: '«__» _________ 20__ г.',
+      children: makeSignatureChildren('Отпустил', ['должность', 'подпись', 'расшифровка подписи'], '«__» _________ 20__ г.'),
     },
     {
       id: uid(), type: 'signature', x: 30, y: 780, w: 500, h: 70,
-      signLabel: 'Получил', signParts: ['должность', 'подпись', 'расшифровка подписи'],
-      signDate: '«__» _________ 20__ г.',
+      children: makeSignatureChildren('Получил', ['должность', 'подпись', 'расшифровка подписи'], '«__» _________ 20__ г.'),
     },
     {
       id: uid(), type: 'frame', x: 700, y: 690, w: 480, h: 120,
-      frameLabel: 'Отметка бухгалтерии', frameContent: '',
+      children: makeFrameChildren('Отметка бухгалтерии', ''),
     },
   ];
 }
@@ -132,6 +179,16 @@ function isEditableElement(el: Element | null): boolean {
   return tag === 'input' || tag === 'textarea' || tag === 'select';
 }
 
+function childTypeLabel(type: ChildType): string {
+  switch (type) {
+    case 'label': return 'Заголовок';
+    case 'sign-fields': return 'Поля подписи';
+    case 'date-text': return 'Дата';
+    case 'line-separator': return 'Линия';
+    case 'free-text': return 'Текст';
+  }
+}
+
 interface Props {
   state: AppState;
   onStateChange: (s: AppState) => void;
@@ -149,6 +206,7 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [dragState, setDragState] = useState<{ blockId: string; offsetX: number; offsetY: number } | null>(null);
   const [resizeState, setResizeState] = useState<{ blockId: string; startX: number; startY: number; startW: number; startH: number } | null>(null);
+  const [expandedChildId, setExpandedChildId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const pushHistory = useCallback((newBlocks: Block[]) => {
@@ -167,8 +225,14 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       if (raw) {
         const parsed = JSON.parse(raw) as Block[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setBlocks(parsed);
-          setHistory([cloneBlocks(parsed)]);
+          const migrated = parsed.map(b => {
+            if ((b.type === 'signature' || b.type === 'frame') && !b.children) {
+              return { ...b, children: ensureChildren(b) };
+            }
+            return b;
+          });
+          setBlocks(migrated);
+          setHistory([cloneBlocks(migrated)]);
           setHistoryIndex(0);
           return;
         }
@@ -254,13 +318,14 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       newBlock.rows = [['', '', ''], ['', '', ''], ['', '', '']];
     }
     if (type === 'signature') {
-      newBlock.signLabel = 'Подпись';
-      newBlock.signParts = ['должность', 'подпись', 'расшифровка подписи'];
-      newBlock.signDate = '«__» _________ 20__ г.';
+      newBlock.children = makeSignatureChildren(
+        'Подпись',
+        ['должность', 'подпись', 'расшифровка подписи'],
+        '«__» _________ 20__ г.'
+      );
     }
     if (type === 'frame') {
-      newBlock.frameLabel = 'Заголовок';
-      newBlock.frameContent = '';
+      newBlock.children = makeFrameChildren('Заголовок', '');
     }
     if (type === 'line') {
       newBlock.lineWidth = 1;
@@ -276,6 +341,64 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     } else {
       setBlocks(newBlocks);
     }
+  };
+
+  const updateChild = (blockId: string, childId: string, updates: Partial<BlockChild>) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    const children = ensureChildren(block);
+    const newChildren = children.map(c => c.id === childId ? { ...c, ...updates } : c);
+    updateBlock(blockId, { children: newChildren });
+  };
+
+  const moveChild = (blockId: string, childId: string, direction: -1 | 1) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    const children = [...ensureChildren(block)];
+    const idx = children.findIndex(c => c.id === childId);
+    if (idx < 0) return;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= children.length) return;
+    [children[idx], children[newIdx]] = [children[newIdx], children[idx]];
+    updateBlock(blockId, { children });
+  };
+
+  const removeChild = (blockId: string, childId: string) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    const children = ensureChildren(block).filter(c => c.id !== childId);
+    updateBlock(blockId, { children });
+    if (expandedChildId === childId) setExpandedChildId(null);
+  };
+
+  const addChild = (blockId: string, type: ChildType) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    const children = [...ensureChildren(block)];
+    const newChild: BlockChild = { id: uid(), type };
+    if (type === 'label') {
+      newChild.text = 'Заголовок';
+      newChild.fontSize = 10;
+      newChild.bold = false;
+    }
+    if (type === 'sign-fields') {
+      newChild.parts = ['подпись'];
+      newChild.gap = 30;
+      newChild.minWidth = 120;
+    }
+    if (type === 'date-text') {
+      newChild.text = '«__» _________ 20__ г.';
+      newChild.fontSize = 9;
+    }
+    if (type === 'line-separator') {
+      newChild.lineStyle = 'solid';
+    }
+    if (type === 'free-text') {
+      newChild.text = '';
+      newChild.fontSize = 9;
+    }
+    children.push(newChild);
+    updateBlock(blockId, { children });
   };
 
   const deleteBlock = (id: string) => {
@@ -372,6 +495,42 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     updateBlocks(def);
   };
 
+  const renderChildHtml = (child: BlockChild): string => {
+    switch (child.type) {
+      case 'label': {
+        const fs = child.fontSize || 10;
+        const fw = child.bold ? 'font-weight:bold;' : '';
+        const ta = child.align ? `text-align:${child.align};` : '';
+        return `<div style="font-size:${fs}pt;${fw}${ta}margin-bottom:4px;">${child.text || ''}</div>`;
+      }
+      case 'sign-fields': {
+        const parts = child.parts || [];
+        const gap = child.gap || 30;
+        const mw = child.minWidth || 120;
+        let html = `<div style="display:flex;gap:${gap}px;">`;
+        for (const p of parts) {
+          html += `<div style="text-align:center;"><div style="border-bottom:1px solid #000;min-width:${mw}px;height:18px;"></div><div style="font-size:7pt;">(${p})</div></div>`;
+        }
+        html += '</div>';
+        return html;
+      }
+      case 'date-text': {
+        const fs = child.fontSize || 9;
+        return `<div style="margin-top:4px;font-size:${fs}pt;">${child.text || ''}</div>`;
+      }
+      case 'line-separator': {
+        const style = child.lineStyle === 'dashed' ? 'dashed' : 'solid';
+        return `<div style="border-top:1px ${style} #000;margin:4px 0;"></div>`;
+      }
+      case 'free-text': {
+        const fs = child.fontSize || 9;
+        return `<div style="font-size:${fs}pt;white-space:pre-wrap;">${child.text || ''}</div>`;
+      }
+      default:
+        return '';
+    }
+  };
+
   const handlePrint = () => {
     const w = window.open('', '_blank');
     if (!w) return;
@@ -417,26 +576,24 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       }
 
       if (block.type === 'signature') {
-        const parts = block.signParts || ['должность', 'подпись', 'расшифровка подписи'];
+        const children = ensureChildren(block);
         let html = `<div style="${baseStyle}font-size:10pt;">`;
-        html += `<div style="margin-bottom:6px;font-weight:bold;">${block.signLabel || ''}</div>`;
-        html += '<div style="display:flex;gap:30px;">';
-        for (const p of parts) {
-          html += `<div style="text-align:center;"><div style="border-bottom:1px solid #000;min-width:120px;height:18px;"></div><div style="font-size:7pt;">(${p})</div></div>`;
+        for (const child of children) {
+          html += renderChildHtml(child);
         }
-        html += '</div>';
-        html += `<div style="margin-top:4px;font-size:9pt;">${block.signDate || ''}</div>`;
         html += '</div>';
         return html;
       }
 
       if (block.type === 'frame') {
+        const children = ensureChildren(block);
         let html = `<div style="${baseStyle}height:${block.h}px;border:1px solid #000;position:absolute;">`;
-        if (block.frameLabel) {
-          html += `<div style="font-size:8pt;padding:2px 4px;border-bottom:1px solid #000;background:#fff;">${block.frameLabel}</div>`;
-        }
-        if (block.frameContent) {
-          html += `<div style="font-size:9pt;padding:4px;white-space:pre-wrap;">${block.frameContent}</div>`;
+        for (const child of children) {
+          if (child.type === 'label') {
+            html += `<div style="font-size:${child.fontSize || 8}pt;padding:2px 4px;border-bottom:1px solid #000;background:#fff;${child.bold ? 'font-weight:bold;' : ''}">${child.text || ''}</div>`;
+          } else {
+            html += `<div style="padding:4px;">${renderChildHtml(child)}</div>`;
+          }
         }
         html += '</div>';
         return html;
@@ -698,72 +855,130 @@ body { font-family:'Times New Roman',serif; }
     );
   };
 
+  const renderChildElement = (block: Block, child: BlockChild, isSelected: boolean) => {
+    switch (child.type) {
+      case 'label':
+        return (
+          <div
+            key={child.id}
+            style={{
+              fontSize: `${child.fontSize || 10}pt`,
+              fontWeight: child.bold ? 'bold' : 'normal',
+              textAlign: child.align || 'left',
+              marginBottom: 4,
+              outline: 'none',
+              cursor: isSelected ? 'text' : 'default',
+            }}
+            contentEditable={isSelected}
+            suppressContentEditableWarning
+            onBlur={(e) => {
+              updateChild(block.id, child.id, { text: e.currentTarget.textContent || '' });
+            }}
+            onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
+          >
+            {child.text || ''}
+          </div>
+        );
+      case 'sign-fields': {
+        const parts = child.parts || [];
+        const gap = child.gap || 30;
+        const mw = child.minWidth || 120;
+        return (
+          <div key={child.id} style={{ display: 'flex', gap }}>
+            {parts.map((p, i) => (
+              <div key={i} style={{ textAlign: 'center' }}>
+                <div style={{ borderBottom: '1px solid #000', minWidth: mw, height: 18 }} />
+                <div style={{ fontSize: '7pt' }}>
+                  {'('}
+                  <span
+                    style={{ outline: 'none', cursor: isSelected ? 'text' : 'default' }}
+                    contentEditable={isSelected}
+                    suppressContentEditableWarning
+                    onBlur={(e) => {
+                      const newParts = [...parts];
+                      newParts[i] = e.currentTarget.textContent || '';
+                      updateChild(block.id, child.id, { parts: newParts });
+                    }}
+                    onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
+                  >
+                    {p}
+                  </span>
+                  {')'}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      case 'date-text':
+        return (
+          <div
+            key={child.id}
+            style={{
+              marginTop: 4,
+              fontSize: `${child.fontSize || 9}pt`,
+              outline: 'none',
+              cursor: isSelected ? 'text' : 'default',
+            }}
+            contentEditable={isSelected}
+            suppressContentEditableWarning
+            onBlur={(e) => {
+              updateChild(block.id, child.id, { text: e.currentTarget.textContent || '' });
+            }}
+            onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
+          >
+            {child.text || ''}
+          </div>
+        );
+      case 'line-separator':
+        return (
+          <div
+            key={child.id}
+            style={{
+              borderTop: `1px ${child.lineStyle === 'dashed' ? 'dashed' : 'solid'} #000`,
+              margin: '4px 0',
+            }}
+          />
+        );
+      case 'free-text':
+        return (
+          <div
+            key={child.id}
+            style={{
+              fontSize: `${child.fontSize || 9}pt`,
+              outline: 'none',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              cursor: isSelected ? 'text' : 'default',
+              minHeight: 16,
+            }}
+            contentEditable={isSelected}
+            suppressContentEditableWarning
+            onBlur={(e) => {
+              updateChild(block.id, child.id, { text: e.currentTarget.textContent || '' });
+            }}
+            onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
+          >
+            {child.text || ''}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   const renderSignatureBlock = (block: Block) => {
-    const parts = block.signParts || ['должность', 'подпись', 'расшифровка подписи'];
+    const children = ensureChildren(block);
     const isSelected = selectedId === block.id;
     return (
       <div style={{ fontFamily: "'Times New Roman', serif", fontSize: '10pt', width: '100%' }}>
-        <div
-          style={{
-            marginBottom: 4,
-            fontWeight: 'bold',
-            cursor: isSelected ? 'text' : 'default',
-            outline: 'none',
-          }}
-          contentEditable={isSelected}
-          suppressContentEditableWarning
-          onBlur={(e) => {
-            updateBlock(block.id, { signLabel: e.currentTarget.textContent || '' });
-          }}
-          onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
-        >
-          {block.signLabel || ''}
-        </div>
-        <div style={{ display: 'flex', gap: 30 }}>
-          {parts.map((p, i) => (
-            <div key={i} style={{ textAlign: 'center' }}>
-              <div style={{ borderBottom: '1px solid #000', minWidth: 120, height: 18 }} />
-              <div style={{ fontSize: '7pt' }}>
-                {'('}
-                <span
-                  style={{ outline: 'none', cursor: isSelected ? 'text' : 'default' }}
-                  contentEditable={isSelected}
-                  suppressContentEditableWarning
-                  onBlur={(e) => {
-                    const newParts = [...parts];
-                    newParts[i] = e.currentTarget.textContent || '';
-                    updateBlock(block.id, { signParts: newParts });
-                  }}
-                  onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
-                >
-                  {p}
-                </span>
-                {')'}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: '9pt',
-            outline: 'none',
-            cursor: isSelected ? 'text' : 'default',
-          }}
-          contentEditable={isSelected}
-          suppressContentEditableWarning
-          onBlur={(e) => {
-            updateBlock(block.id, { signDate: e.currentTarget.textContent || '' });
-          }}
-          onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
-        >
-          {block.signDate || ''}
-        </div>
+        {children.map(child => renderChildElement(block, child, isSelected))}
       </div>
     );
   };
 
   const renderFrameBlock = (block: Block) => {
+    const children = ensureChildren(block);
     const isSelected = selectedId === block.id;
     return (
       <div style={{
@@ -775,47 +990,38 @@ body { font-family:'Times New Roman',serif; }
         display: 'flex',
         flexDirection: 'column',
       }}>
-        {block.frameLabel !== undefined && (
-          <div
-            style={{
-              fontSize: '8pt',
-              padding: '2px 4px',
-              borderBottom: '1px solid #000',
-              background: '#fff',
-              cursor: isSelected ? 'text' : 'default',
-              outline: 'none',
-              flexShrink: 0,
-            }}
-            contentEditable={isSelected}
-            suppressContentEditableWarning
-            onBlur={(e) => {
-              updateBlock(block.id, { frameLabel: e.currentTarget.textContent || '' });
-            }}
-            onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
-          >
-            {block.frameLabel || ''}
-          </div>
-        )}
-        <div
-          style={{
-            flex: 1,
-            fontSize: '9pt',
-            padding: '4px',
-            outline: 'none',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            cursor: isSelected ? 'text' : 'default',
-            overflow: 'hidden',
-          }}
-          contentEditable={isSelected}
-          suppressContentEditableWarning
-          onBlur={(e) => {
-            updateBlock(block.id, { frameContent: e.currentTarget.textContent || '' });
-          }}
-          onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
-        >
-          {block.frameContent || ''}
-        </div>
+        {children.map((child, idx) => {
+          if (child.type === 'label' && idx === 0) {
+            return (
+              <div
+                key={child.id}
+                style={{
+                  fontSize: `${child.fontSize || 8}pt`,
+                  fontWeight: child.bold ? 'bold' : 'normal',
+                  padding: '2px 4px',
+                  borderBottom: '1px solid #000',
+                  background: '#fff',
+                  cursor: isSelected ? 'text' : 'default',
+                  outline: 'none',
+                  flexShrink: 0,
+                }}
+                contentEditable={isSelected}
+                suppressContentEditableWarning
+                onBlur={(e) => {
+                  updateChild(block.id, child.id, { text: e.currentTarget.textContent || '' });
+                }}
+                onMouseDown={(e) => { if (isSelected) e.stopPropagation(); }}
+              >
+                {child.text || ''}
+              </div>
+            );
+          }
+          return (
+            <div key={child.id} style={{ flex: idx === children.length - 1 ? 1 : undefined, padding: '4px', overflow: 'hidden' }}>
+              {renderChildElement(block, child, isSelected)}
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -835,6 +1041,255 @@ body { font-family:'Times New Roman',serif; }
       case 'line': return renderLineBlock();
       default: return null;
     }
+  };
+
+  const renderChildrenPanel = (b: Block) => {
+    const children = ensureChildren(b);
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="text-[10px] font-semibold uppercase text-gray-400">Элементы</div>
+        <div className="border-t border-gray-200" />
+        {children.map((child, idx) => {
+          const isExpanded = expandedChildId === child.id;
+          const desc = child.type === 'label'
+            ? `${childTypeLabel(child.type)}: "${(child.text || '').slice(0, 12)}${(child.text || '').length > 12 ? '...' : ''}"`
+            : child.type === 'sign-fields'
+            ? `${childTypeLabel(child.type)} (${(child.parts || []).length})`
+            : child.type === 'date-text'
+            ? `${childTypeLabel(child.type)}: "${(child.text || '').slice(0, 10)}..."`
+            : child.type === 'free-text'
+            ? `${childTypeLabel(child.type)}`
+            : childTypeLabel(child.type);
+
+          return (
+            <div key={child.id} className="rounded border border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-0.5 px-1 py-0.5">
+                <button
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-200 hover:text-gray-600 disabled:opacity-30"
+                  disabled={idx === 0}
+                  onClick={() => moveChild(b.id, child.id, -1)}
+                >
+                  <Icon name="ChevronUp" size={10} />
+                </button>
+                <button
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-200 hover:text-gray-600 disabled:opacity-30"
+                  disabled={idx === children.length - 1}
+                  onClick={() => moveChild(b.id, child.id, 1)}
+                >
+                  <Icon name="ChevronDown" size={10} />
+                </button>
+                <button
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-red-300 hover:bg-red-100 hover:text-red-500"
+                  onClick={() => removeChild(b.id, child.id)}
+                >
+                  <Icon name="X" size={10} />
+                </button>
+                <button
+                  className="flex-1 truncate text-left text-[10px] text-gray-600 hover:text-gray-900"
+                  onClick={() => setExpandedChildId(isExpanded ? null : child.id)}
+                >
+                  {desc}
+                </button>
+              </div>
+              {isExpanded && (
+                <div className="border-t border-gray-100 px-1 pb-1 pt-1">
+                  {child.type === 'label' && (
+                    <div className="flex flex-col gap-1">
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-500">Текст</span>
+                        <input
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          value={child.text || ''}
+                          onChange={(e) => updateChild(b.id, child.id, { text: e.target.value })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-500">Размер</span>
+                        <input
+                          type="number"
+                          min={6}
+                          max={24}
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          value={child.fontSize || 10}
+                          onChange={(e) => updateChild(b.id, child.id, { fontSize: Number(e.target.value) })}
+                        />
+                      </label>
+                      <div className="flex gap-1">
+                        <button
+                          className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${child.bold ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
+                          onClick={() => updateChild(b.id, child.id, { bold: !child.bold })}
+                        >
+                          B
+                        </button>
+                        {(['left', 'center', 'right'] as const).map(a => (
+                          <button
+                            key={a}
+                            className={`rounded border px-1.5 py-0.5 text-[10px] ${child.align === a ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
+                            onClick={() => updateChild(b.id, child.id, { align: a })}
+                          >
+                            {a === 'left' ? 'Л' : a === 'center' ? 'Ц' : 'П'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {child.type === 'sign-fields' && (
+                    <div className="flex flex-col gap-1">
+                      {(child.parts || []).map((part, pi) => (
+                        <div key={pi} className="flex items-center gap-0.5">
+                          <input
+                            className="flex-1 rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                            value={part}
+                            onChange={(e) => {
+                              const newParts = [...(child.parts || [])];
+                              newParts[pi] = e.target.value;
+                              updateChild(b.id, child.id, { parts: newParts });
+                            }}
+                          />
+                          <button
+                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-red-300 hover:bg-red-100 hover:text-red-500"
+                            onClick={() => {
+                              const newParts = (child.parts || []).filter((_, i) => i !== pi);
+                              updateChild(b.id, child.id, { parts: newParts });
+                            }}
+                          >
+                            <Icon name="X" size={8} />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600 hover:bg-gray-200"
+                        onClick={() => {
+                          const newParts = [...(child.parts || []), 'поле'];
+                          updateChild(b.id, child.id, { parts: newParts });
+                        }}
+                      >
+                        + поле
+                      </button>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-500">Отступ</span>
+                        <input
+                          type="number"
+                          min={0}
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          value={child.gap || 30}
+                          onChange={(e) => updateChild(b.id, child.id, { gap: Number(e.target.value) })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-500">Мин. ширина</span>
+                        <input
+                          type="number"
+                          min={40}
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          value={child.minWidth || 120}
+                          onChange={(e) => updateChild(b.id, child.id, { minWidth: Number(e.target.value) })}
+                        />
+                      </label>
+                    </div>
+                  )}
+                  {child.type === 'date-text' && (
+                    <div className="flex flex-col gap-1">
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-500">Текст</span>
+                        <input
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          value={child.text || ''}
+                          onChange={(e) => updateChild(b.id, child.id, { text: e.target.value })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-500">Размер</span>
+                        <input
+                          type="number"
+                          min={6}
+                          max={24}
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          value={child.fontSize || 9}
+                          onChange={(e) => updateChild(b.id, child.id, { fontSize: Number(e.target.value) })}
+                        />
+                      </label>
+                    </div>
+                  )}
+                  {child.type === 'line-separator' && (
+                    <div className="flex flex-col gap-1">
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-500">Стиль</span>
+                        <select
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          value={child.lineStyle || 'solid'}
+                          onChange={(e) => updateChild(b.id, child.id, { lineStyle: e.target.value as 'solid' | 'dashed' })}
+                        >
+                          <option value="solid">Сплошная</option>
+                          <option value="dashed">Пунктир</option>
+                        </select>
+                      </label>
+                    </div>
+                  )}
+                  {child.type === 'free-text' && (
+                    <div className="flex flex-col gap-1">
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-500">Текст</span>
+                        <textarea
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          rows={3}
+                          value={child.text || ''}
+                          onChange={(e) => updateChild(b.id, child.id, { text: e.target.value })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-gray-500">Размер</span>
+                        <input
+                          type="number"
+                          min={6}
+                          max={24}
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          value={child.fontSize || 9}
+                          onChange={(e) => updateChild(b.id, child.id, { fontSize: Number(e.target.value) })}
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div className="border-t border-gray-200 pt-1" />
+        <div className="flex flex-wrap gap-0.5">
+          <button
+            className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-600 hover:bg-gray-200"
+            onClick={() => addChild(b.id, 'label')}
+          >
+            + Заголовок
+          </button>
+          <button
+            className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-600 hover:bg-gray-200"
+            onClick={() => addChild(b.id, 'sign-fields')}
+          >
+            + Подпись
+          </button>
+          <button
+            className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-600 hover:bg-gray-200"
+            onClick={() => addChild(b.id, 'date-text')}
+          >
+            + Дата
+          </button>
+          <button
+            className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-600 hover:bg-gray-200"
+            onClick={() => addChild(b.id, 'line-separator')}
+          >
+            + Линия
+          </button>
+          <button
+            className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-600 hover:bg-gray-200"
+            onClick={() => addChild(b.id, 'free-text')}
+          >
+            + Текст
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const renderPropertyPanel = () => {
@@ -930,51 +1385,7 @@ body { font-family:'Times New Roman',serif; }
           </>
         )}
 
-        {b.type === 'signature' && (
-          <>
-            <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-gray-500">Подпись</span>
-              <input
-                className="rounded border border-gray-200 px-2 py-1 text-xs"
-                value={b.signLabel || ''}
-                onChange={(e) => updateBlock(b.id, { signLabel: e.target.value })}
-              />
-            </label>
-            <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-gray-500">Дата</span>
-              <input
-                className="rounded border border-gray-200 px-2 py-1 text-xs"
-                value={b.signDate || ''}
-                onChange={(e) => updateBlock(b.id, { signDate: e.target.value })}
-              />
-            </label>
-            {(b.signParts || []).map((part, i) => (
-              <label key={i} className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-gray-500">Часть {i + 1}</span>
-                <input
-                  className="rounded border border-gray-200 px-2 py-1 text-xs"
-                  value={part}
-                  onChange={(e) => {
-                    const newParts = [...(b.signParts || [])];
-                    newParts[i] = e.target.value;
-                    updateBlock(b.id, { signParts: newParts });
-                  }}
-                />
-              </label>
-            ))}
-          </>
-        )}
-
-        {b.type === 'frame' && (
-          <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-gray-500">Заголовок</span>
-            <input
-              className="rounded border border-gray-200 px-2 py-1 text-xs"
-              value={b.frameLabel || ''}
-              onChange={(e) => updateBlock(b.id, { frameLabel: e.target.value })}
-            />
-          </label>
-        )}
+        {(b.type === 'signature' || b.type === 'frame') && renderChildrenPanel(b)}
 
         {b.type === 'table' && (
           <div className="flex flex-col gap-1">
