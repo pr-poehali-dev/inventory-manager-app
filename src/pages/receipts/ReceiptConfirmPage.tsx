@@ -5,7 +5,7 @@ import Icon from '@/components/ui/icon';
 import {
   AppState, crudAction, generateId,
   Receipt, ReceiptLine, ScanEvent,
-  updateLocationStock, updateWarehouseStock, Operation,
+  updateWarehouseStock, Operation,
 } from '@/data/store';
 
 type ScanResult = { ok: true; line: ReceiptLine } | { ok: false; reason: string };
@@ -47,7 +47,7 @@ export function ReceiptConfirmPage({
 
   // per-line inline scanner state
   const [activeLineId, setActiveLineId] = useState<string | null>(null);
-  const [editLocationLineId, setEditLocationLineId] = useState<string | null>(null);
+
   const [lineCameraActive, setLineCameraActive] = useState(false);
   const [lineCameraError, setLineCameraError] = useState('');
   const [lineManualCode, setLineManualCode] = useState('');
@@ -361,16 +361,7 @@ export function ReceiptConfirmPage({
     crudAction('upsert_receipt', { receipt: updatedReceipt, receiptLines: updatedReceipt.lines });
   };
 
-  const handleChangeLocation = (lineId: string, newLocationId: string) => {
-    const updatedLines = liveReceipt.lines.map(l =>
-      l.id === lineId ? { ...l, locationId: newLocationId } : l
-    );
-    const updatedReceipt: Receipt = { ...liveReceipt, lines: updatedLines };
-    const next: AppState = { ...state, receipts: state.receipts.map(r => r.id === liveReceipt.id ? updatedReceipt : r) };
-    onStateChange(next);
-    crudAction('upsert_receipt', { receipt: updatedReceipt, receiptLines: updatedReceipt.lines });
-    setEditLocationLineId(null);
-  };
+
 
   const handleDeleteLine = (lineId: string) => {
     const updatedLines = liveReceipt.lines.filter(l => l.id !== lineId);
@@ -382,7 +373,8 @@ export function ReceiptConfirmPage({
   };
 
   const handlePost = () => {
-    if (!allConfirmed) return;
+    if (!allConfirmed || posting) return;
+    if (liveReceipt.status === 'posted') return;
     setPosting(true);
 
     let next = { ...state };
@@ -402,9 +394,7 @@ export function ReceiptConfirmPage({
         };
       }
 
-      if (line.locationId) {
-        next = updateLocationStock(next, line.itemId, line.locationId, qty);
-      }
+      const wh = liveReceipt.warehouseId ? (state.warehouses || []).find(w => w.id === liveReceipt.warehouseId) : null;
 
       const op: Operation = {
         id: generateId(),
@@ -413,10 +403,9 @@ export function ReceiptConfirmPage({
         quantity: qty,
         comment: `[Оприходование ${liveReceipt.number}]`,
         from: liveReceipt.supplierName,
-        to: line.locationId ? next.locations.find(l => l.id === line.locationId)?.name : undefined,
+        to: wh?.name || 'Склад',
         performedBy: next.currentUser,
         date: new Date().toISOString(),
-        locationId: line.locationId || undefined,
         warehouseId: liveReceipt.warehouseId || undefined,
         scannedCodes: (liveReceipt.scanHistory || [])
           .filter(s => s.lineId === line.id)
@@ -613,7 +602,6 @@ export function ReceiptConfirmPage({
 
         {lines.map(line => {
           const item = state.items.find(i => i.id === line.itemId);
-          const loc = state.locations.find(l => l.id === line.locationId);
           const confirmed = line.confirmedQty || 0;
           const done = confirmed >= line.qty;
           const partial = confirmed > 0 && !done;
@@ -641,37 +629,8 @@ export function ReceiptConfirmPage({
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm truncate">{item?.name || line.itemName}</div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditLocationLineId(editLocationLineId === line.id ? null : line.id); }}
-                        className="flex items-center gap-0.5 hover:text-primary transition-colors"
-                        title="Изменить стеллаж"
-                      >
-                        <Icon name="MapPin" size={9} />
-                        {loc ? loc.name : 'Не указан'}
-                        <Icon name="Pencil" size={8} className="opacity-50" />
-                      </button>
                       {line.isNew && <span className="text-primary font-medium">Новый</span>}
                     </div>
-                    {editLocationLineId === line.id && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {(liveReceipt.warehouseId
-                          ? state.locations.filter(l => l.warehouseId === liveReceipt.warehouseId)
-                          : state.locations
-                        ).map(l => (
-                          <button
-                            key={l.id}
-                            onClick={() => handleChangeLocation(line.id, l.id)}
-                            className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${
-                              l.id === line.locationId
-                                ? 'border-primary bg-primary/10 text-primary font-semibold'
-                                : 'border-border hover:border-primary/40 hover:bg-muted'
-                            }`}
-                          >
-                            {l.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -823,7 +782,7 @@ export function ReceiptConfirmPage({
             </Button>
             <Button
               onClick={handlePost}
-              disabled={confirmedQty === 0}
+              disabled={confirmedQty === 0 || posting}
               variant="outline"
               className="flex-1 h-12 border-amber-500/50 text-amber-600 dark:text-amber-400"
             >

@@ -144,7 +144,6 @@ export function ReceiptDetailModal({
             <div className="bg-card rounded-xl border border-border overflow-hidden">
               {liveReceipt.lines.map((line, idx) => {
                 const item = state.items.find(i => i.id === line.itemId);
-                const loc = line.locationId ? state.locations.find(l => l.id === line.locationId) : null;
                 const confirmed = line.confirmedQty || 0;
                 const done = liveReceipt.status === 'posted' || confirmed >= line.qty;
                 return (
@@ -157,7 +156,6 @@ export function ReceiptDetailModal({
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{item?.name || line.itemName}</div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        {loc && <span className="flex items-center gap-0.5"><Icon name="MapPin" size={9} />{loc.name}</span>}
                         {line.isNew && <span className="text-primary font-medium">Новый товар</span>}
                       </div>
                     </div>

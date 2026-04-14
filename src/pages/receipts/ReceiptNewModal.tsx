@@ -26,7 +26,6 @@ type DraftLine = {
   qty: string;
   unit: string;
   price: string;
-  locationId: string;
   categoryId: string;
   description: string;
   lowStockThreshold: string;
@@ -54,7 +53,7 @@ export function NewReceiptModal({
   const [newFieldKey, setNewFieldKey] = useState('');
   const [showFieldSuggestions, setShowFieldSuggestions] = useState(false);
   const [lines, setLines] = useState<DraftLine[]>([
-    { id: generateId(), itemId: '', itemLabel: '', isNew: false, qty: '1', unit: 'шт', price: '', locationId: '', categoryId: '', description: '', lowStockThreshold: '5' },
+    { id: generateId(), itemId: '', itemLabel: '', isNew: false, qty: '1', unit: 'шт', price: '', categoryId: '', description: '', lowStockThreshold: '5' },
   ]);
 
   const supplierOptions: AutocompleteOption[] = useMemo(() =>
@@ -70,7 +69,7 @@ export function NewReceiptModal({
 
   const addLine = () => setLines(prev => [...prev, {
     id: generateId(), itemId: '', itemLabel: '', isNew: false,
-    qty: '1', unit: 'шт', price: '', locationId: '',
+    qty: '1', unit: 'шт', price: '',
     categoryId: '', description: '', lowStockThreshold: '5',
   }]);
 
@@ -156,7 +155,7 @@ export function NewReceiptModal({
           id: generateId(),
           name: line.itemLabel.trim(),
           categoryId: line.categoryId || (next.categories[0]?.id || ''),
-          locationId: line.locationId || (next.locations[0]?.id || ''),
+          locationId: next.locations[0]?.id || '',
           description: line.description || undefined,
           unit: line.unit,
           quantity: 0,
@@ -174,7 +173,7 @@ export function NewReceiptModal({
         itemName: line.itemLabel || next.items.find(i => i.id === itemId)?.name || '',
         qty,
         confirmedQty: 0,
-        locationId: line.locationId,
+        locationId: '',
         price: parseFloat(line.price) || undefined,
         unit: line.unit,
         isNew: !line.itemId,
@@ -496,7 +495,6 @@ export function NewReceiptModal({
                             updateLine(line.id, {
                               itemId: opt.id, itemLabel: opt.label, isNew: false,
                               unit: item?.unit || 'шт',
-                              locationId: item?.locationId || '',
                             });
                           }}
                           options={itemOptions}
@@ -535,20 +533,6 @@ export function NewReceiptModal({
                           />
                         </div>
                       </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Место хранения</Label>
-                      <select
-                        value={line.locationId}
-                        onChange={e => updateLine(line.id, { locationId: e.target.value })}
-                        className="w-full h-9 px-3 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none appearance-none"
-                      >
-                        <option value="">— не указано —</option>
-                        {state.locations.map(l => (
-                          <option key={l.id} value={l.id}>{l.name}</option>
-                        ))}
-                      </select>
                     </div>
 
                     {line.isNew && (

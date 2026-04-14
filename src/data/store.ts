@@ -616,9 +616,6 @@ export function revertPostedReceipt(state: AppState, receipt: Receipt): AppState
       };
     }
 
-    if (line.locationId) {
-      next = updateLocationStock(next, line.itemId, line.locationId, -qty);
-    }
   }
 
   next = {
