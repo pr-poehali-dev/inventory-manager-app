@@ -57,7 +57,7 @@ interface Block {
 
 const STORAGE_KEY = 'invoice_builder_blocks';
 const STORAGE_VERSION_KEY = 'invoice_builder_version';
-const CURRENT_VERSION = 6;
+const CURRENT_VERSION = 7;
 const CANVAS_W = 1122;
 const CANVAS_H = 794;
 const GRID_SIZE = 10;
@@ -129,9 +129,25 @@ function defaultBlocks(): Block[] {
       id: uid(), type: 'line', x: 454, y: 46, w: 144, h: 1, lineWidth: 1,
     },
     {
-      id: uid(), type: 'table', x: 940, y: 10, w: 170, h: 120,
-      columns: [{ label: '', width: 100 }, { label: 'Коды', width: 70 }],
-      rows: [['Форма по ОКУД', '0504204'], ['Дата', ''], ['по ОКПО', ''], ['', ''], ['', ''], ['по ОКЕИ', '383']],
+      id: uid(), type: 'text', x: 880, y: 28, w: 100, h: 13,
+      text: 'Форма по ОКУД', fontSize: 7, bold: true, align: 'right',
+    },
+    {
+      id: uid(), type: 'text', x: 920, y: 44, w: 60, h: 13,
+      text: 'Дата', fontSize: 7, bold: true, align: 'right',
+    },
+    {
+      id: uid(), type: 'text', x: 900, y: 60, w: 80, h: 13,
+      text: 'по ОКПО', fontSize: 7, bold: false, align: 'right',
+    },
+    {
+      id: uid(), type: 'text', x: 900, y: 106, w: 80, h: 13,
+      text: 'по ОКЕИ', fontSize: 7, bold: false, align: 'right',
+    },
+    {
+      id: uid(), type: 'table', x: 990, y: 10, w: 70, h: 120,
+      columns: [{ label: 'Коды', width: 70 }],
+      rows: [['0504204'], [''], [''], [''], [''], ['383']],
     },
     {
       id: uid(), type: 'text', x: L, y: 66, w: 400, h: 13,
