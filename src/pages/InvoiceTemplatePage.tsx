@@ -20,6 +20,13 @@ interface BlockChild {
   minWidth?: number;
 }
 
+interface HeaderCell {
+  text: string;
+  colspan?: number;
+  rowspan?: number;
+  width?: number;
+}
+
 interface Block {
   id: string;
   type: BlockType;
@@ -41,11 +48,16 @@ interface Block {
   frameContent?: string;
   lineWidth?: number;
   children?: BlockChild[];
+  headerRows?: HeaderCell[][];
+  showRowNumbers?: boolean;
+  showTotals?: boolean;
+  totalsLabel?: string;
+  totalsLabelCol?: number;
 }
 
 const STORAGE_KEY = 'invoice_builder_blocks';
 const CANVAS_W = 1200;
-const CANVAS_H = 850;
+const CANVAS_H = 870;
 const GRID_SIZE = 10;
 const MAX_HISTORY = 50;
 
@@ -93,64 +105,145 @@ function ensureChildren(block: Block): BlockChild[] {
 function defaultBlocks(): Block[] {
   return [
     {
-      id: uid(), type: 'text', x: 300, y: 30, w: 600, h: 30,
-      text: 'ТРЕБОВАНИЕ-НАКЛАДНАЯ №', fontSize: 14, bold: true, align: 'center',
+      id: uid(), type: 'text', x: 300, y: 20, w: 500, h: 30,
+      text: 'ТРЕБОВАНИЕ-НАКЛАДНАЯ №', fontSize: 12, bold: true, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 720, y: 30, w: 150, h: 30,
-      text: '22-ЧТ', fontSize: 14, bold: true, align: 'left',
+      id: uid(), type: 'text', x: 630, y: 20, w: 100, h: 30,
+      text: '22-ЧТ', fontSize: 12, bold: true, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 450, y: 55, w: 250, h: 20,
-      text: 'от _________________ г.', fontSize: 10, bold: false, align: 'left',
+      id: uid(), type: 'text', x: 400, y: 45, w: 300, h: 16,
+      text: 'от             4 апреля 2026 г.', fontSize: 9, align: 'center',
     },
     {
-      id: uid(), type: 'table', x: 1020, y: 20, w: 170, h: 80,
-      columns: [{ label: '', width: 100 }, { label: 'Коды', width: 70 }],
+      id: uid(), type: 'table', x: 990, y: 10, w: 190, h: 80,
+      columns: [{ label: '', width: 120 }, { label: 'Коды', width: 70 }],
       rows: [['Форма по ОКУД', '0504204'], ['Дата', ''], ['по ОКПО', '']],
     },
     {
-      id: uid(), type: 'text', x: 30, y: 100, w: 500, h: 20,
-      text: 'Учреждение _______________', fontSize: 10, bold: false, align: 'left',
+      id: uid(), type: 'text', x: 20, y: 80, w: 600, h: 16,
+      text: 'Учреждение _______________', fontSize: 9, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 30, y: 120, w: 500, h: 20,
-      text: 'Структурное подразделение — отправитель', fontSize: 10, bold: false, align: 'left',
+      id: uid(), type: 'text', x: 20, y: 98, w: 600, h: 16,
+      text: 'Структурное подразделение - отправитель', fontSize: 9, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 30, y: 140, w: 500, h: 20,
-      text: 'Структурное подразделение — получатель', fontSize: 10, bold: false, align: 'left',
+      id: uid(), type: 'text', x: 20, y: 116, w: 600, h: 16,
+      text: 'Структурное подразделение - получатель', fontSize: 9, align: 'left',
     },
     {
-      id: uid(), type: 'table', x: 30, y: 220, w: 1140, h: 400,
-      columns: [
-        { label: '№ п/п', width: 40 },
-        { label: 'Наименование', width: 160 },
-        { label: 'Номенкл. №', width: 70 },
-        { label: 'Ед. изм.', width: 50 },
-        { label: 'Код ОКЕИ', width: 50 },
-        { label: 'Цена, руб.', width: 70 },
-        { label: 'Затребовано', width: 75 },
-        { label: 'Отпущено', width: 75 },
-        { label: 'Сумма, руб.', width: 80 },
-        { label: 'Дебет', width: 70 },
-        { label: 'Кредит', width: 70 },
-        { label: 'Срок годн.', width: 70 },
-        { label: 'Примечание', width: 100 },
+      id: uid(), type: 'text', x: 20, y: 134, w: 600, h: 16,
+      text: 'Единица измерения: руб. (с точностью до второго десятичного знака)', fontSize: 9, align: 'left',
+    },
+    {
+      id: uid(), type: 'table', x: 990, y: 130, w: 190, h: 22,
+      columns: [{ label: '', width: 120 }, { label: '', width: 70 }],
+      rows: [['по ОКЕИ', '383']],
+    },
+    {
+      id: uid(), type: 'text', x: 20, y: 162, w: 560, h: 30,
+      text: 'Затребовал            лейтенант                     0', fontSize: 9, align: 'left',
+    },
+    {
+      id: uid(), type: 'text', x: 120, y: 180, w: 440, h: 14,
+      text: '            (звание)                    (фамилия, инициалы)', fontSize: 7, align: 'left',
+    },
+    {
+      id: uid(), type: 'text', x: 580, y: 162, w: 600, h: 30,
+      text: 'Разрешил                  НЦ (БпС)                                                      Калита Е.Н', fontSize: 9, align: 'left',
+    },
+    {
+      id: uid(), type: 'text', x: 660, y: 180, w: 520, h: 14,
+      text: '          (должность)                 (подпись)                   (расшифровка подписи)', fontSize: 7, align: 'left',
+    },
+    {
+      id: uid(), type: 'table', x: 20, y: 200, w: 1160, h: 430,
+      headerRows: [
+        [
+          { text: 'Материальные ценности', colspan: 3 },
+          { text: 'Единица измерения', colspan: 2 },
+          { text: 'Цена', rowspan: 3 },
+          { text: 'Количество', colspan: 2 },
+          { text: 'Сумма\n(без НДС)', rowspan: 3 },
+          { text: 'Корреспондирующие счета', colspan: 2 },
+          { text: 'Примечание', rowspan: 3 },
+        ],
+        [
+          { text: 'наименование', rowspan: 2 },
+          { text: 'номер', colspan: 2 },
+          { text: 'наимено-\nвание', rowspan: 2 },
+          { text: 'код по\nОКЕИ', rowspan: 2 },
+          { text: 'затре-\nбовано', rowspan: 2 },
+          { text: 'отпу-\nщено', rowspan: 2 },
+          { text: 'дебет', rowspan: 2 },
+          { text: 'кредит', rowspan: 2 },
+        ],
+        [
+          { text: 'номенкла-\nтурный' },
+          { text: 'паспорта\n(иной)' },
+        ],
       ],
-      rows: Array.from({ length: 11 }, () => Array(13).fill('')),
+      showRowNumbers: true,
+      showTotals: true,
+      totalsLabel: 'Итого',
+      totalsLabelCol: 5,
+      columns: [
+        { label: 'наименование', width: 140 },
+        { label: 'номенклатурный', width: 80 },
+        { label: 'паспорта (иной)', width: 80 },
+        { label: 'наименование', width: 65 },
+        { label: 'код по ОКЕИ', width: 50 },
+        { label: 'Цена', width: 60 },
+        { label: 'затребовано', width: 65 },
+        { label: 'отпущено', width: 65 },
+        { label: 'Сумма', width: 70 },
+        { label: 'дебет', width: 65 },
+        { label: 'кредит', width: 65 },
+        { label: 'Примечание', width: 75 },
+      ],
+      rows: [
+        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '600', '600', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '600', '600', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '600', '600', '', '', '', 'М3'],
+      ],
     },
     {
-      id: uid(), type: 'signature', x: 30, y: 700, w: 500, h: 70,
-      children: makeSignatureChildren('Отпустил', ['должность', 'подпись', 'расшифровка подписи'], '«__» _________ 20__ г.'),
+      id: uid(), type: 'signature', x: 20, y: 645, w: 420, h: 65,
+      children: makeSignatureChildren('Отпустил', ['звание', 'подпись', 'расшифровка подписи'], '4 апреля 2026 г.'),
     },
     {
-      id: uid(), type: 'signature', x: 30, y: 780, w: 500, h: 70,
-      children: makeSignatureChildren('Получил', ['должность', 'подпись', 'расшифровка подписи'], '«__» _________ 20__ г.'),
+      id: uid(), type: 'signature', x: 440, y: 645, w: 370, h: 65,
+      children: makeSignatureChildren('Ответственный исполнитель', ['должность', 'подпись', 'расшифровка подписи'], '«__» _________ 20__ г.'),
     },
     {
-      id: uid(), type: 'frame', x: 700, y: 690, w: 480, h: 120,
-      children: makeFrameChildren('Отметка бухгалтерии', ''),
+      id: uid(), type: 'signature', x: 20, y: 720, w: 420, h: 75,
+      children: [
+        { id: uid(), type: 'label', text: 'Получил', fontSize: 10, bold: true },
+        { id: uid(), type: 'free-text', text: '              лейтенант', fontSize: 9 },
+        { id: uid(), type: 'sign-fields', parts: ['звание', 'подпись', 'расшифровка подписи'], gap: 30, minWidth: 100 },
+        { id: uid(), type: 'date-text', text: '4 апреля 2026 г.', fontSize: 9 },
+      ],
+    },
+    {
+      id: uid(), type: 'frame', x: 810, y: 640, w: 370, h: 160,
+      children: [
+        { id: uid(), type: 'label', text: 'Отметка бухгалтерии', fontSize: 8 },
+        { id: uid(), type: 'free-text', text: 'Корреспонденция счетов (графы 10, 11) отражена\nв журнале операций за ___ 20__ г.', fontSize: 8 },
+        { id: uid(), type: 'label', text: 'Исполнитель', fontSize: 8, bold: false },
+        { id: uid(), type: 'sign-fields', parts: ['должность', 'подпись', 'расшифровка подписи'], gap: 15, minWidth: 80 },
+        { id: uid(), type: 'date-text', text: '«__» _________ 20__ г.', fontSize: 8 },
+      ],
     },
   ];
 }
@@ -187,6 +280,28 @@ function childTypeLabel(type: ChildType): string {
     case 'line-separator': return 'Линия';
     case 'free-text': return 'Текст';
   }
+}
+
+function renderMultiHeaderHtml(headerRows: HeaderCell[][], colCount: number, showRowNumbers?: boolean): string {
+  let html = '';
+  for (const row of headerRows) {
+    html += '<tr>';
+    for (const cell of row) {
+      const cs = cell.colspan ? ` colspan="${cell.colspan}"` : '';
+      const rs = cell.rowspan ? ` rowspan="${cell.rowspan}"` : '';
+      const textLines = (cell.text || '').split('\n').join('<br/>');
+      html += `<th${cs}${rs} style="border:1px solid #000;padding:2px 3px;font-weight:normal;text-align:center;font-size:7pt;white-space:pre-wrap;vertical-align:middle;">${textLines}</th>`;
+    }
+    html += '</tr>';
+  }
+  if (showRowNumbers) {
+    html += '<tr>';
+    for (let i = 0; i < colCount; i++) {
+      html += `<td style="border:1px solid #000;padding:1px 2px;text-align:center;font-size:7pt;font-weight:normal;">${i + 1}</td>`;
+    }
+    html += '</tr>';
+  }
+  return html;
 }
 
 interface Props {
@@ -549,12 +664,22 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       if (block.type === 'table') {
         const cols = block.columns || [];
         const rows = block.rows || [];
+        const hasMultiHeader = block.headerRows && block.headerRows.length > 0;
         let html = `<div style="${baseStyle}"><table style="border-collapse:collapse;width:100%;font-size:8pt;font-family:'Times New Roman',serif;">`;
-        html += '<thead><tr>';
-        for (const col of cols) {
-          html += `<th style="border:1px solid #000;padding:2px 3px;font-weight:normal;text-align:center;">${col.label}</th>`;
+
+        if (hasMultiHeader) {
+          html += '<thead>';
+          html += renderMultiHeaderHtml(block.headerRows!, cols.length, block.showRowNumbers);
+          html += '</thead>';
+        } else {
+          html += '<thead><tr>';
+          for (const col of cols) {
+            html += `<th style="border:1px solid #000;padding:2px 3px;font-weight:normal;text-align:center;">${col.label}</th>`;
+          }
+          html += '</tr></thead>';
         }
-        html += '</tr></thead><tbody>';
+
+        html += '<tbody>';
         for (let ri = 0; ri < rows.length; ri++) {
           html += '<tr>';
           for (let ci = 0; ci < cols.length; ci++) {
@@ -562,15 +687,29 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
           }
           html += '</tr>';
         }
-        const sumRow = cols.map((_, ci) => computeTableSum(rows, ci));
-        const hasAnySum = sumRow.some(s => s !== '');
-        if (hasAnySum) {
+
+        if (block.showTotals) {
+          const sumRow = cols.map((_, ci) => computeTableSum(rows, ci));
           html += '<tr>';
           for (let ci = 0; ci < cols.length; ci++) {
-            html += `<td style="border:1px solid #000;padding:2px 3px;text-align:center;font-weight:bold;">${ci === 0 ? 'Итого' : sumRow[ci]}</td>`;
+            const isTotalsLabelCol = ci === (block.totalsLabelCol ?? 0);
+            const val = isTotalsLabelCol ? (block.totalsLabel || 'Итого') : sumRow[ci];
+            const fw = isTotalsLabelCol ? 'font-weight:bold;' : '';
+            html += `<td style="border:1px solid #000;padding:2px 3px;text-align:center;${fw}">${val}</td>`;
           }
           html += '</tr>';
+        } else {
+          const sumRow = cols.map((_, ci) => computeTableSum(rows, ci));
+          const hasAnySum = sumRow.some(s => s !== '');
+          if (hasAnySum) {
+            html += '<tr>';
+            for (let ci = 0; ci < cols.length; ci++) {
+              html += `<td style="border:1px solid #000;padding:2px 3px;text-align:center;font-weight:bold;">${ci === 0 ? 'Итого' : sumRow[ci]}</td>`;
+            }
+            html += '</tr>';
+          }
         }
+
         html += '</tbody></table></div>';
         return html;
       }
@@ -661,59 +800,115 @@ body { font-family:'Times New Roman',serif; }
     );
   };
 
+  const renderMultiHeaderRow = (block: Block) => {
+    if (!block.headerRows || block.headerRows.length === 0) return null;
+    const cols = block.columns || [];
+    return (
+      <>
+        {block.headerRows.map((row, rowIdx) => (
+          <tr key={`hdr-${rowIdx}`}>
+            {row.map((cell, cellIdx) => (
+              <th
+                key={`hdr-${rowIdx}-${cellIdx}`}
+                colSpan={cell.colspan || 1}
+                rowSpan={cell.rowspan || 1}
+                style={{
+                  border: '1px solid #000',
+                  padding: '2px 3px',
+                  fontWeight: 'normal',
+                  textAlign: 'center',
+                  fontSize: '7pt',
+                  whiteSpace: 'pre-wrap',
+                  verticalAlign: 'middle',
+                  lineHeight: '1.2',
+                }}
+              >
+                {cell.text}
+              </th>
+            ))}
+          </tr>
+        ))}
+        {block.showRowNumbers && (
+          <tr>
+            {cols.map((_, ci) => (
+              <td
+                key={`num-${ci}`}
+                style={{
+                  border: '1px solid #000',
+                  padding: '1px 2px',
+                  textAlign: 'center',
+                  fontSize: '7pt',
+                  fontWeight: 'normal',
+                }}
+              >
+                {ci + 1}
+              </td>
+            ))}
+          </tr>
+        )}
+      </>
+    );
+  };
+
   const renderTableBlock = (block: Block) => {
     const cols = block.columns || [];
     const rows = block.rows || [];
     const isSelected = selectedId === block.id;
+    const hasMultiHeader = block.headerRows && block.headerRows.length > 0;
+
     return (
       <div style={{ width: '100%', fontFamily: "'Times New Roman', serif", fontSize: '8pt' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
-            <tr>
-              {cols.map((col, ci) => (
-                <th
-                  key={ci}
-                  style={{
-                    border: '1px solid #000',
-                    padding: '2px 3px',
-                    fontWeight: 'normal',
-                    textAlign: 'center',
-                    fontSize: '7pt',
-                    minWidth: 30,
-                  }}
-                >
-                  {editingCell?.blockId === block.id && editingCell.row === -1 && editingCell.col === ci ? (
-                    <input
-                      autoFocus
-                      className="w-full border-none bg-blue-50 text-center outline-none"
-                      style={{ fontSize: '7pt', fontFamily: "'Times New Roman', serif" }}
-                      defaultValue={col.label}
-                      onBlur={(e) => {
-                        const newCols = [...cols];
-                        newCols[ci] = { ...newCols[ci], label: e.target.value };
-                        updateBlock(block.id, { columns: newCols });
-                        setEditingCell(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                      }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingCell({ blockId: block.id, row: -1, col: ci });
-                      }}
-                      style={{ display: 'block', minHeight: 14, cursor: 'text' }}
-                    >
-                      {col.label}
-                    </span>
-                  )}
-                </th>
-              ))}
-              {isSelected && <th style={{ border: 'none', width: 20 }} />}
-            </tr>
+            {hasMultiHeader ? (
+              renderMultiHeaderRow(block)
+            ) : (
+              <tr>
+                {cols.map((col, ci) => (
+                  <th
+                    key={ci}
+                    style={{
+                      border: '1px solid #000',
+                      padding: '2px 3px',
+                      fontWeight: 'normal',
+                      textAlign: 'center',
+                      fontSize: '7pt',
+                      minWidth: 30,
+                    }}
+                  >
+                    {editingCell?.blockId === block.id && editingCell.row === -1 && editingCell.col === ci ? (
+                      <input
+                        autoFocus
+                        className="w-full border-none bg-blue-50 text-center outline-none"
+                        style={{ fontSize: '7pt', fontFamily: "'Times New Roman', serif" }}
+                        defaultValue={col.label}
+                        onBlur={(e) => {
+                          const newCols = [...cols];
+                          newCols[ci] = { ...newCols[ci], label: e.target.value };
+                          updateBlock(block.id, { columns: newCols });
+                          setEditingCell(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCell({ blockId: block.id, row: -1, col: ci });
+                        }}
+                        style={{ display: 'block', minHeight: 14, cursor: 'text' }}
+                      >
+                        {col.label}
+                      </span>
+                    )}
+                  </th>
+                ))}
+                {isSelected && <th style={{ border: 'none', width: 20 }} />}
+              </tr>
+            )}
           </thead>
           <tbody>
             {rows.map((row, ri) => (
@@ -725,7 +920,7 @@ body { font-family:'Times New Roman',serif; }
                       border: '1px solid #000',
                       padding: '1px 3px',
                       textAlign: 'center',
-                      minWidth: 30,
+                      fontSize: '8pt',
                     }}
                   >
                     {editingCell?.blockId === block.id && editingCell.row === ri && editingCell.col === ci ? (
@@ -735,8 +930,12 @@ body { font-family:'Times New Roman',serif; }
                         style={{ fontSize: '8pt', fontFamily: "'Times New Roman', serif" }}
                         defaultValue={row[ci] || ''}
                         onBlur={(e) => {
-                          const newRows = rows.map(r => [...r]);
-                          newRows[ri][ci] = e.target.value;
+                          const newRows = rows.map((r, i) => {
+                            if (i !== ri) return r;
+                            const newRow = [...r];
+                            newRow[ci] = e.target.value;
+                            return newRow;
+                          });
                           updateBlock(block.id, { rows: newRows });
                           setEditingCell(null);
                         }}
@@ -745,10 +944,10 @@ body { font-family:'Times New Roman',serif; }
                           if (e.key === 'Tab') {
                             e.preventDefault();
                             (e.target as HTMLInputElement).blur();
-                            const nextCi = ci + 1 < cols.length ? ci + 1 : 0;
-                            const nextRi = ci + 1 < cols.length ? ri : ri + 1;
-                            if (nextRi < rows.length) {
-                              setEditingCell({ blockId: block.id, row: nextRi, col: nextCi });
+                            const nextCol = ci + 1 < cols.length ? ci + 1 : 0;
+                            const nextRow = nextCol === 0 ? ri + 1 : ri;
+                            if (nextRow < rows.length) {
+                              setEditingCell({ blockId: block.id, row: nextRow, col: nextCol });
                             }
                           }
                         }}
@@ -785,29 +984,52 @@ body { font-family:'Times New Roman',serif; }
                 )}
               </tr>
             ))}
-            {(() => {
-              const sumRow = cols.map((_, ci) => computeTableSum(rows, ci));
-              const hasAny = sumRow.some(s => s !== '');
-              if (!hasAny) return null;
-              return (
-                <tr>
-                  {cols.map((_, ci) => (
+            {block.showTotals ? (
+              <tr>
+                {cols.map((_, ci) => {
+                  const isTotalsLabelCol = ci === (block.totalsLabelCol ?? 0);
+                  const sumRow = computeTableSum(rows, ci);
+                  return (
                     <td
                       key={ci}
                       style={{
                         border: '1px solid #000',
                         padding: '1px 3px',
                         textAlign: 'center',
-                        fontWeight: 'bold',
+                        fontWeight: isTotalsLabelCol ? 'bold' : 'normal',
                         fontSize: '8pt',
                       }}
                     >
-                      {ci === 0 ? 'Итого' : sumRow[ci]}
+                      {isTotalsLabelCol ? (block.totalsLabel || 'Итого') : sumRow}
                     </td>
-                  ))}
-                </tr>
-              );
-            })()}
+                  );
+                })}
+              </tr>
+            ) : (
+              (() => {
+                const sumRow = cols.map((_, ci) => computeTableSum(rows, ci));
+                const hasAny = sumRow.some(s => s !== '');
+                if (!hasAny) return null;
+                return (
+                  <tr>
+                    {cols.map((_, ci) => (
+                      <td
+                        key={ci}
+                        style={{
+                          border: '1px solid #000',
+                          padding: '1px 3px',
+                          textAlign: 'center',
+                          fontWeight: 'bold',
+                          fontSize: '8pt',
+                        }}
+                      >
+                        {ci === 0 ? 'Итого' : sumRow[ci]}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })()
+            )}
           </tbody>
         </table>
         {isSelected && (
@@ -1171,6 +1393,7 @@ body { font-family:'Times New Roman',serif; }
                         <input
                           type="number"
                           min={0}
+                          max={100}
                           className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
                           value={child.gap || 30}
                           onChange={(e) => updateChild(b.id, child.id, { gap: Number(e.target.value) })}
@@ -1180,7 +1403,8 @@ body { font-family:'Times New Roman',serif; }
                         <span className="text-[10px] text-gray-500">Мин. ширина</span>
                         <input
                           type="number"
-                          min={40}
+                          min={30}
+                          max={300}
                           className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
                           value={child.minWidth || 120}
                           onChange={(e) => updateChild(b.id, child.id, { minWidth: Number(e.target.value) })}
@@ -1188,12 +1412,13 @@ body { font-family:'Times New Roman',serif; }
                       </label>
                     </div>
                   )}
-                  {child.type === 'date-text' && (
+                  {(child.type === 'date-text' || child.type === 'free-text') && (
                     <div className="flex flex-col gap-1">
                       <label className="flex flex-col gap-0.5">
                         <span className="text-[10px] text-gray-500">Текст</span>
-                        <input
+                        <textarea
                           className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                          rows={2}
                           value={child.text || ''}
                           onChange={(e) => updateChild(b.id, child.id, { text: e.target.value })}
                         />
@@ -1212,42 +1437,19 @@ body { font-family:'Times New Roman',serif; }
                     </div>
                   )}
                   {child.type === 'line-separator' && (
-                    <div className="flex flex-col gap-1">
-                      <label className="flex flex-col gap-0.5">
-                        <span className="text-[10px] text-gray-500">Стиль</span>
-                        <select
-                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
-                          value={child.lineStyle || 'solid'}
-                          onChange={(e) => updateChild(b.id, child.id, { lineStyle: e.target.value as 'solid' | 'dashed' })}
-                        >
-                          <option value="solid">Сплошная</option>
-                          <option value="dashed">Пунктир</option>
-                        </select>
-                      </label>
-                    </div>
-                  )}
-                  {child.type === 'free-text' && (
-                    <div className="flex flex-col gap-1">
-                      <label className="flex flex-col gap-0.5">
-                        <span className="text-[10px] text-gray-500">Текст</span>
-                        <textarea
-                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
-                          rows={3}
-                          value={child.text || ''}
-                          onChange={(e) => updateChild(b.id, child.id, { text: e.target.value })}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-0.5">
-                        <span className="text-[10px] text-gray-500">Размер</span>
-                        <input
-                          type="number"
-                          min={6}
-                          max={24}
-                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
-                          value={child.fontSize || 9}
-                          onChange={(e) => updateChild(b.id, child.id, { fontSize: Number(e.target.value) })}
-                        />
-                      </label>
+                    <div className="flex gap-1">
+                      <button
+                        className={`rounded border px-1.5 py-0.5 text-[10px] ${child.lineStyle !== 'dashed' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
+                        onClick={() => updateChild(b.id, child.id, { lineStyle: 'solid' })}
+                      >
+                        Сплошная
+                      </button>
+                      <button
+                        className={`rounded border px-1.5 py-0.5 text-[10px] ${child.lineStyle === 'dashed' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
+                        onClick={() => updateChild(b.id, child.id, { lineStyle: 'dashed' })}
+                      >
+                        Пунктир
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1350,7 +1552,7 @@ body { font-family:'Times New Roman',serif; }
               <span className="text-[10px] text-gray-500">Размер шрифта</span>
               <input
                 type="number"
-                min={8}
+                min={6}
                 max={24}
                 className="rounded border border-gray-200 px-2 py-1 text-xs"
                 value={b.fontSize || 10}
@@ -1391,6 +1593,67 @@ body { font-family:'Times New Roman',serif; }
           <div className="flex flex-col gap-1">
             <span className="text-[10px] text-gray-500">Столбцов: {(b.columns || []).length}</span>
             <span className="text-[10px] text-gray-500">Строк: {(b.rows || []).length}</span>
+            <div className="border-t border-gray-200 pt-1" />
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={!!b.headerRows && b.headerRows.length > 0}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    const cols = b.columns || [];
+                    const defaultHeader: HeaderCell[][] = [
+                      cols.map(c => ({ text: c.label })),
+                    ];
+                    updateBlock(b.id, { headerRows: defaultHeader });
+                  } else {
+                    updateBlock(b.id, { headerRows: undefined });
+                  }
+                }}
+                className="h-3 w-3"
+              />
+              <span className="text-[10px] text-gray-600">Многоуровневая шапка</span>
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={!!b.showRowNumbers}
+                onChange={(e) => updateBlock(b.id, { showRowNumbers: e.target.checked })}
+                className="h-3 w-3"
+              />
+              <span className="text-[10px] text-gray-600">Нумерация столбцов</span>
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={!!b.showTotals}
+                onChange={(e) => updateBlock(b.id, { showTotals: e.target.checked })}
+                className="h-3 w-3"
+              />
+              <span className="text-[10px] text-gray-600">Строка итогов</span>
+            </label>
+            {b.showTotals && (
+              <>
+                <label className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-gray-500">Текст итогов</span>
+                  <input
+                    className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                    value={b.totalsLabel || 'Итого'}
+                    onChange={(e) => updateBlock(b.id, { totalsLabel: e.target.value })}
+                  />
+                </label>
+                <label className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-gray-500">Столбец итогов (0-based)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={(b.columns || []).length - 1}
+                    className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px]"
+                    value={b.totalsLabelCol ?? 0}
+                    onChange={(e) => updateBlock(b.id, { totalsLabelCol: Number(e.target.value) })}
+                  />
+                </label>
+              </>
+            )}
           </div>
         )}
 
