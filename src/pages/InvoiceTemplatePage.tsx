@@ -405,6 +405,7 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   const [dragState, setDragState] = useState<{ blockId: string; offsetX: number; offsetY: number } | null>(null);
   const [resizeState, setResizeState] = useState<{ blockId: string; startX: number; startY: number; startW: number; startH: number } | null>(null);
   const [expandedChildId, setExpandedChildId] = useState<string | null>(null);
+  const [saveFlash, setSaveFlash] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const pushHistory = useCallback((newBlocks: Block[]) => {
@@ -419,8 +420,8 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
 
   useEffect(() => {
     const savedVersion = parseInt(localStorage.getItem(STORAGE_VERSION_KEY) || '0', 10);
-    if (savedVersion < CURRENT_VERSION) {
-      localStorage.removeItem(STORAGE_KEY);
+    const hasUserData = !!localStorage.getItem(STORAGE_KEY);
+    if (savedVersion < CURRENT_VERSION && !hasUserData) {
       localStorage.setItem(STORAGE_VERSION_KEY, String(CURRENT_VERSION));
     }
     try {
@@ -690,6 +691,8 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   const handleSave = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
     localStorage.setItem(STORAGE_VERSION_KEY, String(CURRENT_VERSION));
+    setSaveFlash(true);
+    setTimeout(() => setSaveFlash(false), 1500);
   };
 
   const handleClear = () => {
@@ -1773,8 +1776,8 @@ body { font-family:'Times New Roman',serif; }
           <Button variant="ghost" size="sm" onClick={handleClear} title="Очистить">
             <Icon name="Trash2" size={16} />
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleSave} title="Сохранить">
-            <Icon name="Save" size={16} />
+          <Button variant="ghost" size="sm" onClick={handleSave} title="Сохранить" className={saveFlash ? 'text-green-600' : ''}>
+            <Icon name={saveFlash ? 'Check' : 'Save'} size={16} />
           </Button>
           <Button variant="ghost" size="sm" onClick={handlePrint} title="Печать">
             <Icon name="Printer" size={16} />

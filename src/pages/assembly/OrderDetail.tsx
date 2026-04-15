@@ -355,7 +355,7 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
 <div class="row">Структурное подразделение - получатель <span class="u" style="min-width:200px">${f.receiverDept}</span></div>
 <div class="row">Единица измерения: руб. (с точностью до второго десятичного знака)</div>
 </div>
-<table style="border-collapse:collapse;font-size:8pt;align-self:flex-start"><tr><td colspan="2" style="border:1px solid #000;padding:1pt 4pt;text-align:center;font-weight:bold">Коды</td></tr><tr><td style="padding:1pt 4pt;text-align:right;border-left:1px solid #000;border-top:1px solid #000;border-bottom:1px solid #000">Форма по ОКУД</td><td style="border:1px solid #000;padding:1pt 4pt;text-align:center">${f.okud}</td></tr><tr><td style="padding:1pt 4pt;text-align:right;border-left:1px solid #000;border-top:1px solid #000;border-bottom:1px solid #000">Дата</td><td style="border:1px solid #000;padding:1pt 4pt;text-align:center">${f.dateCode}</td></tr><tr><td style="padding:1pt 4pt;text-align:right;border-left:1px solid #000;border-top:1px solid #000;border-bottom:1px solid #000">по ОКПО</td><td style="border:1px solid #000;padding:1pt 4pt;text-align:center">${f.okpo}</td></tr><tr><td style="height:4pt"></td><td></td></tr><tr><td style="padding:1pt 4pt;text-align:right">по ОКЕИ</td><td style="border:1px solid #000;padding:1pt 4pt;text-align:center">${f.okei}</td></tr></table></div>
+<div style="display:flex;align-self:flex-start;font-size:8pt"><div style="padding-top:16pt"><div style="padding:1pt 4pt;text-align:right;font-weight:bold;height:18pt">Форма по ОКУД</div><div style="padding:1pt 4pt;text-align:right;font-weight:bold;height:18pt">Дата</div><div style="padding:1pt 4pt;text-align:right;height:18pt">по ОКПО</div><div style="height:4pt"></div><div style="padding:1pt 4pt;text-align:right">по ОКЕИ</div></div><table style="border-collapse:collapse"><tr><td style="border:1px solid #000;padding:1pt 4pt;text-align:center;font-weight:bold">Коды</td></tr><tr><td style="border:1px solid #000;padding:1pt 4pt;text-align:center">${f.okud}</td></tr><tr><td style="border:1px solid #000;padding:1pt 4pt;text-align:center">${f.dateCode}</td></tr><tr><td style="border:1px solid #000;padding:1pt 4pt;text-align:center">${f.okpo}</td></tr><tr><td style="height:4pt"></td></tr><tr><td style="border:1px solid #000;padding:1pt 4pt;text-align:center">${f.okei}</td></tr></table></div></div>
 <div style="height:4pt"></div>
 <div class="row">Затребовал <span class="u">${f.reqRank}</span> <span class="lbl">(звание)</span> <span class="u" style="min-width:80px">${f.reqName}</span> <span class="lbl">(фамилия, инициалы)</span> <span style="margin-left:16pt">Разрешил</span> <span class="u">${f.appRole}</span> <span class="lbl">(должность)</span> <span class="u">${f.appSign}</span> <span class="lbl">(подпись)</span> <span class="u" style="min-width:80px">${f.appName}</span> <span class="lbl">(расшифровка подписи)</span></div>
 <table class="m"><thead>
@@ -435,16 +435,25 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
               </div>
               <div>Единица измерения: руб. (с точностью до второго десятичного знака)</div>
             </div>
-            <table className="border-collapse shrink-0 self-start" style={{ fontSize: '8pt' }}>
-              <tbody>
-                <tr><td colSpan={2} className={`${bb} px-2 py-0.5 text-center font-bold`}>Коды</td></tr>
-                <tr><td className="px-2 py-0.5 text-right border-l border-t border-b border-black" style={{ borderRight: 0 }}>Форма по ОКУД</td><td className={th}><EF k="okud" w="60px" a="center" /></td></tr>
-                <tr><td className="px-2 py-0.5 text-right border-l border-t border-b border-black" style={{ borderRight: 0 }}>Дата</td><td className={th}><EF k="dateCode" w="60px" a="center" /></td></tr>
-                <tr><td className="px-2 py-0.5 text-right border-l border-t border-b border-black" style={{ borderRight: 0 }}>по ОКПО</td><td className={th}><EF k="okpo" w="60px" a="center" /></td></tr>
-                <tr><td /><td style={{ height: 4 }} /></tr>
-                <tr><td className="px-2 py-0.5 text-right" style={{ border: 'none' }}>по ОКЕИ</td><td className={th}><EF k="okei" w="60px" a="center" /></td></tr>
-              </tbody>
-            </table>
+            <div className="shrink-0 self-start flex" style={{ fontSize: '8pt' }}>
+              <div className="flex flex-col justify-start" style={{ paddingTop: 20 }}>
+                <div className="px-1 py-0.5 text-right font-bold" style={{ height: 22 }}>Форма по ОКУД</div>
+                <div className="px-1 py-0.5 text-right font-bold" style={{ height: 22 }}>Дата</div>
+                <div className="px-1 py-0.5 text-right" style={{ height: 22 }}>по ОКПО</div>
+                <div style={{ height: 4 }} />
+                <div className="px-1 py-0.5 text-right">по ОКЕИ</div>
+              </div>
+              <table className="border-collapse">
+                <tbody>
+                  <tr><td className={th} style={{ fontWeight: 'bold' }}>Коды</td></tr>
+                  <tr><td className={th}><EF k="okud" w="60px" a="center" /></td></tr>
+                  <tr><td className={th}><EF k="dateCode" w="60px" a="center" /></td></tr>
+                  <tr><td className={th}><EF k="okpo" w="60px" a="center" /></td></tr>
+                  <tr><td style={{ height: 4 }} /></tr>
+                  <tr><td className={th}><EF k="okei" w="60px" a="center" /></td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="flex items-end gap-1 flex-wrap mt-3" style={{ fontSize: '8.5pt' }}>
