@@ -57,9 +57,9 @@ interface Block {
 
 const STORAGE_KEY = 'invoice_builder_blocks';
 const STORAGE_VERSION_KEY = 'invoice_builder_version';
-const CURRENT_VERSION = 3;
-const CANVAS_W = 1190;
-const CANVAS_H = 842;
+const CURRENT_VERSION = 4;
+const CANVAS_W = 1122;
+const CANVAS_H = 794;
 const GRID_SIZE = 10;
 const MAX_HISTORY = 50;
 
@@ -105,113 +105,106 @@ function ensureChildren(block: Block): BlockChild[] {
 }
 
 function defaultBlocks(): Block[] {
+  const L = 30;
+  const R = 1090;
+  const TW = R - L;
   return [
     {
-      id: uid(), type: 'text', x: 320, y: 18, w: 420, h: 22,
+      id: uid(), type: 'text', x: 300, y: 15, w: 380, h: 20,
       text: 'ТРЕБОВАНИЕ-НАКЛАДНАЯ  №', fontSize: 11, bold: true, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 680, y: 18, w: 80, h: 22,
-      text: '22-ЧТ', fontSize: 11, bold: true, align: 'left',
+      id: uid(), type: 'text', x: 640, y: 15, w: 70, h: 20,
+      text: '22-ЧТ', fontSize: 11, bold: true, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 430, y: 38, w: 40, h: 14,
+      id: uid(), type: 'text', x: 420, y: 36, w: 30, h: 12,
       text: 'от', fontSize: 8, align: 'right',
     },
     {
-      id: uid(), type: 'text', x: 480, y: 36, w: 150, h: 14,
+      id: uid(), type: 'text', x: 456, y: 34, w: 140, h: 12,
       text: '4 апреля 2026 г.', fontSize: 8, align: 'center',
     },
     {
-      id: uid(), type: 'line', x: 475, y: 50, w: 160, h: 1, lineWidth: 1,
+      id: uid(), type: 'line', x: 454, y: 46, w: 144, h: 1, lineWidth: 1,
     },
     {
-      id: uid(), type: 'table', x: 1000, y: 12, w: 180, h: 72,
-      columns: [{ label: '', width: 110 }, { label: 'Коды', width: 70 }],
+      id: uid(), type: 'table', x: 940, y: 10, w: 170, h: 68,
+      columns: [{ label: '', width: 100 }, { label: 'Коды', width: 70 }],
       rows: [['Форма по ОКУД', '0504204'], ['Дата', ''], ['по ОКПО', '']],
     },
     {
-      id: uid(), type: 'text', x: 24, y: 72, w: 500, h: 14,
+      id: uid(), type: 'text', x: L, y: 66, w: 400, h: 13,
       text: 'Учреждение', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 24, y: 88, w: 500, h: 14,
+      id: uid(), type: 'text', x: L, y: 80, w: 400, h: 13,
       text: 'Структурное подразделение - отправитель', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 24, y: 104, w: 500, h: 14,
+      id: uid(), type: 'text', x: L, y: 94, w: 400, h: 13,
       text: 'Структурное подразделение - получатель', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 24, y: 120, w: 550, h: 14,
+      id: uid(), type: 'text', x: L, y: 108, w: 500, h: 13,
       text: 'Единица измерения: руб. (с точностью до второго десятичного знака)', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'table', x: 1000, y: 116, w: 180, h: 20,
-      columns: [{ label: '', width: 110 }, { label: '', width: 70 }],
+      id: uid(), type: 'table', x: 940, y: 104, w: 170, h: 18,
+      columns: [{ label: '', width: 100 }, { label: '', width: 70 }],
       rows: [['по ОКЕИ', '383']],
     },
     {
-      id: uid(), type: 'text', x: 24, y: 145, w: 80, h: 14,
-      text: 'Затребовал', fontSize: 8, bold: false, align: 'left',
+      id: uid(), type: 'text', x: L, y: 132, w: 70, h: 12,
+      text: 'Затребовал', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 130, y: 140, w: 95, h: 12,
+      id: uid(), type: 'text', x: 120, y: 128, w: 80, h: 11,
       text: 'лейтенант', fontSize: 8, italic: true, align: 'center',
     },
+    { id: uid(), type: 'line', x: 108, y: 139, w: 105, h: 1, lineWidth: 1 },
     {
-      id: uid(), type: 'line', x: 115, y: 152, w: 120, h: 1, lineWidth: 1,
-    },
-    {
-      id: uid(), type: 'text', x: 115, y: 153, w: 120, h: 10,
+      id: uid(), type: 'text', x: 108, y: 140, w: 105, h: 9,
       text: '(звание)', fontSize: 6, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 300, y: 140, w: 95, h: 12,
+      id: uid(), type: 'text', x: 268, y: 128, w: 80, h: 11,
       text: '0', fontSize: 8, italic: true, align: 'center',
     },
+    { id: uid(), type: 'line', x: 240, y: 139, w: 140, h: 1, lineWidth: 1 },
     {
-      id: uid(), type: 'line', x: 270, y: 152, w: 150, h: 1, lineWidth: 1,
-    },
-    {
-      id: uid(), type: 'text', x: 270, y: 153, w: 150, h: 10,
+      id: uid(), type: 'text', x: 240, y: 140, w: 140, h: 9,
       text: '(фамилия, инициалы)', fontSize: 6, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 520, y: 145, w: 70, h: 14,
-      text: 'Разрешил', fontSize: 8, bold: false, align: 'left',
+      id: uid(), type: 'text', x: 490, y: 132, w: 65, h: 12,
+      text: 'Разрешил', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 650, y: 140, w: 90, h: 12,
+      id: uid(), type: 'text', x: 608, y: 128, w: 80, h: 11,
       text: 'НЦ (БпС)', fontSize: 8, italic: true, align: 'center',
     },
+    { id: uid(), type: 'line', x: 590, y: 139, w: 110, h: 1, lineWidth: 1 },
     {
-      id: uid(), type: 'line', x: 630, y: 152, w: 120, h: 1, lineWidth: 1,
-    },
-    {
-      id: uid(), type: 'text', x: 630, y: 153, w: 120, h: 10,
+      id: uid(), type: 'text', x: 590, y: 140, w: 110, h: 9,
       text: '(должность)', fontSize: 6, align: 'center',
     },
+    { id: uid(), type: 'line', x: 720, y: 139, w: 80, h: 1, lineWidth: 1 },
     {
-      id: uid(), type: 'line', x: 780, y: 152, w: 90, h: 1, lineWidth: 1,
-    },
-    {
-      id: uid(), type: 'text', x: 780, y: 153, w: 90, h: 10,
+      id: uid(), type: 'text', x: 720, y: 140, w: 80, h: 9,
       text: '(подпись)', fontSize: 6, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 920, y: 140, w: 120, h: 12,
+      id: uid(), type: 'text', x: 860, y: 128, w: 110, h: 11,
       text: 'Калита Е.Н', fontSize: 8, italic: true, align: 'center',
     },
+    { id: uid(), type: 'line', x: 840, y: 139, w: 150, h: 1, lineWidth: 1 },
     {
-      id: uid(), type: 'line', x: 900, y: 152, w: 160, h: 1, lineWidth: 1,
-    },
-    {
-      id: uid(), type: 'text', x: 900, y: 153, w: 160, h: 10,
+      id: uid(), type: 'text', x: 840, y: 140, w: 150, h: 9,
       text: '(расшифровка подписи)', fontSize: 6, align: 'center',
     },
     {
-      id: uid(), type: 'table', x: 24, y: 172, w: 1150, h: 440,
+      id: uid(), type: 'table', x: L, y: 158, w: TW, h: 420,
       headerRows: [
         [
           { text: 'Материальные ценности', colspan: 3 },
@@ -242,18 +235,18 @@ function defaultBlocks(): Block[] {
       totalsLabel: 'Итого',
       totalsLabelCol: 5,
       columns: [
-        { label: 'наименование', width: 155 },
-        { label: 'номенклатурный', width: 85 },
-        { label: 'паспорта (иной)', width: 85 },
-        { label: 'наименование', width: 68 },
-        { label: 'код по ОКЕИ', width: 52 },
-        { label: 'Цена', width: 55 },
-        { label: 'затребовано', width: 62 },
-        { label: 'отпущено', width: 58 },
-        { label: 'Сумма', width: 68 },
-        { label: 'дебет', width: 70 },
-        { label: 'кредит', width: 68 },
-        { label: 'Примечание', width: 72 },
+        { label: 'наименование', width: 140 },
+        { label: 'номенклатурный', width: 78 },
+        { label: 'паспорта (иной)', width: 78 },
+        { label: 'наименование', width: 62 },
+        { label: 'код по ОКЕИ', width: 48 },
+        { label: 'Цена', width: 50 },
+        { label: 'затребовано', width: 56 },
+        { label: 'отпущено', width: 52 },
+        { label: 'Сумма', width: 60 },
+        { label: 'дебет', width: 62 },
+        { label: 'кредит', width: 60 },
+        { label: 'Примечание', width: 66 },
       ],
       rows: [
         ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
@@ -271,49 +264,54 @@ function defaultBlocks(): Block[] {
       ],
     },
     {
-      id: uid(), type: 'text', x: 24, y: 628, w: 70, h: 14,
-      text: 'Отпустил', fontSize: 8, bold: true, align: 'left',
+      id: uid(), type: 'text', x: L, y: 590, w: 60, h: 12,
+      text: 'Отпустил', fontSize: 8, bold: false, align: 'left',
     },
     {
-      id: uid(), type: 'signature', x: 24, y: 644, w: 400, h: 50,
+      id: uid(), type: 'signature', x: L, y: 604, w: 380, h: 44,
       children: [
-        { id: uid(), type: 'sign-fields', parts: ['звание', 'подпись', 'расшифровка подписи'], gap: 20, minWidth: 110 },
+        { id: uid(), type: 'sign-fields', parts: ['звание', 'подпись', 'расшифровка подписи'], gap: 16, minWidth: 100 },
         { id: uid(), type: 'date-text', text: '4 апреля 2026 г.', fontSize: 8 },
       ],
     },
     {
-      id: uid(), type: 'text', x: 460, y: 628, w: 200, h: 14,
-      text: 'Ответственный исполнитель', fontSize: 8, bold: true, align: 'left',
+      id: uid(), type: 'text', x: 430, y: 590, w: 180, h: 12,
+      text: 'Ответственный исполнитель', fontSize: 8, bold: false, align: 'left',
     },
     {
-      id: uid(), type: 'signature', x: 460, y: 644, w: 340, h: 50,
+      id: uid(), type: 'signature', x: 430, y: 604, w: 310, h: 44,
       children: [
-        { id: uid(), type: 'sign-fields', parts: ['должность', 'подпись', 'расшифровка\nподписи'], gap: 15, minWidth: 90 },
+        { id: uid(), type: 'sign-fields', parts: ['должность', 'подпись', 'расшифровка\nподписи'], gap: 12, minWidth: 80 },
         { id: uid(), type: 'date-text', text: '«__» _________ 20__ г.', fontSize: 8 },
       ],
     },
     {
-      id: uid(), type: 'text', x: 24, y: 702, w: 70, h: 14,
-      text: 'Получил', fontSize: 8, bold: true, align: 'left',
+      id: uid(), type: 'text', x: L, y: 656, w: 60, h: 12,
+      text: 'Получил', fontSize: 8, bold: false, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 130, y: 698, w: 80, h: 12,
+      id: uid(), type: 'text', x: 115, y: 652, w: 75, h: 11,
       text: 'лейтенант', fontSize: 8, italic: true, align: 'center',
     },
+    { id: uid(), type: 'line', x: 100, y: 663, w: 105, h: 1, lineWidth: 1 },
     {
-      id: uid(), type: 'signature', x: 24, y: 716, w: 400, h: 50,
+      id: uid(), type: 'text', x: 100, y: 664, w: 105, h: 9,
+      text: '(звание)', fontSize: 6, align: 'center',
+    },
+    {
+      id: uid(), type: 'signature', x: L, y: 676, w: 380, h: 44,
       children: [
-        { id: uid(), type: 'sign-fields', parts: ['звание', 'подпись', 'расшифровка подписи'], gap: 20, minWidth: 110 },
+        { id: uid(), type: 'sign-fields', parts: ['звание', 'подпись', 'расшифровка подписи'], gap: 16, minWidth: 100 },
         { id: uid(), type: 'date-text', text: '4 апреля 2026 г.', fontSize: 8 },
       ],
     },
     {
-      id: uid(), type: 'frame', x: 820, y: 622, w: 354, h: 150,
+      id: uid(), type: 'frame', x: 760, y: 584, w: 330, h: 140,
       children: [
         { id: uid(), type: 'label', text: 'Отметка бухгалтерии', fontSize: 8, bold: true, align: 'center' },
         { id: uid(), type: 'free-text', text: 'Корреспонденция счетов (графы 10, 11) отражена\nв журнале операций за       20    г.', fontSize: 7 },
-        { id: uid(), type: 'label', text: 'Исполнитель', fontSize: 8, bold: false },
-        { id: uid(), type: 'sign-fields', parts: ['должность', 'подпись', 'расшифровка подписи'], gap: 10, minWidth: 70 },
+        { id: uid(), type: 'label', text: 'Исполнитель', fontSize: 7, bold: false },
+        { id: uid(), type: 'sign-fields', parts: ['должность', 'подпись', 'расшифровка подписи'], gap: 8, minWidth: 65 },
         { id: uid(), type: 'date-text', text: '«__» _________ 20__ г.', fontSize: 7 },
       ],
     },
@@ -389,7 +387,7 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ blockId: string; row: number; col: number } | null>(null);
-  const [zoom, setZoom] = useState(0.8);
+  const [zoom, setZoom] = useState(0.85);
   const [history, setHistory] = useState<Block[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [dragState, setDragState] = useState<{ blockId: string; offsetX: number; offsetY: number } | null>(null);
