@@ -53,11 +53,12 @@ interface Block {
   showTotals?: boolean;
   totalsLabel?: string;
   totalsLabelCol?: number;
+  borderStyle?: 'solid' | 'dashed';
 }
 
 const STORAGE_KEY = 'invoice_builder_blocks';
 const STORAGE_VERSION_KEY = 'invoice_builder_version';
-const CURRENT_VERSION = 7;
+const CURRENT_VERSION = 8;
 const CANVAS_W = 1122;
 const CANVAS_H = 794;
 const GRID_SIZE = 10;
@@ -317,7 +318,7 @@ function defaultBlocks(): Block[] {
       ],
     },
     {
-      id: uid(), type: 'frame', x: 760, y: 584, w: 330, h: 148,
+      id: uid(), type: 'frame', x: 760, y: 584, w: 330, h: 148, borderStyle: 'dashed',
       children: [
         { id: uid(), type: 'label', text: 'Отметка бухгалтерии', fontSize: 8, bold: false, align: 'center' },
         { id: uid(), type: 'free-text', text: 'Корреспонденция счетов (графы 10, 11) отражена\nв журнале операций за __________ 20___ г.', fontSize: 7 },
@@ -804,10 +805,11 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
 
       if (block.type === 'frame') {
         const children = ensureChildren(block);
-        let html = `<div style="${baseStyle}height:${block.h}px;border:1px solid #000;position:absolute;">`;
+        const fbs = block.borderStyle || 'solid';
+        let html = `<div style="${baseStyle}height:${block.h}px;border:1px ${fbs} #000;position:absolute;">`;
         for (const child of children) {
           if (child.type === 'label') {
-            html += `<div style="font-size:${child.fontSize || 8}pt;padding:2px 4px;border-bottom:1px solid #000;background:#fff;${child.bold ? 'font-weight:bold;' : ''}">${child.text || ''}</div>`;
+            html += `<div style="font-size:${child.fontSize || 8}pt;padding:2px 4px;border-bottom:1px ${fbs} #000;background:#fff;${child.bold ? 'font-weight:bold;' : ''}">${child.text || ''}</div>`;
           } else {
             html += `<div style="padding:4px;">${renderChildHtml(child)}</div>`;
           }
@@ -1260,7 +1262,7 @@ body { font-family:'Times New Roman',serif; }
       <div style={{
         width: '100%',
         height: '100%',
-        border: '1px solid #000',
+        border: `1px ${block.borderStyle || 'solid'} #000`,
         fontFamily: "'Times New Roman', serif",
         position: 'relative',
         display: 'flex',
@@ -1275,7 +1277,7 @@ body { font-family:'Times New Roman',serif; }
                   fontSize: `${child.fontSize || 8}pt`,
                   fontWeight: child.bold ? 'bold' : 'normal',
                   padding: '2px 4px',
-                  borderBottom: '1px solid #000',
+                  borderBottom: `1px ${block.borderStyle || 'solid'} #000`,
                   background: '#fff',
                   cursor: isSelected ? 'text' : 'default',
                   outline: 'none',
