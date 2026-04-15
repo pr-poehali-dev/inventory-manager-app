@@ -56,6 +56,8 @@ interface Block {
 }
 
 const STORAGE_KEY = 'invoice_builder_blocks';
+const STORAGE_VERSION_KEY = 'invoice_builder_version';
+const CURRENT_VERSION = 2;
 const CANVAS_W = 1200;
 const CANVAS_H = 870;
 const GRID_SIZE = 10;
@@ -212,10 +214,10 @@ function defaultBlocks(): Block[] {
         ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
         ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
         ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
-        ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
         ['', '', '', 'шт.', '', '', '600', '600', '', '', '', 'М3'],
         ['', '', '', 'шт.', '', '', '600', '600', '', '', '', 'М3'],
         ['', '', '', 'шт.', '', '', '600', '600', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '', '', '', '', '', 'М3'],
       ],
     },
     {
@@ -262,7 +264,8 @@ function computeTableSum(rows: string[][], colIndex: number): string {
       hasNum = true;
     }
   }
-  return hasNum ? sum.toFixed(2) : '';
+  if (!hasNum) return '';
+  return sum === Math.floor(sum) ? sum.toString() : sum.toFixed(2);
 }
 
 function isEditableElement(el: Element | null): boolean {
@@ -335,6 +338,11 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   }, [historyIndex]);
 
   useEffect(() => {
+    const savedVersion = parseInt(localStorage.getItem(STORAGE_VERSION_KEY) || '0', 10);
+    if (savedVersion < CURRENT_VERSION) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(STORAGE_VERSION_KEY, String(CURRENT_VERSION));
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -601,6 +609,7 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
 
   const handleSave = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
+    localStorage.setItem(STORAGE_VERSION_KEY, String(CURRENT_VERSION));
   };
 
   const handleClear = () => {
@@ -698,16 +707,6 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
             html += `<td style="border:1px solid #000;padding:2px 3px;text-align:center;${fw}">${val}</td>`;
           }
           html += '</tr>';
-        } else {
-          const sumRow = cols.map((_, ci) => computeTableSum(rows, ci));
-          const hasAnySum = sumRow.some(s => s !== '');
-          if (hasAnySum) {
-            html += '<tr>';
-            for (let ci = 0; ci < cols.length; ci++) {
-              html += `<td style="border:1px solid #000;padding:2px 3px;text-align:center;font-weight:bold;">${ci === 0 ? 'Итого' : sumRow[ci]}</td>`;
-            }
-            html += '</tr>';
-          }
         }
 
         html += '</tbody></table></div>';
@@ -984,7 +983,7 @@ body { font-family:'Times New Roman',serif; }
                 )}
               </tr>
             ))}
-            {block.showTotals ? (
+            {block.showTotals && (
               <tr>
                 {cols.map((_, ci) => {
                   const isTotalsLabelCol = ci === (block.totalsLabelCol ?? 0);
@@ -1005,30 +1004,6 @@ body { font-family:'Times New Roman',serif; }
                   );
                 })}
               </tr>
-            ) : (
-              (() => {
-                const sumRow = cols.map((_, ci) => computeTableSum(rows, ci));
-                const hasAny = sumRow.some(s => s !== '');
-                if (!hasAny) return null;
-                return (
-                  <tr>
-                    {cols.map((_, ci) => (
-                      <td
-                        key={ci}
-                        style={{
-                          border: '1px solid #000',
-                          padding: '1px 3px',
-                          textAlign: 'center',
-                          fontWeight: 'bold',
-                          fontSize: '8pt',
-                        }}
-                      >
-                        {ci === 0 ? 'Итого' : sumRow[ci]}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })()
             )}
           </tbody>
         </table>
