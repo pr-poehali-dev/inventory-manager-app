@@ -57,9 +57,9 @@ interface Block {
 
 const STORAGE_KEY = 'invoice_builder_blocks';
 const STORAGE_VERSION_KEY = 'invoice_builder_version';
-const CURRENT_VERSION = 2;
-const CANVAS_W = 1200;
-const CANVAS_H = 870;
+const CURRENT_VERSION = 3;
+const CANVAS_W = 1190;
+const CANVAS_H = 842;
 const GRID_SIZE = 10;
 const MAX_HISTORY = 50;
 
@@ -107,65 +107,115 @@ function ensureChildren(block: Block): BlockChild[] {
 function defaultBlocks(): Block[] {
   return [
     {
-      id: uid(), type: 'text', x: 300, y: 20, w: 500, h: 30,
-      text: 'ТРЕБОВАНИЕ-НАКЛАДНАЯ №', fontSize: 12, bold: true, align: 'center',
+      id: uid(), type: 'text', x: 320, y: 18, w: 420, h: 22,
+      text: 'ТРЕБОВАНИЕ-НАКЛАДНАЯ  №', fontSize: 11, bold: true, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 630, y: 20, w: 100, h: 30,
-      text: '22-ЧТ', fontSize: 12, bold: true, align: 'center',
+      id: uid(), type: 'text', x: 680, y: 18, w: 80, h: 22,
+      text: '22-ЧТ', fontSize: 11, bold: true, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 400, y: 45, w: 300, h: 16,
-      text: 'от             4 апреля 2026 г.', fontSize: 9, align: 'center',
+      id: uid(), type: 'text', x: 430, y: 38, w: 40, h: 14,
+      text: 'от', fontSize: 8, align: 'right',
     },
     {
-      id: uid(), type: 'table', x: 990, y: 10, w: 190, h: 80,
-      columns: [{ label: '', width: 120 }, { label: 'Коды', width: 70 }],
+      id: uid(), type: 'text', x: 480, y: 36, w: 150, h: 14,
+      text: '4 апреля 2026 г.', fontSize: 8, align: 'center',
+    },
+    {
+      id: uid(), type: 'line', x: 475, y: 50, w: 160, h: 1, lineWidth: 1,
+    },
+    {
+      id: uid(), type: 'table', x: 1000, y: 12, w: 180, h: 72,
+      columns: [{ label: '', width: 110 }, { label: 'Коды', width: 70 }],
       rows: [['Форма по ОКУД', '0504204'], ['Дата', ''], ['по ОКПО', '']],
     },
     {
-      id: uid(), type: 'text', x: 20, y: 80, w: 600, h: 16,
-      text: 'Учреждение _______________', fontSize: 9, align: 'left',
+      id: uid(), type: 'text', x: 24, y: 72, w: 500, h: 14,
+      text: 'Учреждение', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 20, y: 98, w: 600, h: 16,
-      text: 'Структурное подразделение - отправитель', fontSize: 9, align: 'left',
+      id: uid(), type: 'text', x: 24, y: 88, w: 500, h: 14,
+      text: 'Структурное подразделение - отправитель', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 20, y: 116, w: 600, h: 16,
-      text: 'Структурное подразделение - получатель', fontSize: 9, align: 'left',
+      id: uid(), type: 'text', x: 24, y: 104, w: 500, h: 14,
+      text: 'Структурное подразделение - получатель', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 20, y: 134, w: 600, h: 16,
-      text: 'Единица измерения: руб. (с точностью до второго десятичного знака)', fontSize: 9, align: 'left',
+      id: uid(), type: 'text', x: 24, y: 120, w: 550, h: 14,
+      text: 'Единица измерения: руб. (с точностью до второго десятичного знака)', fontSize: 8, align: 'left',
     },
     {
-      id: uid(), type: 'table', x: 990, y: 130, w: 190, h: 22,
-      columns: [{ label: '', width: 120 }, { label: '', width: 70 }],
+      id: uid(), type: 'table', x: 1000, y: 116, w: 180, h: 20,
+      columns: [{ label: '', width: 110 }, { label: '', width: 70 }],
       rows: [['по ОКЕИ', '383']],
     },
     {
-      id: uid(), type: 'text', x: 20, y: 162, w: 560, h: 30,
-      text: 'Затребовал            лейтенант                     0', fontSize: 9, align: 'left',
+      id: uid(), type: 'text', x: 24, y: 145, w: 80, h: 14,
+      text: 'Затребовал', fontSize: 8, bold: false, align: 'left',
     },
     {
-      id: uid(), type: 'text', x: 120, y: 180, w: 440, h: 14,
-      text: '            (звание)                    (фамилия, инициалы)', fontSize: 7, align: 'left',
+      id: uid(), type: 'text', x: 130, y: 140, w: 95, h: 12,
+      text: 'лейтенант', fontSize: 8, italic: true, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 580, y: 162, w: 600, h: 30,
-      text: 'Разрешил                  НЦ (БпС)                                                      Калита Е.Н', fontSize: 9, align: 'left',
+      id: uid(), type: 'line', x: 115, y: 152, w: 120, h: 1, lineWidth: 1,
     },
     {
-      id: uid(), type: 'text', x: 660, y: 180, w: 520, h: 14,
-      text: '          (должность)                 (подпись)                   (расшифровка подписи)', fontSize: 7, align: 'left',
+      id: uid(), type: 'text', x: 115, y: 153, w: 120, h: 10,
+      text: '(звание)', fontSize: 6, align: 'center',
     },
     {
-      id: uid(), type: 'table', x: 20, y: 200, w: 1160, h: 430,
+      id: uid(), type: 'text', x: 300, y: 140, w: 95, h: 12,
+      text: '0', fontSize: 8, italic: true, align: 'center',
+    },
+    {
+      id: uid(), type: 'line', x: 270, y: 152, w: 150, h: 1, lineWidth: 1,
+    },
+    {
+      id: uid(), type: 'text', x: 270, y: 153, w: 150, h: 10,
+      text: '(фамилия, инициалы)', fontSize: 6, align: 'center',
+    },
+    {
+      id: uid(), type: 'text', x: 520, y: 145, w: 70, h: 14,
+      text: 'Разрешил', fontSize: 8, bold: false, align: 'left',
+    },
+    {
+      id: uid(), type: 'text', x: 650, y: 140, w: 90, h: 12,
+      text: 'НЦ (БпС)', fontSize: 8, italic: true, align: 'center',
+    },
+    {
+      id: uid(), type: 'line', x: 630, y: 152, w: 120, h: 1, lineWidth: 1,
+    },
+    {
+      id: uid(), type: 'text', x: 630, y: 153, w: 120, h: 10,
+      text: '(должность)', fontSize: 6, align: 'center',
+    },
+    {
+      id: uid(), type: 'line', x: 780, y: 152, w: 90, h: 1, lineWidth: 1,
+    },
+    {
+      id: uid(), type: 'text', x: 780, y: 153, w: 90, h: 10,
+      text: '(подпись)', fontSize: 6, align: 'center',
+    },
+    {
+      id: uid(), type: 'text', x: 920, y: 140, w: 120, h: 12,
+      text: 'Калита Е.Н', fontSize: 8, italic: true, align: 'center',
+    },
+    {
+      id: uid(), type: 'line', x: 900, y: 152, w: 160, h: 1, lineWidth: 1,
+    },
+    {
+      id: uid(), type: 'text', x: 900, y: 153, w: 160, h: 10,
+      text: '(расшифровка подписи)', fontSize: 6, align: 'center',
+    },
+    {
+      id: uid(), type: 'table', x: 24, y: 172, w: 1150, h: 440,
       headerRows: [
         [
           { text: 'Материальные ценности', colspan: 3 },
-          { text: 'Единица измерения', colspan: 2 },
+          { text: 'Единица\nизмерения', colspan: 2 },
           { text: 'Цена', rowspan: 3 },
           { text: 'Количество', colspan: 2 },
           { text: 'Сумма\n(без НДС)', rowspan: 3 },
@@ -184,7 +234,7 @@ function defaultBlocks(): Block[] {
         ],
         [
           { text: 'номенкла-\nтурный' },
-          { text: 'паспорта\n(иной)' },
+          { text: 'паспорта (иной)' },
         ],
       ],
       showRowNumbers: true,
@@ -192,18 +242,18 @@ function defaultBlocks(): Block[] {
       totalsLabel: 'Итого',
       totalsLabelCol: 5,
       columns: [
-        { label: 'наименование', width: 140 },
-        { label: 'номенклатурный', width: 80 },
-        { label: 'паспорта (иной)', width: 80 },
-        { label: 'наименование', width: 65 },
-        { label: 'код по ОКЕИ', width: 50 },
-        { label: 'Цена', width: 60 },
-        { label: 'затребовано', width: 65 },
-        { label: 'отпущено', width: 65 },
-        { label: 'Сумма', width: 70 },
-        { label: 'дебет', width: 65 },
-        { label: 'кредит', width: 65 },
-        { label: 'Примечание', width: 75 },
+        { label: 'наименование', width: 155 },
+        { label: 'номенклатурный', width: 85 },
+        { label: 'паспорта (иной)', width: 85 },
+        { label: 'наименование', width: 68 },
+        { label: 'код по ОКЕИ', width: 52 },
+        { label: 'Цена', width: 55 },
+        { label: 'затребовано', width: 62 },
+        { label: 'отпущено', width: 58 },
+        { label: 'Сумма', width: 68 },
+        { label: 'дебет', width: 70 },
+        { label: 'кредит', width: 68 },
+        { label: 'Примечание', width: 72 },
       ],
       rows: [
         ['', '', '', 'шт.', '', '', '130', '130', '', '', '', 'М3'],
@@ -217,34 +267,54 @@ function defaultBlocks(): Block[] {
         ['', '', '', 'шт.', '', '', '600', '600', '', '', '', 'М3'],
         ['', '', '', 'шт.', '', '', '600', '600', '', '', '', 'М3'],
         ['', '', '', 'шт.', '', '', '600', '600', '', '', '', 'М3'],
-        ['', '', '', 'шт.', '', '', '', '', '', '', '', 'М3'],
+        ['', '', '', 'шт.', '', '', '', '', '', '', '', ''],
       ],
     },
     {
-      id: uid(), type: 'signature', x: 20, y: 645, w: 420, h: 65,
-      children: makeSignatureChildren('Отпустил', ['звание', 'подпись', 'расшифровка подписи'], '4 апреля 2026 г.'),
+      id: uid(), type: 'text', x: 24, y: 628, w: 70, h: 14,
+      text: 'Отпустил', fontSize: 8, bold: true, align: 'left',
     },
     {
-      id: uid(), type: 'signature', x: 440, y: 645, w: 370, h: 65,
-      children: makeSignatureChildren('Ответственный исполнитель', ['должность', 'подпись', 'расшифровка подписи'], '«__» _________ 20__ г.'),
-    },
-    {
-      id: uid(), type: 'signature', x: 20, y: 720, w: 420, h: 75,
+      id: uid(), type: 'signature', x: 24, y: 644, w: 400, h: 50,
       children: [
-        { id: uid(), type: 'label', text: 'Получил', fontSize: 10, bold: true },
-        { id: uid(), type: 'free-text', text: '              лейтенант', fontSize: 9 },
-        { id: uid(), type: 'sign-fields', parts: ['звание', 'подпись', 'расшифровка подписи'], gap: 30, minWidth: 100 },
-        { id: uid(), type: 'date-text', text: '4 апреля 2026 г.', fontSize: 9 },
+        { id: uid(), type: 'sign-fields', parts: ['звание', 'подпись', 'расшифровка подписи'], gap: 20, minWidth: 110 },
+        { id: uid(), type: 'date-text', text: '4 апреля 2026 г.', fontSize: 8 },
       ],
     },
     {
-      id: uid(), type: 'frame', x: 810, y: 640, w: 370, h: 160,
+      id: uid(), type: 'text', x: 460, y: 628, w: 200, h: 14,
+      text: 'Ответственный исполнитель', fontSize: 8, bold: true, align: 'left',
+    },
+    {
+      id: uid(), type: 'signature', x: 460, y: 644, w: 340, h: 50,
       children: [
-        { id: uid(), type: 'label', text: 'Отметка бухгалтерии', fontSize: 8 },
-        { id: uid(), type: 'free-text', text: 'Корреспонденция счетов (графы 10, 11) отражена\nв журнале операций за ___ 20__ г.', fontSize: 8 },
-        { id: uid(), type: 'label', text: 'Исполнитель', fontSize: 8, bold: false },
-        { id: uid(), type: 'sign-fields', parts: ['должность', 'подпись', 'расшифровка подписи'], gap: 15, minWidth: 80 },
+        { id: uid(), type: 'sign-fields', parts: ['должность', 'подпись', 'расшифровка\nподписи'], gap: 15, minWidth: 90 },
         { id: uid(), type: 'date-text', text: '«__» _________ 20__ г.', fontSize: 8 },
+      ],
+    },
+    {
+      id: uid(), type: 'text', x: 24, y: 702, w: 70, h: 14,
+      text: 'Получил', fontSize: 8, bold: true, align: 'left',
+    },
+    {
+      id: uid(), type: 'text', x: 130, y: 698, w: 80, h: 12,
+      text: 'лейтенант', fontSize: 8, italic: true, align: 'center',
+    },
+    {
+      id: uid(), type: 'signature', x: 24, y: 716, w: 400, h: 50,
+      children: [
+        { id: uid(), type: 'sign-fields', parts: ['звание', 'подпись', 'расшифровка подписи'], gap: 20, minWidth: 110 },
+        { id: uid(), type: 'date-text', text: '4 апреля 2026 г.', fontSize: 8 },
+      ],
+    },
+    {
+      id: uid(), type: 'frame', x: 820, y: 622, w: 354, h: 150,
+      children: [
+        { id: uid(), type: 'label', text: 'Отметка бухгалтерии', fontSize: 8, bold: true, align: 'center' },
+        { id: uid(), type: 'free-text', text: 'Корреспонденция счетов (графы 10, 11) отражена\nв журнале операций за       20    г.', fontSize: 7 },
+        { id: uid(), type: 'label', text: 'Исполнитель', fontSize: 8, bold: false },
+        { id: uid(), type: 'sign-fields', parts: ['должность', 'подпись', 'расшифровка подписи'], gap: 10, minWidth: 70 },
+        { id: uid(), type: 'date-text', text: '«__» _________ 20__ г.', fontSize: 7 },
       ],
     },
   ];
