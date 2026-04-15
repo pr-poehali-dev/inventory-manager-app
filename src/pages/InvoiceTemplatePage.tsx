@@ -57,7 +57,7 @@ interface Block {
 
 const STORAGE_KEY = 'invoice_builder_blocks';
 const STORAGE_VERSION_KEY = 'invoice_builder_version';
-const CURRENT_VERSION = 4;
+const CURRENT_VERSION = 5;
 const CANVAS_W = 1122;
 const CANVAS_H = 794;
 const GRID_SIZE = 10;
@@ -129,9 +129,9 @@ function defaultBlocks(): Block[] {
       id: uid(), type: 'line', x: 454, y: 46, w: 144, h: 1, lineWidth: 1,
     },
     {
-      id: uid(), type: 'table', x: 940, y: 10, w: 170, h: 68,
+      id: uid(), type: 'table', x: 940, y: 10, w: 170, h: 120,
       columns: [{ label: '', width: 100 }, { label: 'Коды', width: 70 }],
-      rows: [['Форма по ОКУД', '0504204'], ['Дата', ''], ['по ОКПО', '']],
+      rows: [['Форма по ОКУД', '0504204'], ['Дата', ''], ['по ОКПО', ''], ['', ''], ['', ''], ['по ОКЕИ', '383']],
     },
     {
       id: uid(), type: 'text', x: L, y: 66, w: 400, h: 13,
@@ -148,11 +148,6 @@ function defaultBlocks(): Block[] {
     {
       id: uid(), type: 'text', x: L, y: 108, w: 500, h: 13,
       text: 'Единица измерения: руб. (с точностью до второго десятичного знака)', fontSize: 8, align: 'left',
-    },
-    {
-      id: uid(), type: 'table', x: 940, y: 104, w: 170, h: 18,
-      columns: [{ label: '', width: 100 }, { label: '', width: 70 }],
-      rows: [['по ОКЕИ', '383']],
     },
     {
       id: uid(), type: 'text', x: L, y: 132, w: 70, h: 12,
@@ -195,12 +190,12 @@ function defaultBlocks(): Block[] {
       text: '(подпись)', fontSize: 6, align: 'center',
     },
     {
-      id: uid(), type: 'text', x: 860, y: 128, w: 110, h: 11,
+      id: uid(), type: 'text', x: 940, y: 128, w: 170, h: 11,
       text: 'Калита Е.Н', fontSize: 8, italic: true, align: 'center',
     },
-    { id: uid(), type: 'line', x: 840, y: 139, w: 150, h: 1, lineWidth: 1 },
+    { id: uid(), type: 'line', x: 940, y: 139, w: 170, h: 1, lineWidth: 1 },
     {
-      id: uid(), type: 'text', x: 840, y: 140, w: 150, h: 9,
+      id: uid(), type: 'text', x: 940, y: 140, w: 170, h: 9,
       text: '(расшифровка подписи)', fontSize: 6, align: 'center',
     },
     {
