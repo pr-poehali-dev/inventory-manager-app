@@ -57,7 +57,7 @@ interface Block {
 
 const STORAGE_KEY = 'invoice_builder_blocks';
 const STORAGE_VERSION_KEY = 'invoice_builder_version';
-const CURRENT_VERSION = 5;
+const CURRENT_VERSION = 6;
 const CANVAS_W = 1122;
 const CANVAS_H = 794;
 const GRID_SIZE = 10;
@@ -301,13 +301,13 @@ function defaultBlocks(): Block[] {
       ],
     },
     {
-      id: uid(), type: 'frame', x: 760, y: 584, w: 330, h: 140,
+      id: uid(), type: 'frame', x: 760, y: 584, w: 330, h: 148,
       children: [
-        { id: uid(), type: 'label', text: 'Отметка бухгалтерии', fontSize: 8, bold: true, align: 'center' },
-        { id: uid(), type: 'free-text', text: 'Корреспонденция счетов (графы 10, 11) отражена\nв журнале операций за       20    г.', fontSize: 7 },
-        { id: uid(), type: 'label', text: 'Исполнитель', fontSize: 7, bold: false },
+        { id: uid(), type: 'label', text: 'Отметка бухгалтерии', fontSize: 8, bold: false, align: 'center' },
+        { id: uid(), type: 'free-text', text: 'Корреспонденция счетов (графы 10, 11) отражена\nв журнале операций за __________ 20___ г.', fontSize: 7 },
+        { id: uid(), type: 'free-text', text: 'Исполнитель ____________________________', fontSize: 7 },
         { id: uid(), type: 'sign-fields', parts: ['должность', 'подпись', 'расшифровка подписи'], gap: 8, minWidth: 65 },
-        { id: uid(), type: 'date-text', text: '«__» _________ 20__ г.', fontSize: 7 },
+        { id: uid(), type: 'free-text', text: '«____» _______________ 20____ г.', fontSize: 7 },
       ],
     },
   ];
