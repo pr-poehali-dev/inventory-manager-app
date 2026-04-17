@@ -596,7 +596,7 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
   html: string; order: WorkOrder; state: AppState; onClose: () => void;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [iframeHeight, setIframeHeight] = useState(800);
+  const [iframeHeight, setIframeHeight] = useState(1100);
   const [zoom, setZoom] = useState(1);
 
   const filledHtml = useMemo(() => {
@@ -685,27 +685,21 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
           <Icon name="Printer" size={14} />Печать
         </Button>
       </div>
-      <div className="flex-1 overflow-auto p-4">
-        <div
-          className="mx-auto bg-white shadow-lg"
-          style={{ width: 1200 * zoom, height: iframeHeight * zoom, overflow: 'hidden' }}
-        >
-          <iframe
-            ref={iframeRef}
-            srcDoc={filledHtml}
-            onLoad={handleIframeLoad}
-            title="Накладная"
-            className="border-0"
-            style={{
-              width: 1200,
-              height: iframeHeight,
-              transform: `scale(${zoom})`,
-              transformOrigin: 'top left',
-              display: 'block',
-            }}
-            sandbox="allow-same-origin"
-          />
-        </div>
+      <div className="flex-1 overflow-auto bg-gray-100">
+        <iframe
+          ref={iframeRef}
+          srcDoc={filledHtml}
+          onLoad={handleIframeLoad}
+          title="Накладная"
+          className="border-0 block bg-white"
+          style={{
+            width: '100%',
+            height: Math.max(iframeHeight, 900),
+            transform: zoom !== 1 ? `scale(${zoom})` : undefined,
+            transformOrigin: 'top left',
+          }}
+          sandbox="allow-same-origin allow-scripts"
+        />
       </div>
     </div>
   );

@@ -40,7 +40,7 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   const [zoom, setZoom] = useState(1);
   const [saveFlash, setSaveFlash] = useState(false);
   const [fileName, setFileName] = useState<string>('');
-  const [iframeHeight, setIframeHeight] = useState(800);
+  const [iframeHeight, setIframeHeight] = useState(1100);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,20 +51,24 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       const doc = f.contentDocument;
       if (!doc) return;
       const measure = () => {
-        const b = doc.body;
-        const d = doc.documentElement;
+        const all = Array.from(doc.querySelectorAll('body *'));
+        let maxBottom = 0;
+        for (const el of all) {
+          const r = (el as HTMLElement).getBoundingClientRect();
+          if (r.bottom > maxBottom) maxBottom = r.bottom;
+        }
         const h = Math.max(
-          b?.scrollHeight || 0,
-          b?.offsetHeight || 0,
-          d?.scrollHeight || 0,
-          d?.offsetHeight || 0,
-          800,
+          maxBottom,
+          doc.body?.scrollHeight || 0,
+          doc.documentElement?.scrollHeight || 0,
+          900,
         );
-        setIframeHeight(h);
+        setIframeHeight(Math.ceil(h) + 40);
       };
       measure();
-      setTimeout(measure, 100);
-      setTimeout(measure, 500);
+      setTimeout(measure, 150);
+      setTimeout(measure, 600);
+      setTimeout(measure, 1500);
     } catch { /* cross-origin guard */ }
   }, []);
 
@@ -224,32 +228,21 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-4">
-        <div
-          className="mx-auto bg-white shadow-lg"
+      <div className="flex-1 overflow-auto bg-gray-100">
+        <iframe
+          ref={iframeRef}
+          srcDoc={html}
+          onLoad={handleIframeLoad}
+          title="Шаблон накладной"
+          className="border-0 block bg-white"
           style={{
-            width: 1200 * zoom,
-            height: iframeHeight * zoom,
-            transition: 'width 0.15s ease, height 0.15s ease',
-            overflow: 'hidden',
+            width: '100%',
+            height: Math.max(iframeHeight, 900),
+            transform: zoom !== 1 ? `scale(${zoom})` : undefined,
+            transformOrigin: 'top left',
           }}
-        >
-          <iframe
-            ref={iframeRef}
-            srcDoc={html}
-            onLoad={handleIframeLoad}
-            title="Шаблон накладной"
-            className="border-0"
-            style={{
-              width: 1200,
-              height: iframeHeight,
-              transform: `scale(${zoom})`,
-              transformOrigin: 'top left',
-              display: 'block',
-            }}
-            sandbox="allow-same-origin"
-          />
-        </div>
+          sandbox="allow-same-origin allow-scripts"
+        />
       </div>
     </div>
   );
