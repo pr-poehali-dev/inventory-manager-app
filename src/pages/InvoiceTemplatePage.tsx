@@ -98,6 +98,10 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     }
     styleEl.textContent = `
       [data-bind] {
+        background: transparent !important;
+        outline: none !important;
+      }
+      .__map-mode [data-bind] {
         background: rgba(34, 197, 94, 0.18) !important;
         outline: 1px dashed #16a34a !important;
         cursor: pointer !important;
@@ -106,6 +110,12 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
         background: rgba(59, 130, 246, 0.18) !important;
         outline: 1px dashed #2563eb !important;
         cursor: pointer !important;
+      }
+      @media print {
+        [data-bind], .__map-mode [data-bind] {
+          background: transparent !important;
+          outline: none !important;
+        }
       }
     `;
   };
