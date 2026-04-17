@@ -13,13 +13,19 @@ type Props = {
 function resolveSource(source: string, order: WorkOrder, state: AppState, tpl: InvoiceTemplate): string {
   const now = new Date();
   const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const wh = (state.warehouses || [])[0];
   const map: Record<string, string> = {
     '{{number}}': order.number,
     '{{date}}': `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} г.`,
     '{{recipient}}': order.recipientName || '',
-    '{{institution}}': tpl.companyName || '',
-    '{{signatory}}': tpl.signatory || '',
-    '{{signatoryRole}}': tpl.signatoryRole || '',
+    '{{institution}}': wh?.institution || tpl.companyName || '',
+    '{{senderDept}}': wh?.senderDept || wh?.name || '',
+    '{{issuerRank}}': wh?.issuerRank || '',
+    '{{issuerName}}': wh?.issuerName || '',
+    '{{approverRole}}': wh?.approverRole || tpl.signatoryRole || '',
+    '{{approverName}}': wh?.approverName || tpl.signatory || '',
+    '{{signatory}}': wh?.approverName || tpl.signatory || '',
+    '{{signatoryRole}}': wh?.approverRole || tpl.signatoryRole || '',
   };
   return map[source] || '';
 }
@@ -104,6 +110,16 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
       rows[ri][ci] = v;
       return { ...prev, [tid]: rows };
     });
+  };
+
+  const addRow = (tid: string) => {
+    const el = elements.find(e => e.id === tid);
+    const colsCount = el?.columns?.length || 0;
+    setTableValues(prev => ({ ...prev, [tid]: [...(prev[tid] || []), Array(colsCount).fill('')] }));
+  };
+
+  const removeRow = (tid: string, ri: number) => {
+    setTableValues(prev => ({ ...prev, [tid]: (prev[tid] || []).filter((_, i) => i !== ri) }));
   };
 
   const handlePrint = () => {
@@ -217,15 +233,22 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
             </thead>
             <tbody>
               {rows.map((row, ri) => (
-                <tr key={ri}>
+                <tr key={ri} className="group relative">
                   {row.map((cell, ci) => (
-                    <td key={ci} className="border border-black px-1 py-0.5">
+                    <td key={ci} className="border border-black px-1 py-0.5 relative">
                       {editing ? (
                         <input value={cell} onChange={e => updCell(el.id, ri, ci, e.target.value)}
                           className="w-full bg-transparent border-0 outline-none text-center px-0"
                           style={{ fontSize: 'inherit', fontFamily: 'inherit' }} />
                       ) : (
                         <span className="block text-center">{cell || '\u00A0'}</span>
+                      )}
+                      {editing && ci === row.length - 1 && (
+                        <button
+                          onClick={() => removeRow(el.id, ri)}
+                          className="absolute -right-6 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
+                          title="Удалить строку"
+                        >×</button>
                       )}
                     </td>
                   ))}
@@ -240,6 +263,12 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
               )}
             </tbody>
           </table>
+          {editing && (
+            <button
+              onClick={() => addRow(el.id)}
+              className="mt-1 w-full py-1 text-xs border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50 rounded print:hidden"
+            >+ Добавить строку</button>
+          )}
         </div>
       );
     }
