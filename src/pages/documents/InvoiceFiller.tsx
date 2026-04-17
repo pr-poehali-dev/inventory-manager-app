@@ -241,9 +241,12 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
     html += '</body></html>';
     const w = window.open('', '_blank');
     if (!w) return;
+    const docTitle = `Накладная ${order.number}`;
+    w.document.open();
     w.document.write(html);
     w.document.close();
-    setTimeout(() => w.print(), 300);
+    try { w.document.title = docTitle; } catch { /* noop */ }
+    setTimeout(() => { try { w.document.title = docTitle; } catch { /* noop */ } w.print(); }, 350);
   };
 
   const renderElement = (el: InvElement) => {

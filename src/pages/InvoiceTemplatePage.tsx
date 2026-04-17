@@ -274,8 +274,13 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       } else {
         el.setAttribute('data-bind', field);
       }
+      // Clone the document and strip editor-only styles before saving
+      const clone = doc.documentElement.cloneNode(true) as HTMLElement;
+      const bindStyle = clone.querySelector('#__bind_style');
+      if (bindStyle) bindStyle.remove();
+      setHtml(`<!DOCTYPE html>\n${clone.outerHTML}`);
+      // Re-apply highlight only for the live editor iframe
       highlightExistingBinds(doc);
-      setHtml(`<!DOCTYPE html>\n${doc.documentElement.outerHTML}`);
     }
     setPicker(null);
   }, [picker]);

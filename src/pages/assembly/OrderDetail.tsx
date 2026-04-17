@@ -21,6 +21,7 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
   const [showPrint, setShowPrint] = useState(false);
   const [showCloseWarning, setShowCloseWarning] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showReassembleConfirm, setShowReassembleConfirm] = useState(false);
 
   const doneCount = order.items.filter(i => i.status === 'done').length;
   const progress = order.items.length > 0 ? Math.round((doneCount / order.items.length) * 100) : 0;
@@ -63,7 +64,7 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         if (o.id !== order.id) return o;
         return {
           ...o,
-          status: 'active' as OrderStatus,
+          status: 'draft' as OrderStatus,
           updatedAt: new Date().toISOString(),
           items: o.items.map(oi => ({ ...oi, pickedQty: 0, status: 'pending' as OrderItem['status'] })),
         };
@@ -71,6 +72,10 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
     };
     onStateChange(next);
     saveState(next);
+    const updatedOrder = next.workOrders.find(o => o.id === order.id);
+    if (updatedOrder) {
+      crudAction('upsert_work_order', { workOrder: updatedOrder, orderItems: updatedOrder.items });
+    }
   };
 
   const orderHistory = state.operations.filter(op => op.orderId === order.id)
@@ -271,15 +276,22 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         )}
 
         {liveOrder.status === 'pending_stock' && <Button onClick={() => changeStatus('active')} className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground"><Icon name="Play" size={14} className="mr-1.5" />Запустить (поставка пришла)</Button>}
-        {liveOrder.status === 'assembled' && <Button onClick={handleClose} className="flex-1 bg-muted text-foreground hover:bg-muted/80"><Icon name="Archive" size={14} className="mr-1.5" />Закрыть заявку</Button>}
+        {liveOrder.status === 'assembled' && (
+          <>
+            <Button onClick={handleClose} className="flex-1 bg-muted text-foreground hover:bg-muted/80"><Icon name="Archive" size={14} className="mr-1.5" />Закрыть заявку</Button>
+            <Button variant="outline" onClick={() => setShowReassembleConfirm(true)} className="flex items-center gap-1.5">
+              <Icon name="RotateCcw" size={14} />Пересобрать
+            </Button>
+          </>
+        )}
         {(liveOrder.status === 'assembled' || liveOrder.status === 'closed') && (
           <Button variant="outline" onClick={() => setShowPrint(true)} className="flex items-center gap-1.5">
             <Icon name="Eye" size={14} />Накладная
           </Button>
         )}
         {liveOrder.status === 'closed' && (
-          <Button onClick={() => changeStatus('active')} className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground">
-            <Icon name="RotateCcw" size={14} className="mr-1.5" />Возобновить сборку
+          <Button onClick={() => setShowReassembleConfirm(true)} className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground">
+            <Icon name="RotateCcw" size={14} className="mr-1.5" />Пересобрать
           </Button>
         )}
       </div>
@@ -292,6 +304,33 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
           onConfirm={() => { setShowCloseWarning(false); changeStatus('closed'); }}
           onCancel={() => setShowCloseWarning(false)}
         />
+      )}
+
+      {showReassembleConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-md w-full p-5 animate-scale-in">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-warning/15 text-warning flex items-center justify-center shrink-0">
+                <Icon name="RotateCcw" size={18} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-base">Пересобрать заявку?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Все товары вернутся на склад (в места, откуда были взяты). Заявка перейдёт в статус <b className="text-foreground">«Черновик»</b> — её можно будет отредактировать и запустить заново.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button variant="outline" onClick={() => setShowReassembleConfirm(false)} className="flex-1">Отмена</Button>
+              <Button
+                onClick={() => { setShowReassembleConfirm(false); handleReassemble(); }}
+                className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground gap-1.5"
+              >
+                <Icon name="RotateCcw" size={14} />Пересобрать
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showPrint && (() => {
@@ -445,9 +484,12 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
 </body></html>`;
     const w = window.open('', '_blank');
     if (!w) return;
+    const docTitle = `Накладная ${f.num || order.number}`;
+    w.document.open();
     w.document.write(html);
     w.document.close();
-    setTimeout(() => w.print(), 300);
+    try { w.document.title = docTitle; } catch { /* noop */ }
+    setTimeout(() => { try { w.document.title = docTitle; } catch { /* noop */ } w.print(); }, 350);
   };
 
   const bb = 'border border-black';
@@ -711,6 +753,23 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
 
+      // Strip editor-only bind-highlight style that leaks dashed green/blue outlines
+      const bindStyle = doc.getElementById('__bind_style');
+      if (bindStyle) bindStyle.remove();
+      // Inject clean style that guarantees no dashed highlights in preview/print
+      const cleanStyle = doc.createElement('style');
+      cleanStyle.id = '__clean_bind_style';
+      cleanStyle.textContent = `
+        [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; }
+        @media print {
+          @page { size: A4 landscape; margin: 8mm; }
+          html, body { margin: 0 !important; background: #fff !important; }
+          [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; }
+          *[style*="dashed"] { border-style: solid !important; border-color: transparent !important; }
+        }
+      `;
+      if (doc.head) doc.head.appendChild(cleanStyle);
+
       const rowKeys = new Set(['rowIndex','rowName','rowUnit','rowQtyReq','rowQtyRel','rowPrice','rowSum']);
       const templateRow = doc.querySelector('tr[data-bind="itemsRows"]') as HTMLElement | null;
       if (templateRow && templateRow.parentElement) {
@@ -782,9 +841,35 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
   const handlePrint = () => {
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.write(filledHtml);
+    const docTitle = `Накладная ${order.number}`;
+    const printHead = `
+<title>${docTitle}</title>
+<style id="__print_reset">
+  @page { size: A4 landscape; margin: 8mm; }
+  @media print {
+    html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+    [data-bind] { background: transparent !important; outline: none !important; border-color: transparent !important; }
+    [data-bindable-hover] { background: transparent !important; outline: none !important; }
+    *[style*="dashed"] { border-style: solid !important; border-color: transparent !important; }
+    .__map-mode [data-bind] { background: transparent !important; outline: none !important; }
+  }
+  [data-bind] { background: transparent !important; outline: none !important; }
+</style>`;
+    let html = filledHtml;
+    // Remove existing title to avoid duplicates
+    html = html.replace(/<title>[^<]*<\/title>/i, '');
+    if (html.includes('</head>')) {
+      html = html.replace('</head>', `${printHead}</head>`);
+    } else if (html.includes('<head>')) {
+      html = html.replace('<head>', `<head>${printHead}`);
+    } else {
+      html = `<!DOCTYPE html><html><head>${printHead}</head><body>${html}</body></html>`;
+    }
+    w.document.open();
+    w.document.write(html);
     w.document.close();
-    setTimeout(() => w.print(), 300);
+    w.document.title = docTitle;
+    setTimeout(() => { try { w.document.title = docTitle; } catch { /* noop */ } w.print(); }, 400);
   };
 
   return (
