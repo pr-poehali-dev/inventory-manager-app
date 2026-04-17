@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { AppState, loadState, saveLocal, loadStateFromServer, checkServerUpdatedAt } from '@/data/store';
+import { AppState, loadState, saveLocal, loadStateFromServer, checkServerUpdatedAt, getLastCrudAt } from '@/data/store';
 import Layout, { Page } from '@/components/Layout';
 import CatalogPage from '@/pages/CatalogPage';
 import NomenclaturePage from '@/pages/NomenclaturePage';
@@ -120,10 +120,12 @@ export default function App() {
   }, []);
 
   const poll = useCallback(async () => {
-    if (Date.now() - lastLocalSaveRef.current < 3000) return;
+    const lastChange = Math.max(lastLocalSaveRef.current, getLastCrudAt());
+    if (Date.now() - lastChange < 8000) return;
     const remoteTs = await checkServerUpdatedAt();
     if (!remoteTs) return;
     if (remoteTs === serverUpdatedAtRef.current) return;
+    if (Date.now() - Math.max(lastLocalSaveRef.current, getLastCrudAt()) < 8000) return;
     const result = await loadStateFromServer();
     if (!result) return;
     serverUpdatedAtRef.current = result.updatedAt;

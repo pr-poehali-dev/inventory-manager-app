@@ -46,11 +46,16 @@ export function WarehousesSection({ state, onStateChange, onDeleteConfirm }: Ent
   const saveWhProfile = (id: string, patch: Partial<Warehouse>) => {
     const warehouses = (state.warehouses || []).map(w => w.id === id ? { ...w, ...patch } : w);
     const updated = warehouses.find(w => w.id === id);
-    onStateChange({ ...state, warehouses });
+    const nextState = { ...state, warehouses };
+    onStateChange(nextState);
     if (updated) {
       crudAction('upsert_warehouse', { warehouse: updated }).then(ok => {
-        if (ok) toast.success('Профиль склада сохранён');
-        else toast.error('Не удалось сохранить профиль');
+        if (ok) {
+          toast.success('Профиль склада сохранён');
+          onStateChange({ ...nextState });
+        } else {
+          toast.error('Не удалось сохранить профиль');
+        }
       });
     }
   };
