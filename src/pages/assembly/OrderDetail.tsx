@@ -414,56 +414,56 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
       </div>
 
       <div className="flex-1 overflow-auto p-4">
-        <div className="bg-white mx-auto shadow-lg border border-gray-300 px-10 py-6" style={{ maxWidth: 1200, minWidth: 1000, fontSize: '9pt', ...serif }}>
+        <div className="bg-white mx-auto shadow-lg border border-gray-300 px-10 py-6" style={{ maxWidth: 1300, minWidth: 1100, fontSize: '9pt', ...serif }}>
 
-          <div className="flex items-start gap-4">
-            <div className="flex-1 space-y-0.5" style={{ fontSize: '8.5pt' }}>
-              <div className="text-center font-bold mb-0.5" style={{ fontSize: '12pt' }}>
-                ТРЕБОВАНИЕ-НАКЛАДНАЯ {'\u2116'}{' '}<EF k="num" w="70px" a="center" />
+          <div className="flex items-start gap-3">
+            <div className="flex-1" style={{ fontSize: '8.5pt' }}>
+              <div className="text-center font-bold" style={{ fontSize: '12pt' }}>
+                ТРЕБОВАНИЕ-НАКЛАДНАЯ {'\u2116'}{' '}<EF k="num" w="90px" a="center" />
               </div>
-              <div className="text-center mb-2" style={{ fontSize: '8.5pt' }}>
-                от{' '}<EF k="date" w="150px" a="center" />
+              <div className="text-center" style={{ fontSize: '8.5pt', marginBottom: 8 }}>
+                от{' '}<EF k="date" w="160px" a="center" />
               </div>
-              <div className="flex items-end gap-1">
+              <div className="flex items-end gap-1" style={{ marginBottom: 2 }}>
                 <span className="whitespace-nowrap">Учреждение</span><EF k="institution" />
               </div>
-              <div className="flex items-end gap-1">
+              <div className="flex items-end gap-1" style={{ marginBottom: 2 }}>
                 <span className="whitespace-nowrap">Структурное подразделение - отправитель</span><EF k="senderDept" />
               </div>
-              <div className="flex items-end gap-1">
+              <div className="flex items-end gap-1" style={{ marginBottom: 2 }}>
                 <span className="whitespace-nowrap">Структурное подразделение - получатель</span><EF k="receiverDept" />
               </div>
               <div>Единица измерения: руб. (с точностью до второго десятичного знака)</div>
             </div>
-            <div className="shrink-0 self-start flex" style={{ fontSize: '8pt' }}>
-              <div className="flex flex-col justify-start" style={{ paddingTop: 20 }}>
-                <div className="px-1 py-0.5 text-right font-bold" style={{ height: 22 }}>Форма по ОКУД</div>
-                <div className="px-1 py-0.5 text-right font-bold" style={{ height: 22 }}>Дата</div>
-                <div className="px-1 py-0.5 text-right" style={{ height: 22 }}>по ОКПО</div>
-                <div style={{ height: 4 }} />
-                <div className="px-1 py-0.5 text-right">по ОКЕИ</div>
+            <div className="shrink-0 self-start flex items-start" style={{ fontSize: '8pt', paddingTop: 2 }}>
+              <div className="flex flex-col text-right" style={{ paddingTop: 22 }}>
+                <div className="font-bold whitespace-nowrap" style={{ height: 19, lineHeight: '19px', paddingRight: 4 }}>Форма по ОКУД</div>
+                <div className="font-bold whitespace-nowrap" style={{ height: 19, lineHeight: '19px', paddingRight: 4 }}>Дата</div>
+                <div className="whitespace-nowrap" style={{ height: 19, lineHeight: '19px', paddingRight: 4 }}>по ОКПО</div>
+                <div style={{ height: 19 }} />
+                <div className="whitespace-nowrap" style={{ height: 19, lineHeight: '19px', paddingRight: 4 }}>по ОКЕИ</div>
               </div>
-              <table className="border-collapse">
+              <table className="border-collapse" style={{ tableLayout: 'fixed' }}>
                 <tbody>
-                  <tr><td className={th} style={{ fontWeight: 'bold' }}>Коды</td></tr>
-                  <tr><td className={th}><EF k="okud" w="60px" a="center" /></td></tr>
-                  <tr><td className={th}><EF k="dateCode" w="60px" a="center" /></td></tr>
-                  <tr><td className={th}><EF k="okpo" w="60px" a="center" /></td></tr>
-                  <tr><td style={{ height: 4 }} /></tr>
-                  <tr><td className={th}><EF k="okei" w="60px" a="center" /></td></tr>
+                  <tr><td className="border border-black text-center font-bold" style={{ width: 70, height: 19, padding: 0 }}>Коды</td></tr>
+                  <tr><td className="border border-black text-center" style={{ width: 70, height: 19, padding: 0 }}><EC value={f.okud} onChange={v => uf('okud', v)} /></td></tr>
+                  <tr><td className="border border-black text-center" style={{ width: 70, height: 19, padding: 0 }}><EC value={f.dateCode} onChange={v => uf('dateCode', v)} /></td></tr>
+                  <tr><td className="border border-black text-center" style={{ width: 70, height: 19, padding: 0 }}><EC value={f.okpo} onChange={v => uf('okpo', v)} /></td></tr>
+                  <tr><td style={{ height: 19, border: 'none' }} /></tr>
+                  <tr><td className="border border-black text-center" style={{ width: 70, height: 19, padding: 0 }}><EC value={f.okei} onChange={v => uf('okei', v)} /></td></tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          <div className="flex items-end gap-1 flex-wrap mt-3" style={{ fontSize: '8.5pt' }}>
-            <span className="font-semibold">Затребовал</span>
-            <div className="text-center"><EF k="reqRank" w="100px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(звание)</div></div>
-            <div className="text-center"><EF k="reqName" w="120px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(фамилия, инициалы)</div></div>
-            <span className="font-semibold ml-4">Разрешил</span>
-            <div className="text-center"><EF k="appRole" w="100px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(должность)</div></div>
-            <div className="text-center"><EF k="appSign" w="80px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(подпись)</div></div>
-            <div className="text-center"><EF k="appName" w="120px" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(расшифровка подписи)</div></div>
+          <div className="flex items-end gap-2 flex-nowrap mt-3" style={{ fontSize: '8.5pt' }}>
+            <span>Затребовал</span>
+            <div className="text-center flex-1 max-w-[140px]"><EF k="reqRank" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(звание)</div></div>
+            <div className="text-center flex-1 max-w-[180px]"><EF k="reqName" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(фамилия, инициалы)</div></div>
+            <span className="ml-4">Разрешил</span>
+            <div className="text-center flex-1 max-w-[140px]"><EF k="appRole" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(должность)</div></div>
+            <div className="text-center flex-1 max-w-[120px]"><EF k="appSign" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(подпись)</div></div>
+            <div className="text-center flex-1 max-w-[180px]"><EF k="appName" a="center" /><div className="text-gray-500" style={{ fontSize: '6.5pt' }}>(расшифровка подписи)</div></div>
           </div>
 
           <div className="overflow-x-auto mt-3">
@@ -521,56 +521,59 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
           </div>
 
           <div className="flex gap-4 mt-4 items-start" style={{ fontSize: '8pt' }}>
-            <div className="flex-1 space-y-1.5">
-              <div className="font-bold" style={{ fontSize: '9pt' }}>Отпустил</div>
-              <div className="flex items-end gap-1.5 flex-wrap">
-                <div className="text-center"><EF k="relRank" w="90px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(звание)</div></div>
-                <div className="text-center"><EF k="relSign" w="80px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
-                <div className="text-center"><EF k="relName" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
+            <div className="flex-1">
+              <div>Отпустил</div>
+              <div className="flex items-end gap-2 mt-1">
+                <div className="text-center flex-1"><EF k="relRank" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(звание)</div></div>
+                <div className="text-center flex-1"><EF k="relSign" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
+                <div className="text-center flex-1"><EF k="relName" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
               </div>
-              <div className="pl-4"><EF k="date" w="130px" /></div>
+              <div className="mt-0.5"><EF k="date" w="130px" /></div>
             </div>
 
-            <div className="flex-1 space-y-1.5">
-              <div className="font-bold" style={{ fontSize: '9pt' }}>Ответственный исполнитель</div>
-              <div className="flex items-end gap-1.5 flex-wrap">
-                <div className="text-center"><EF k="respRole" w="90px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(должность)</div></div>
-                <div className="text-center"><EF k="respSign" w="80px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
+            <div className="flex-1">
+              <div>Ответственный исполнитель</div>
+              <div className="flex items-end gap-2 mt-1">
+                <div className="text-center flex-1"><EF k="respRole" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(должность)</div></div>
+                <div className="text-center flex-1"><EF k="respSign" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
+                <div className="text-center flex-1"><EF k="respSignName" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
               </div>
-              <div className="flex items-end gap-1.5">
-                <div className="text-center"><EF k="respSignName" w="140px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
-              </div>
-              <div className="flex items-center gap-0.5" style={{ fontSize: '7.5pt' }}>
-                <span>{'" '}</span><EF k="relDay" w="24px" a="center" /><span>{' " '}</span><EF k="relMonth" w="60px" a="center" /><span> 20</span><EF k="relYear" w="20px" a="center" /><span> г.</span>
+              <div className="flex items-center gap-0.5 mt-0.5" style={{ fontSize: '7.5pt' }}>
+                <span>{'"'}</span><EF k="relDay" w="24px" a="center" /><span>{'"'}</span><EF k="relMonth" w="60px" a="center" /><span>&nbsp;20</span><EF k="relYear" w="20px" a="center" /><span>&nbsp;г.</span>
               </div>
             </div>
 
-            <div className="border border-dashed border-black p-2.5" style={{ fontSize: '7.5pt', minWidth: 250, maxWidth: 290 }}>
+            <div className="border border-dashed border-black p-2" style={{ fontSize: '7.5pt', minWidth: 280, maxWidth: 320 }}>
               <div className="text-center font-bold mb-1">Отметка бухгалтерии</div>
               <div>Корреспонденция счетов (графы 10, 11) отражена</div>
               <div className="flex items-end gap-0.5 flex-wrap">
-                <span>в журнале операций за</span><EF k="accJournalMonth" w="50px" a="center" /><span>20</span><EF k="accYear" w="20px" a="center" /><span> г.</span>
+                <span>в журнале операций за</span><EF k="accJournalMonth" w="60px" a="center" /><span>&nbsp;20</span><EF k="accYear" w="24px" a="center" /><span>&nbsp;г.</span>
               </div>
-              <div className="font-bold mt-1.5">Исполнитель</div>
-              <div className="flex items-end gap-0.5 flex-wrap mt-0.5">
-                <div className="text-center"><EF k="accExecRole" w="55px" a="center" /><div className="text-gray-500" style={{ fontSize: '5.5pt' }}>(должность)</div></div>
-                <div className="text-center"><EF k="accExecSign" w="50px" a="center" /><div className="text-gray-500" style={{ fontSize: '5.5pt' }}>(подпись)</div></div>
-                <div className="text-center"><EF k="accExecName" w="65px" a="center" /><div className="text-gray-500" style={{ fontSize: '5.5pt' }}>(расшифровка подписи)</div></div>
+              <div className="flex items-end gap-1 mt-1">
+                <span>Исполнитель</span>
+                <div className="text-center flex-1"><EF k="accExecRole" a="center" /></div>
+                <div className="text-center flex-1"><EF k="accExecSign" a="center" /></div>
+                <div className="text-center flex-1"><EF k="accExecName" a="center" /></div>
+              </div>
+              <div className="flex gap-1" style={{ fontSize: '5.5pt' }}>
+                <span className="ml-14">(должность)</span>
+                <span className="ml-8">(подпись)</span>
+                <span className="ml-6">(расшифровка подписи)</span>
               </div>
               <div className="flex items-center gap-0.5 mt-0.5">
-                <span>{'" '}</span><EF k="accExecDay" w="18px" a="center" /><span>{' " '}</span><EF k="accExecMonth" w="45px" a="center" /><span> 20</span><EF k="accExecYear" w="16px" a="center" /><span> г.</span>
+                <span>{'"'}</span><EF k="accExecDay" w="20px" a="center" /><span>{'"'}</span><EF k="accExecMonth" w="50px" a="center" /><span>&nbsp;20</span><EF k="accExecYear" w="18px" a="center" /><span>&nbsp;г.</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-2 space-y-1" style={{ fontSize: '8.5pt' }}>
-            <div className="flex items-end gap-1.5">
-              <span className="font-bold">Получил</span>
-              <div className="text-center"><EF k="recRank" w="110px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(звание)</div></div>
-              <div className="text-center"><EF k="recSign" w="100px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
-              <div className="text-center"><EF k="recName" w="160px" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
+          <div className="mt-2" style={{ fontSize: '8.5pt' }}>
+            <div className="flex items-end gap-2">
+              <span>Получил</span>
+              <div className="text-center flex-1 max-w-[180px]"><EF k="recRank" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(звание)</div></div>
+              <div className="text-center flex-1 max-w-[160px]"><EF k="recSign" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(подпись)</div></div>
+              <div className="text-center flex-1 max-w-[240px]"><EF k="recName" a="center" /><div className="text-gray-500" style={{ fontSize: '6pt' }}>(расшифровка подписи)</div></div>
             </div>
-            <div className="pl-14"><EF k="date" w="130px" /></div>
+            <div className="mt-0.5"><EF k="date" w="130px" /></div>
           </div>
 
         </div>
