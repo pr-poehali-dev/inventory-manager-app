@@ -483,8 +483,7 @@ let lastCrudAt = 0;
 export function getLastCrudAt(): number { return lastCrudAt; }
 export function markLocalChange() { lastCrudAt = Date.now(); }
 
-export async function crudAction(action: string, payload: Record<string, unknown>): Promise<boolean> {
-  markLocalChange();
+async function crudFetchOnce(action: string, payload: Record<string, unknown>): Promise<boolean> {
   try {
     const body = JSON.stringify({ action, ...payload });
     const res = await fetch(CRUD_API, {
@@ -493,12 +492,25 @@ export async function crudAction(action: string, payload: Record<string, unknown
       body,
     });
     if (!res.ok) console.error(`[crudAction] ${action} failed (${res.status})`);
-    markLocalChange();
     return res.ok;
   } catch (e) {
     console.error(`[crudAction] ${action} error:`, e);
     return false;
   }
+}
+
+export async function crudAction(action: string, payload: Record<string, unknown>): Promise<boolean> {
+  markLocalChange();
+  let ok = await crudFetchOnce(action, payload);
+  let attempts = 0;
+  while (!ok && attempts < 2) {
+    attempts++;
+    await new Promise(r => setTimeout(r, 500 * attempts));
+    markLocalChange();
+    ok = await crudFetchOnce(action, payload);
+  }
+  markLocalChange();
+  return ok;
 }
 
 export function guardState(p: AppState): AppState {
