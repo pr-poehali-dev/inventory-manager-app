@@ -603,6 +603,7 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
     const now = new Date();
     const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
     const longDate = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} г.`;
+    const shortDate = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
     const tpl = state.invoiceTemplates?.[0];
 
     const itemRows = order.items.map(oi => {
@@ -618,25 +619,75 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
     const totalReq = order.items.reduce((s, i) => s + (i.requiredQty || 0), 0);
     const totalRel = order.items.reduce((s, i) => s + (i.pickedQty || 0), 0);
 
-    const rowsText = itemRows.map((r, i) =>
-      `${i + 1}. ${r.name} — ${r.qtyReq}/${r.qtyRel} ${r.unit}`
-    ).join('\n');
-
-    const map: Record<string, string> = {
-      '{{number}}': order.number || '',
-      '{{date}}': longDate,
-      '{{recipient}}': order.recipientName || '',
-      '{{institution}}': tpl?.companyName || '',
-      '{{signatory}}': tpl?.signatory || '',
-      '{{signatoryRole}}': tpl?.signatoryRole || '',
-      '{{totalReq}}': String(totalReq),
-      '{{totalRel}}': String(totalRel),
-      '{{rows}}': rowsText,
+    const values: Record<string, string> = {
+      number: order.number || '',
+      date: longDate,
+      dateShort: shortDate,
+      recipient: order.recipientName || '',
+      senderDept: '',
+      receiverDept: order.recipientName || '',
+      institution: tpl?.companyName || '',
+      signatory: tpl?.signatory || '',
+      signatoryRole: tpl?.signatoryRole || '',
+      okud: '0504204',
+      okpo: '',
+      okei: '383',
+      totalReq: String(totalReq),
+      totalRel: String(totalRel),
+      totalSum: '',
     };
+
     let out = html;
-    Object.entries(map).forEach(([k, v]) => {
-      out = out.split(k).join(v);
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      doc.querySelectorAll('[data-bind]').forEach(el => {
+        const key = el.getAttribute('data-bind') || '';
+        if (key === 'itemsRows') {
+          const tr = el.closest('tr');
+          if (tr && tr.parentElement) {
+            const parent = tr.parentElement;
+            const template = tr.cloneNode(true) as HTMLElement;
+            template.removeAttribute('data-bind');
+            template.querySelectorAll('[data-bind]').forEach(sub => {
+              sub.removeAttribute('data-bind');
+            });
+            const cells = Array.from(template.children);
+            parent.removeChild(tr);
+            itemRows.forEach((r, i) => {
+              const row = template.cloneNode(true) as HTMLElement;
+              const rowCells = Array.from(row.children) as HTMLElement[];
+              const fill = (idx: number, val: string) => {
+                if (rowCells[idx]) rowCells[idx].textContent = val;
+              };
+              fill(0, String(i + 1));
+              fill(1, r.name);
+              fill(2, r.unit);
+              fill(3, r.qtyReq);
+              fill(4, r.qtyRel);
+              parent.appendChild(row);
+            });
+            cells.forEach(() => {});
+          } else {
+            el.textContent = itemRows.map((r, i) => `${i + 1}. ${r.name} — ${r.qtyReq}/${r.qtyRel} ${r.unit}`).join('\n');
+          }
+          return;
+        }
+        if (key in values) {
+          el.textContent = values[key];
+        }
+      });
+
+      out = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+    } catch {
+      /* fallback to original */
+    }
+
+    Object.entries(values).forEach(([k, v]) => {
+      out = out.split(`{{${k}}}`).join(v);
     });
+
     return out;
   }, [html, order, state]);
 

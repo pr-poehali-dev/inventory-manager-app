@@ -5,6 +5,27 @@ import { AppState } from '@/data/store';
 
 const STORAGE_KEY = 'invoice_template_html';
 
+type FieldDef = { key: string; label: string; group: string };
+
+const FIELDS: FieldDef[] = [
+  { key: 'number', label: 'Номер накладной', group: 'Заявка' },
+  { key: 'date', label: 'Дата (полная)', group: 'Заявка' },
+  { key: 'dateShort', label: 'Дата (коротко)', group: 'Заявка' },
+  { key: 'recipient', label: 'Получатель', group: 'Заявка' },
+  { key: 'senderDept', label: 'Отправитель (подразделение)', group: 'Заявка' },
+  { key: 'receiverDept', label: 'Получатель (подразделение)', group: 'Заявка' },
+  { key: 'institution', label: 'Учреждение', group: 'Организация' },
+  { key: 'signatory', label: 'ФИО подписанта', group: 'Организация' },
+  { key: 'signatoryRole', label: 'Должность подписанта', group: 'Организация' },
+  { key: 'okud', label: 'Код ОКУД', group: 'Коды' },
+  { key: 'okpo', label: 'Код ОКПО', group: 'Коды' },
+  { key: 'okei', label: 'Код ОКЕИ', group: 'Коды' },
+  { key: 'totalReq', label: 'Итого затребовано', group: 'Итоги' },
+  { key: 'totalRel', label: 'Итого отпущено', group: 'Итоги' },
+  { key: 'totalSum', label: 'Итого сумма', group: 'Итоги' },
+  { key: 'itemsRows', label: 'Строки товаров (в эту строку таблицы)', group: 'Таблица товаров' },
+];
+
 const PLACEHOLDER_HTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -41,8 +62,41 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   const [saveFlash, setSaveFlash] = useState(false);
   const [fileName, setFileName] = useState<string>('');
   const [iframeHeight, setIframeHeight] = useState(1100);
+  const [mapMode, setMapMode] = useState(false);
+  const [picker, setPicker] = useState<{ x: number; y: number; targetId: string } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mapModeRef = useRef(mapMode);
+  mapModeRef.current = mapMode;
+
+  const ensureBindIds = (doc: Document) => {
+    doc.querySelectorAll('[data-bind]').forEach((el, i) => {
+      if (!(el as HTMLElement).dataset.bindId) {
+        (el as HTMLElement).dataset.bindId = `b_${i}_${Date.now().toString(36)}`;
+      }
+    });
+  };
+
+  const highlightExistingBinds = (doc: Document) => {
+    let styleEl = doc.getElementById('__bind_style') as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = doc.createElement('style');
+      styleEl.id = '__bind_style';
+      doc.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `
+      [data-bind] {
+        background: rgba(34, 197, 94, 0.18) !important;
+        outline: 1px dashed #16a34a !important;
+        cursor: pointer !important;
+      }
+      .__map-mode [data-bindable-hover]:hover {
+        background: rgba(59, 130, 246, 0.18) !important;
+        outline: 1px dashed #2563eb !important;
+        cursor: pointer !important;
+      }
+    `;
+  };
 
   const handleIframeLoad = useCallback(() => {
     const f = iframeRef.current;
@@ -69,8 +123,51 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       setTimeout(measure, 150);
       setTimeout(measure, 600);
       setTimeout(measure, 1500);
+
+      ensureBindIds(doc);
+      highlightExistingBinds(doc);
+
+      const onClick = (e: MouseEvent) => {
+        if (!mapModeRef.current) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const target = e.target as HTMLElement;
+        if (!target || target === doc.body) return;
+        const text = (target.textContent || '').trim();
+        let el: HTMLElement = target;
+        if (!text && target.parentElement) el = target.parentElement;
+        if (!el.dataset.bindId) el.dataset.bindId = `b_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+        const frameRect = f.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        setPicker({
+          x: frameRect.left + r.left + r.width / 2,
+          y: frameRect.top + r.bottom + 4,
+          targetId: el.dataset.bindId!,
+        });
+      };
+
+      const onOver = (e: MouseEvent) => {
+        if (!mapModeRef.current) return;
+        const t = e.target as HTMLElement;
+        if (t && t !== doc.body) t.setAttribute('data-bindable-hover', '1');
+      };
+      const onOut = (e: MouseEvent) => {
+        const t = e.target as HTMLElement;
+        if (t) t.removeAttribute('data-bindable-hover');
+      };
+
+      doc.addEventListener('click', onClick, true);
+      doc.addEventListener('mouseover', onOver, true);
+      doc.addEventListener('mouseout', onOut, true);
     } catch { /* cross-origin guard */ }
   }, []);
+
+  useEffect(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+    if (mapMode) doc.body?.classList.add('__map-mode');
+    else doc.body?.classList.remove('__map-mode');
+  }, [mapMode, html]);
 
   useEffect(() => {
     try {
@@ -138,6 +235,22 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     setTimeout(() => w.print(), 300);
   }, [html]);
 
+  const applyBind = useCallback((field: string) => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc || !picker) return;
+    const el = doc.querySelector(`[data-bind-id="${picker.targetId}"]`) as HTMLElement | null;
+    if (el) {
+      if (field === '__clear__') {
+        el.removeAttribute('data-bind');
+      } else {
+        el.setAttribute('data-bind', field);
+      }
+      highlightExistingBinds(doc);
+      setHtml(`<!DOCTYPE html>\n${doc.documentElement.outerHTML}`);
+    }
+    setPicker(null);
+  }, [picker]);
+
   const handleDownload = useCallback(() => {
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -186,6 +299,19 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
           <span className="text-xs">Печать</span>
         </Button>
 
+        <div className="mx-1 h-5 w-px bg-gray-200" />
+
+        <Button
+          variant={mapMode ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => { setMapMode(m => !m); setPicker(null); }}
+          title="Режим разметки полей"
+          className="gap-1.5"
+        >
+          <Icon name={mapMode ? 'MousePointerClick' : 'Target'} size={16} />
+          <span className="text-xs">{mapMode ? 'Готово' : 'Разметить'}</span>
+        </Button>
+
         <Button variant="ghost" size="sm" onClick={handleClear} title="Очистить" className="gap-1.5 text-red-600">
           <Icon name="Trash2" size={16} />
           <span className="text-xs">Очистить</span>
@@ -228,7 +354,14 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-gray-100">
+      {mapMode && (
+        <div className="px-4 py-1.5 bg-blue-50 border-b border-blue-200 text-xs text-blue-900 flex items-center gap-2">
+          <Icon name="Info" size={12} />
+          Режим разметки: кликните по элементу в шаблоне и выберите поле для привязки. Зелёным помечены уже привязанные элементы.
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto bg-gray-100 relative">
         <iframe
           ref={iframeRef}
           srcDoc={html}
@@ -244,6 +377,52 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
           sandbox="allow-same-origin allow-scripts"
         />
       </div>
+
+      {picker && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setPicker(null)} />
+          <div
+            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-2 max-h-[400px] overflow-auto"
+            style={{
+              left: Math.max(8, Math.min(picker.x - 140, window.innerWidth - 290)),
+              top: Math.min(picker.y, window.innerHeight - 420),
+              width: 280,
+            }}
+          >
+            <div className="text-xs font-semibold text-gray-500 px-2 py-1 uppercase tracking-wide">
+              Привязать к полю:
+            </div>
+            {Object.entries(
+              FIELDS.reduce<Record<string, FieldDef[]>>((acc, f) => {
+                (acc[f.group] ||= []).push(f);
+                return acc;
+              }, {})
+            ).map(([group, fields]) => (
+              <div key={group} className="mb-1">
+                <div className="text-[10px] font-semibold text-gray-400 px-2 pt-1 pb-0.5">{group}</div>
+                {fields.map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => applyBind(f.key)}
+                    className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 rounded flex items-center gap-2"
+                  >
+                    <span className="flex-1">{f.label}</span>
+                    <code className="text-[10px] text-gray-400">{`{{${f.key}}}`}</code>
+                  </button>
+                ))}
+              </div>
+            ))}
+            <div className="border-t border-gray-200 mt-1 pt-1">
+              <button
+                onClick={() => applyBind('__clear__')}
+                className="w-full text-left px-2 py-1.5 text-xs hover:bg-red-50 rounded text-red-600 flex items-center gap-2"
+              >
+                <Icon name="X" size={12} />Убрать привязку
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
