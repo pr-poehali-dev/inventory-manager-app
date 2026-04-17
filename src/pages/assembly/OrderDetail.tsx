@@ -397,7 +397,7 @@ function InvoicePreviewPage({ order, state, onClose }: { order: WorkOrder; state
 .codes{border-collapse:collapse;font-size:8pt}.codes td{border:1px solid #000;padding:1pt 4pt}
 .row{margin:1pt 0;font-size:8.5pt}.lbl{font-size:7pt;color:#555}
 table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m th,table.m td{border:1px solid #000;padding:1pt 2pt;text-align:center;vertical-align:middle}table.m td.r{text-align:right}
-.ft{font-size:8pt;margin-top:3pt}.acc{border:1px dashed #000;padding:4pt;font-size:7.5pt}
+.ft{font-size:8pt;margin-top:3pt}.acc{border:1px solid transparent;padding:4pt;font-size:7.5pt}
 @media print{body{padding:4mm 6mm}@page{size:landscape;margin:6mm}}</style></head><body>
 <div class="hdr"><div style="flex:1">
 <div style="text-align:center;font-weight:bold;font-size:11pt;margin-bottom:2pt">ТРЕБОВАНИЕ-НАКЛАДНАЯ \u2116 <span class="u">${f.num}</span></div>
