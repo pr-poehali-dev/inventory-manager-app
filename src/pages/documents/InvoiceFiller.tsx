@@ -102,6 +102,27 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
     });
   }, [order.items, state.items]);
 
+  useEffect(() => {
+    setValues(prev => {
+      const next: Record<string, string> = { ...prev };
+      elements.forEach(el => {
+        if (el.type !== 'text') return;
+        if (!el.source) {
+          if (next[el.id] === undefined) next[el.id] = el.text || '';
+          return;
+        }
+        const auto = resolveSource(el.source, order, state, template);
+        const prevVal = prev[el.id];
+        if (prevVal === undefined || prevVal === '' || !prevVal) {
+          next[el.id] = auto;
+        } else if (auto && prevVal !== auto) {
+          next[el.id] = auto;
+        }
+      });
+      return next;
+    });
+  }, [state.warehouses, state.items, order.number, order.recipientName, template.companyName, template.signatory, template.signatoryRole]);
+
   const updVal = (id: string, v: string) => setValues(prev => ({ ...prev, [id]: v }));
   const updCell = (tid: string, ri: number, ci: number, v: string) => {
     setTableValues(prev => {
