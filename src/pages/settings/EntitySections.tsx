@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
+import { toast } from 'sonner';
 import { AppState, crudAction, Category, Location, Warehouse, generateId } from '@/data/store';
 
 const CAT_COLORS = ['#6366f1', '#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
@@ -42,11 +43,16 @@ export function WarehousesSection({ state, onStateChange, onDeleteConfirm }: Ent
     onStateChange(next); crudAction('delete_warehouse', { warehouseId: id });
   };
 
-  const updateWh = (id: string, patch: Partial<Warehouse>) => {
+  const saveWhProfile = (id: string, patch: Partial<Warehouse>) => {
     const warehouses = (state.warehouses || []).map(w => w.id === id ? { ...w, ...patch } : w);
     const updated = warehouses.find(w => w.id === id);
     onStateChange({ ...state, warehouses });
-    if (updated) crudAction('upsert_warehouse', { warehouse: updated });
+    if (updated) {
+      crudAction('upsert_warehouse', { warehouse: updated }).then(ok => {
+        if (ok) toast.success('Профиль склада сохранён');
+        else toast.error('Не удалось сохранить профиль');
+      });
+    }
   };
 
   return (
@@ -99,42 +105,87 @@ export function WarehousesSection({ state, onStateChange, onDeleteConfirm }: Ent
                 )}
               </div>
               {isOpen && (
-                <div className="px-3 pb-3 pt-1 border-t border-border space-y-3 bg-muted/20">
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">
-                    Профиль выдачи (для накладной)
-                  </div>
-                  <div className="grid grid-cols-1 gap-2">
-                    <label className="text-xs text-muted-foreground">Учреждение
-                      <Input className="mt-1" value={wh.institution || ''} onChange={e => updateWh(wh.id, { institution: e.target.value })} placeholder="Название организации" />
-                    </label>
-                    <label className="text-xs text-muted-foreground">Структурное подразделение — отправитель
-                      <Input className="mt-1" value={wh.senderDept || ''} onChange={e => updateWh(wh.id, { senderDept: e.target.value })} placeholder="Например: Склад №1" />
-                    </label>
-                  </div>
-                  <div className="text-xs font-semibold text-muted-foreground pt-1">Отпустил</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="text-xs text-muted-foreground">Звание / должность
-                      <Input className="mt-1" value={wh.issuerRank || ''} onChange={e => updateWh(wh.id, { issuerRank: e.target.value })} placeholder="Напр.: кладовщик" />
-                    </label>
-                    <label className="text-xs text-muted-foreground">ФИО (расшифровка)
-                      <Input className="mt-1" value={wh.issuerName || ''} onChange={e => updateWh(wh.id, { issuerName: e.target.value })} placeholder="Иванов И.И." />
-                    </label>
-                  </div>
-                  <div className="text-xs font-semibold text-muted-foreground pt-1">Разрешил</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="text-xs text-muted-foreground">Должность
-                      <Input className="mt-1" value={wh.approverRole || ''} onChange={e => updateWh(wh.id, { approverRole: e.target.value })} placeholder="Напр.: начальник склада" />
-                    </label>
-                    <label className="text-xs text-muted-foreground">ФИО (расшифровка)
-                      <Input className="mt-1" value={wh.approverName || ''} onChange={e => updateWh(wh.id, { approverName: e.target.value })} placeholder="Петров П.П." />
-                    </label>
-                  </div>
-                </div>
+                <WarehouseProfileForm wh={wh} onSave={patch => saveWhProfile(wh.id, patch)} />
               )}
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function WarehouseProfileForm({ wh, onSave }: { wh: Warehouse; onSave: (patch: Partial<Warehouse>) => void }) {
+  const [institution, setInstitution] = useState(wh.institution || '');
+  const [senderDept, setSenderDept] = useState(wh.senderDept || '');
+  const [issuerRank, setIssuerRank] = useState(wh.issuerRank || '');
+  const [issuerName, setIssuerName] = useState(wh.issuerName || '');
+  const [approverRole, setApproverRole] = useState(wh.approverRole || '');
+  const [approverName, setApproverName] = useState(wh.approverName || '');
+
+  useEffect(() => {
+    setInstitution(wh.institution || '');
+    setSenderDept(wh.senderDept || '');
+    setIssuerRank(wh.issuerRank || '');
+    setIssuerName(wh.issuerName || '');
+    setApproverRole(wh.approverRole || '');
+    setApproverName(wh.approverName || '');
+  }, [wh.id]);
+
+  const dirty =
+    institution !== (wh.institution || '') ||
+    senderDept !== (wh.senderDept || '') ||
+    issuerRank !== (wh.issuerRank || '') ||
+    issuerName !== (wh.issuerName || '') ||
+    approverRole !== (wh.approverRole || '') ||
+    approverName !== (wh.approverName || '');
+
+  const handleSave = () => {
+    onSave({
+      institution: institution.trim() || undefined,
+      senderDept: senderDept.trim() || undefined,
+      issuerRank: issuerRank.trim() || undefined,
+      issuerName: issuerName.trim() || undefined,
+      approverRole: approverRole.trim() || undefined,
+      approverName: approverName.trim() || undefined,
+    });
+  };
+
+  return (
+    <div className="px-3 pb-3 pt-1 border-t border-border space-y-3 bg-muted/20">
+      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">
+        Профиль выдачи (для накладной)
+      </div>
+      <div className="grid grid-cols-1 gap-2">
+        <label className="text-xs text-muted-foreground">Учреждение
+          <Input className="mt-1" value={institution} onChange={e => setInstitution(e.target.value)} placeholder="Название организации" />
+        </label>
+        <label className="text-xs text-muted-foreground">Структурное подразделение — отправитель
+          <Input className="mt-1" value={senderDept} onChange={e => setSenderDept(e.target.value)} placeholder="Например: Склад №1" />
+        </label>
+      </div>
+      <div className="text-xs font-semibold text-muted-foreground pt-1">Отпустил</div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-muted-foreground">Звание / должность
+          <Input className="mt-1" value={issuerRank} onChange={e => setIssuerRank(e.target.value)} placeholder="Напр.: кладовщик" />
+        </label>
+        <label className="text-xs text-muted-foreground">ФИО (расшифровка)
+          <Input className="mt-1" value={issuerName} onChange={e => setIssuerName(e.target.value)} placeholder="Иванов И.И." />
+        </label>
+      </div>
+      <div className="text-xs font-semibold text-muted-foreground pt-1">Разрешил</div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-muted-foreground">Должность
+          <Input className="mt-1" value={approverRole} onChange={e => setApproverRole(e.target.value)} placeholder="Напр.: начальник склада" />
+        </label>
+        <label className="text-xs text-muted-foreground">ФИО (расшифровка)
+          <Input className="mt-1" value={approverName} onChange={e => setApproverName(e.target.value)} placeholder="Петров П.П." />
+        </label>
+      </div>
+      <Button onClick={handleSave} disabled={!dirty} className="w-full">
+        <Icon name="Save" size={14} className="mr-1.5" />
+        {dirty ? 'Сохранить профиль' : 'Сохранено'}
+      </Button>
     </div>
   );
 }
