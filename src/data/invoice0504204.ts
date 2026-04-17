@@ -100,7 +100,7 @@ export function create0504204Template(): InvoiceTemplate {
     e({ type: 'text', x: 560, y: 477, w: 100, h: 10, text: '(подпись)', fontSize: 7, align: 'center', italic: true }),
     e({ type: 'text', x: 450, y: 494, w: 200, h: 14, text: '"    "           20    г.', fontSize: 9 }),
 
-    e({ type: 'frame', x: 700, y: 430, w: 270, h: 110, lineStyle: 'dashed', frameLabel: 'Отметка бухгалтерии' }),
+    e({ type: 'frame', x: 700, y: 430, w: 270, h: 110, lineStyle: 'solid', frameLabel: 'Отметка бухгалтерии' }),
     e({ type: 'text', x: 710, y: 450, w: 250, h: 12, text: 'Корреспонденция счетов (графы 10, 11) отражена', fontSize: 8 }),
     e({ type: 'text', x: 710, y: 464, w: 250, h: 12, text: 'в журнале операций за _______ 20__ г.', fontSize: 8 }),
     e({ type: 'text', x: 710, y: 484, w: 250, h: 12, text: 'Исполнитель', fontSize: 8, bold: true }),

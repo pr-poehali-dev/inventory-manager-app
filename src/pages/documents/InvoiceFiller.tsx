@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { InvoiceTemplate, InvElement, WorkOrder, AppState } from '@/data/store';
@@ -74,6 +74,28 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
   const [editing, setEditing] = useState(true);
   const [zoom, setZoom] = useState(0.7);
 
+  useEffect(() => {
+    setTableValues(prev => {
+      const next: Record<string, string[][]> = { ...prev };
+      elements.filter(el => el.type === 'table').forEach(el => {
+        const cols = el.columns || [];
+        const existing = prev[el.id] || [];
+        const rows = order.items.map((oi, idx) => {
+          const autoRow = cols.map(c => c.source ? resolveItemSource(c.source, oi, state) : '');
+          const prevRow = existing[idx];
+          if (!prevRow) return autoRow;
+          return autoRow.map((auto, ci) => {
+            const prevCell = prevRow[ci] ?? '';
+            const prevAuto = cols[ci]?.source ? resolveItemSource(cols[ci].source!, oi, state) : '';
+            return prevCell && prevCell !== prevAuto ? prevCell : auto;
+          });
+        });
+        next[el.id] = rows;
+      });
+      return next;
+    });
+  }, [order.items, state.items]);
+
   const updVal = (id: string, v: string) => setValues(prev => ({ ...prev, [id]: v }));
   const updCell = (tid: string, ri: number, ci: number, v: string) => {
     setTableValues(prev => {
@@ -121,11 +143,11 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
         html += '</tbody></table></div>';
       }
       if (el.type === 'line') {
-        const bdr = el.vertical ? `border-left:${el.lineWidth || 1}px ${el.lineStyle || 'solid'} #000` : `border-top:${el.lineWidth || 1}px ${el.lineStyle || 'solid'} #000`;
+        const bdr = el.vertical ? `border-left:${el.lineWidth || 1}px solid #000` : `border-top:${el.lineWidth || 1}px solid #000`;
         html += `<div class="el" style="left:${el.x}px;top:${el.y}px;width:${el.vertical ? (el.lineWidth || 1) : el.w}px;height:${el.vertical ? el.h : (el.lineWidth || 1)}px;${bdr}"></div>`;
       }
       if (el.type === 'frame') {
-        html += `<div class="el" style="left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;border:1px ${el.lineStyle || 'dashed'} #000;padding:4px">`;
+        html += `<div class="el" style="left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;border:1px solid #000;padding:4px">`;
         if (el.frameLabel) html += `<div style="text-align:center;font-weight:bold;font-size:9pt">${el.frameLabel}</div>`;
         html += '</div>';
       }
@@ -225,14 +247,14 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
     if (el.type === 'line') {
       return (
         <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.vertical ? (el.lineWidth || 1) : el.w, height: el.vertical ? el.h : (el.lineWidth || 1) }}>
-          <div className="w-full h-full" style={{ borderTop: el.vertical ? 'none' : `${el.lineWidth || 1}px ${el.lineStyle || 'solid'} #000`, borderLeft: el.vertical ? `${el.lineWidth || 1}px ${el.lineStyle || 'solid'} #000` : 'none' }} />
+          <div className="w-full h-full" style={{ borderTop: el.vertical ? 'none' : `${el.lineWidth || 1}px solid #000`, borderLeft: el.vertical ? `${el.lineWidth || 1}px solid #000` : 'none' }} />
         </div>
       );
     }
 
     if (el.type === 'frame') {
       return (
-        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, height: el.h, border: `1px ${el.lineStyle || 'dashed'} #000`, padding: 4 }}>
+        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, height: el.h, border: `1px solid #000`, padding: 4 }}>
           {el.frameLabel && <div className="text-center font-bold" style={{ fontFamily: "'Times New Roman', serif", fontSize: 9 }}>{el.frameLabel}</div>}
         </div>
       );
