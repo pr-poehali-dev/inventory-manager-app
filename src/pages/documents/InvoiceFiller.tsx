@@ -18,6 +18,8 @@ function resolveSource(source: string, order: WorkOrder, state: AppState, tpl: I
     '{{number}}': order.number,
     '{{date}}': `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} г.`,
     '{{recipient}}': order.recipientName || '',
+    '{{receiverRank}}': order.receiverRank || '',
+    '{{receiverName}}': order.receiverName || '',
     '{{institution}}': wh?.institution || tpl.companyName || '',
     '{{senderDept}}': wh?.senderDept || wh?.name || '',
     '{{issuerRank}}': wh?.issuerRank || '',
@@ -144,7 +146,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
       });
       return next;
     });
-  }, [state.warehouses, state.items, order.number, order.recipientName, template.companyName, template.signatory, template.signatoryRole]);
+  }, [state.warehouses, state.items, order.number, order.recipientName, order.receiverRank, order.receiverName, template.companyName, template.signatory, template.signatoryRole]);
 
   const updVal = (id: string, v: string) => setValues(prev => ({ ...prev, [id]: v }));
   const updCell = (tid: string, ri: number, ci: number, v: string) => {

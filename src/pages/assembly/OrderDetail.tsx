@@ -9,6 +9,8 @@ import {
 } from '@/data/store';
 import { PickItemModal, CloseWarningModal } from './PickModals';
 import InvoiceFiller from '@/pages/documents/InvoiceFiller';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export function OrderDetail({ order, state, onStateChange, onBack }: {
   order: WorkOrder; state: AppState;
@@ -25,6 +27,13 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
   const changeStatus = (status: OrderStatus) => {
     const next = { ...state, workOrders: state.workOrders.map(o => o.id === order.id ? { ...o, status, updatedAt: new Date().toISOString() } : o) };
     onStateChange(next); crudAction('upsert_work_order', { workOrder: { ...order, status, updatedAt: new Date().toISOString() }, orderItems: order.items });
+  };
+
+  const patchOrder = (patch: Partial<WorkOrder>) => {
+    const updated = { ...order, ...patch, updatedAt: new Date().toISOString() };
+    const next = { ...state, workOrders: state.workOrders.map(o => o.id === order.id ? updated : o) };
+    onStateChange(next);
+    crudAction('upsert_work_order', { workOrder: updated, orderItems: updated.items });
   };
 
   const handleClose = () => {
@@ -102,6 +111,39 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
           <div className={`h-full rounded-full transition-all duration-500 ${progress === 100 ? 'bg-success' : 'bg-primary'}`} style={{ width: `${progress}%` }} />
         </div>
         <div className="text-xs text-muted-foreground">{doneCount} из {liveOrder.items.length} позиций собрано</div>
+      </div>
+
+      <div className="bg-card rounded-xl border border-border p-4 shadow-card space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon name="FileText" size={14} className="text-muted-foreground" />
+          <h3 className="font-semibold text-sm">Данные для накладной</h3>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Структурное подразделение — получатель</Label>
+          <Input
+            value={liveOrder.recipientName || ''}
+            onChange={e => patchOrder({ recipientName: e.target.value })}
+            placeholder="Напр.: Отдел снабжения"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Получил — звание / должность</Label>
+            <Input
+              value={liveOrder.receiverRank || ''}
+              onChange={e => patchOrder({ receiverRank: e.target.value })}
+              placeholder="Напр.: кладовщик"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Получил — ФИО (расшифровка)</Label>
+            <Input
+              value={liveOrder.receiverName || ''}
+              onChange={e => patchOrder({ receiverName: e.target.value })}
+              placeholder="Иванов И.И."
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-1 flex-wrap">

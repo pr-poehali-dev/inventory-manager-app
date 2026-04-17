@@ -26,6 +26,8 @@ export function CreateOrderModal({
   const [comment, setComment] = useState('');
   const [recipientLabel, setRecipientLabel] = useState('');
   const [recipientId, setRecipientId] = useState('');
+  const [receiverRank, setReceiverRank] = useState('');
+  const [receiverName, setReceiverName] = useState('');
   const [lines, setLines] = useState<OrderLine[]>([{ id: generateId(), itemId: '', itemLabel: '', qty: '1' }]);
   const [showConflict, setShowConflict] = useState(false);
 
@@ -139,6 +141,8 @@ export function CreateOrderModal({
       createdBy: state.currentUser,
       recipientId: finalRecipientId || undefined,
       recipientName: recipientLabel.trim() || undefined,
+      receiverRank: receiverRank.trim() || undefined,
+      receiverName: receiverName.trim() || undefined,
       comment: comment.trim() || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -204,7 +208,19 @@ export function CreateOrderModal({
                 placeholder="Введите получателя..."
                 allowCustom
               />
-              <p className="text-xs text-muted-foreground">Выберите из существующих или введите нового — он сохранится автоматически</p>
+              <p className="text-xs text-muted-foreground">Структурное подразделение — получатель (для накладной)</p>
+            </div>
+
+            {/* Receiver for invoice */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Получил — звание / должность</Label>
+                <Input value={receiverRank} onChange={e => setReceiverRank(e.target.value)} placeholder="Напр.: кладовщик" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Получил — ФИО (расшифровка)</Label>
+                <Input value={receiverName} onChange={e => setReceiverName(e.target.value)} placeholder="Иванов И.И." />
+              </div>
             </div>
 
             {/* Comment */}
