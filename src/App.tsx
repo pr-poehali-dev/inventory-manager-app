@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { AppState, loadState, saveLocal, loadStateFromServer, checkServerUpdatedAt, getLastCrudAt } from '@/data/store';
+import { AppState, loadState, saveLocal, loadStateFromServer, checkServerUpdatedAt, getLastCrudAt, crudAction } from '@/data/store';
 import Layout, { Page } from '@/components/Layout';
 import CatalogPage from '@/pages/CatalogPage';
 import NomenclaturePage from '@/pages/NomenclaturePage';
@@ -103,6 +103,23 @@ export default function App() {
     }
   }, []);
 
+  const mergeServerState = useCallback((local: AppState, server: AppState): AppState => {
+    const arrayKeys: (keyof AppState)[] = [
+      'items', 'categories', 'locations', 'operations', 'warehouses',
+      'partners', 'barcodes', 'locationStocks', 'warehouseStocks',
+      'workOrders', 'receipts', 'techDocs', 'invoiceTemplates',
+    ];
+    const merged: AppState = { ...local, ...server };
+    for (const k of arrayKeys) {
+      const srv = (server[k] as unknown[]) || [];
+      const loc = (local[k] as unknown[]) || [];
+      if ((!srv || srv.length === 0) && loc.length > 0) {
+        (merged as Record<string, unknown>)[k as string] = loc;
+      }
+    }
+    return merged;
+  }, []);
+
   useEffect(() => {
     loadStateFromServer().then(result => {
       if (!result) return;
@@ -114,10 +131,33 @@ export default function App() {
         return;
       }
       serverUpdatedAtRef.current = result.updatedAt;
-      setState(result.state);
-      saveLocal(result.state);
+      setState(prev => {
+        const merged = mergeServerState(prev, result.state);
+        saveLocal(merged);
+        const srvWh = result.state.warehouses || [];
+        const locWh = prev.warehouses || [];
+        if (srvWh.length === 0 && locWh.length > 0) {
+          locWh.forEach(w => { crudAction('upsert_warehouse', { warehouse: w }); });
+        }
+        const srvCats = result.state.categories || [];
+        const locCats = prev.categories || [];
+        if (srvCats.length === 0 && locCats.length > 0) {
+          locCats.forEach(c => { crudAction('upsert_category', { category: c }); });
+        }
+        const srvLocs = result.state.locations || [];
+        const locLocs = prev.locations || [];
+        if (srvLocs.length === 0 && locLocs.length > 0) {
+          locLocs.forEach(l => { crudAction('upsert_location', { location: l }); });
+        }
+        const srvItems = result.state.items || [];
+        const locItems = prev.items || [];
+        if (srvItems.length === 0 && locItems.length > 0) {
+          locItems.forEach(i => { crudAction('upsert_item', { item: i }); });
+        }
+        return merged;
+      });
     });
-  }, []);
+  }, [mergeServerState]);
 
   const poll = useCallback(async () => {
     const lastChange = Math.max(lastLocalSaveRef.current, getLastCrudAt());
@@ -129,9 +169,12 @@ export default function App() {
     const result = await loadStateFromServer();
     if (!result) return;
     serverUpdatedAtRef.current = result.updatedAt;
-    setState(result.state);
-    saveLocal(result.state);
-  }, []);
+    setState(prev => {
+      const merged = mergeServerState(prev, result.state);
+      saveLocal(merged);
+      return merged;
+    });
+  }, [mergeServerState]);
 
   useEffect(() => {
     const id = setInterval(poll, POLL_INTERVAL);
