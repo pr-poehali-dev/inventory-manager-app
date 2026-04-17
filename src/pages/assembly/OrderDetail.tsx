@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import {
@@ -251,6 +251,16 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
       )}
 
       {showPrint && (() => {
+        const htmlTpl = (() => {
+          try { return localStorage.getItem('invoice_template_html') || ''; } catch { return ''; }
+        })();
+        if (htmlTpl) {
+          return (
+            <div className="fixed inset-0 z-50 bg-background">
+              <HtmlInvoiceView html={htmlTpl} order={liveOrder} state={state} onClose={() => setShowPrint(false)} />
+            </div>
+          );
+        }
         const templates: InvoiceTemplate[] = state.invoiceTemplates || [];
         const visualTpl = templates.find(t => t.elements && t.elements.length > 0);
         if (visualTpl) {
@@ -576,6 +586,125 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
             <div className="mt-0.5"><EF k="date" w="130px" /></div>
           </div>
 
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HtmlInvoiceView({ html, order, state, onClose }: {
+  html: string; order: WorkOrder; state: AppState; onClose: () => void;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [iframeHeight, setIframeHeight] = useState(800);
+  const [zoom, setZoom] = useState(1);
+
+  const filledHtml = useMemo(() => {
+    const now = new Date();
+    const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+    const longDate = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} г.`;
+    const tpl = state.invoiceTemplates?.[0];
+
+    const itemRows = order.items.map(oi => {
+      const it = state.items.find(i => i.id === oi.itemId);
+      return {
+        name: it?.name || '',
+        unit: it?.unit || 'шт.',
+        qtyReq: String(oi.requiredQty),
+        qtyRel: String(oi.pickedQty),
+      };
+    });
+
+    const totalReq = order.items.reduce((s, i) => s + (i.requiredQty || 0), 0);
+    const totalRel = order.items.reduce((s, i) => s + (i.pickedQty || 0), 0);
+
+    const rowsText = itemRows.map((r, i) =>
+      `${i + 1}. ${r.name} — ${r.qtyReq}/${r.qtyRel} ${r.unit}`
+    ).join('\n');
+
+    const map: Record<string, string> = {
+      '{{number}}': order.number || '',
+      '{{date}}': longDate,
+      '{{recipient}}': order.recipientName || '',
+      '{{institution}}': tpl?.companyName || '',
+      '{{signatory}}': tpl?.signatory || '',
+      '{{signatoryRole}}': tpl?.signatoryRole || '',
+      '{{totalReq}}': String(totalReq),
+      '{{totalRel}}': String(totalRel),
+      '{{rows}}': rowsText,
+    };
+    let out = html;
+    Object.entries(map).forEach(([k, v]) => {
+      out = out.split(k).join(v);
+    });
+    return out;
+  }, [html, order, state]);
+
+  const handleIframeLoad = useCallback(() => {
+    const f = iframeRef.current;
+    if (!f) return;
+    try {
+      const doc = f.contentDocument;
+      if (!doc) return;
+      const measure = () => {
+        const h = Math.max(
+          doc.body?.scrollHeight || 0,
+          doc.documentElement?.scrollHeight || 0,
+          800,
+        );
+        setIframeHeight(h);
+      };
+      measure();
+      setTimeout(measure, 100);
+      setTimeout(measure, 400);
+    } catch { /* noop */ }
+  }, []);
+
+  const handlePrint = () => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(filledHtml);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-gray-200 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-300 shrink-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
+        <Button variant="outline" size="sm" onClick={onClose} className="gap-1.5">
+          <Icon name="ArrowLeft" size={14} />Назад
+        </Button>
+        <span className="text-sm font-medium">Накладная № {order.number}</span>
+        <div className="flex-1" />
+        <div className="flex items-center gap-1">
+          <button className="rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100" onClick={() => setZoom(z => Math.max(0.3, +(z - 0.1).toFixed(1)))}>−</button>
+          <span className="w-12 text-center text-xs text-gray-600 tabular-nums">{Math.round(zoom * 100)}%</span>
+          <button className="rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100" onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(1)))}>+</button>
+        </div>
+        <Button size="sm" onClick={handlePrint} className="gap-1.5">
+          <Icon name="Printer" size={14} />Печать
+        </Button>
+      </div>
+      <div className="flex-1 overflow-auto p-4">
+        <div
+          className="mx-auto bg-white shadow-lg"
+          style={{ width: 1200 * zoom, height: iframeHeight * zoom, overflow: 'hidden' }}
+        >
+          <iframe
+            ref={iframeRef}
+            srcDoc={filledHtml}
+            onLoad={handleIframeLoad}
+            title="Накладная"
+            className="border-0"
+            style={{
+              width: 1200,
+              height: iframeHeight,
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top left',
+              display: 'block',
+            }}
+            sandbox="allow-same-origin"
+          />
         </div>
       </div>
     </div>
