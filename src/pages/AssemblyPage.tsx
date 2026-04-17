@@ -16,7 +16,10 @@ type Props = {
 export default function AssemblyPage({ state, onStateChange, initialOrderId }: Props & { initialOrderId?: string | null }) {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(initialOrderId ?? null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editOrderId, setEditOrderId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+
+  const editOrder = editOrderId ? state.workOrders.find(o => o.id === editOrderId) || null : null;
 
   const selectedOrder = selectedOrderId ? state.workOrders.find(o => o.id === selectedOrderId) || null : null;
 
@@ -126,8 +129,9 @@ export default function AssemblyPage({ state, onStateChange, initialOrderId }: P
             const isReopenable = order.status === 'closed' && order.items.some(oi => oi.status !== 'done');
 
             return (
-              <button key={order.id} onClick={() => setSelectedOrderId(order.id)}
-                className="w-full text-left bg-card rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary/30 p-4 transition-all group animate-fade-in"
+              <div key={order.id} onClick={() => setSelectedOrderId(order.id)} role="button" tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter') setSelectedOrderId(order.id); }}
+                className="w-full text-left bg-card rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary/30 p-4 transition-all group animate-fade-in cursor-pointer"
                 style={{ animationDelay: `${idx * 40}ms` }}>
                 <div className="flex items-start gap-3">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5
@@ -157,15 +161,26 @@ export default function AssemblyPage({ state, onStateChange, initialOrderId }: P
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">{new Date(order.updatedAt).toLocaleDateString('ru-RU')} · {order.items.length} позиций</div>
                   </div>
+                  {order.status === 'draft' && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditOrderId(order.id); }}
+                      className="flex items-center gap-1 shrink-0 mt-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                      title="Редактировать черновик"
+                    >
+                      <Icon name="Pencil" size={12} />
+                      Изменить
+                    </button>
+                  )}
                   <Icon name="ChevronRight" size={16} className="text-muted-foreground group-hover:text-primary shrink-0 mt-2 transition-colors" />
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
       )}
 
       {showCreate && <CreateOrderModal state={state} onStateChange={onStateChange} onClose={() => setShowCreate(false)} />}
+      {editOrder && <CreateOrderModal state={state} onStateChange={onStateChange} onClose={() => setEditOrderId(null)} editOrder={editOrder} />}
     </div>
   );
 }

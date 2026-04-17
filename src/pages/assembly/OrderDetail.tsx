@@ -11,6 +11,7 @@ import { PickItemModal, CloseWarningModal } from './PickModals';
 import InvoiceFiller from '@/pages/documents/InvoiceFiller';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CreateOrderModal } from './CreateOrderModal';
 
 export function OrderDetail({ order, state, onStateChange, onBack }: {
   order: WorkOrder; state: AppState;
@@ -19,6 +20,7 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
   const [pickingItem, setPickingItem] = useState<OrderItem | null>(null);
   const [showPrint, setShowPrint] = useState(false);
   const [showCloseWarning, setShowCloseWarning] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const doneCount = order.items.filter(i => i.status === 'done').length;
   const progress = order.items.length > 0 ? Math.round((doneCount / order.items.length) * 100) : 0;
@@ -261,8 +263,8 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         )}
         {liveOrder.status === 'draft' && (
           <>
-            <Button variant="outline" onClick={() => changeStatus('draft')} disabled className="flex-1 opacity-50">
-              <Icon name="Pencil" size={14} />Черновик
+            <Button variant="outline" onClick={() => setShowEdit(true)} className="flex-1 gap-1.5">
+              <Icon name="Pencil" size={14} />Редактировать
             </Button>
             <Button onClick={() => changeStatus('active')} className="flex-1"><Icon name="Play" size={14} className="mr-1.5" />Запустить в работу</Button>
           </>
@@ -318,6 +320,14 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
           </div>
         );
       })()}
+      {showEdit && (
+        <CreateOrderModal
+          state={state}
+          onStateChange={onStateChange}
+          onClose={() => setShowEdit(false)}
+          editOrder={liveOrder}
+        />
+      )}
     </div>
   );
 }
@@ -352,11 +362,11 @@ function InvoicePreviewPage({ order, state, onClose }: { order: WorkOrder; state
     num: order.number, date: longDate, okud: '0504204', dateCode: '', okpo: '', okei: '383',
     institution: tpl?.companyName || '', senderDept: '', receiverDept: order.recipientName || '',
     reqRank: '', reqName: '',
-    appRole: tpl?.signatoryRole || '', appSign: '', appName: tpl?.signatory || '',
-    relRank: '', relSign: '', relName: '', relFio: '',
+    appRole: order.issuerRank || tpl?.signatoryRole || '', appSign: '', appName: order.issuerName || tpl?.signatory || '',
+    relRank: order.issuerRank || '', relSign: '', relName: order.issuerName || '', relFio: '',
     respRole: '', respSign: '', respSignName: '',
     relDay: '', relMonth: '', relYear: yearShort,
-    recRank: '', recSign: '', recName: '',
+    recRank: order.receiverRank || '', recSign: '', recName: order.receiverName || '',
     accJournalMonth: '', accYear: yearShort,
     accExecRole: '', accExecSign: '', accExecName: '',
     accExecDay: '', accExecMonth: '', accExecYear: yearShort,

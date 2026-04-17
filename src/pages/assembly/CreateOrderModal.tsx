@@ -15,20 +15,31 @@ import { ConflictModal, ConflictInfo } from './ConflictModal';
 type OrderLine = { id: string; itemId: string; itemLabel: string; qty: string };
 
 export function CreateOrderModal({
-  state, onStateChange, onClose,
+  state, onStateChange, onClose, editOrder,
 }: {
   state: AppState;
   onStateChange: (s: AppState) => void;
   onClose: () => void;
+  editOrder?: WorkOrder;
 }) {
-  const [title, setTitle] = useState('');
-  const [number, setNumber] = useState(`ЗС-${String(state.orderCounter).padStart(3, '0')}`);
-  const [comment, setComment] = useState('');
-  const [recipientLabel, setRecipientLabel] = useState('');
-  const [recipientId, setRecipientId] = useState('');
-  const [receiverRank, setReceiverRank] = useState('');
-  const [receiverName, setReceiverName] = useState('');
-  const [lines, setLines] = useState<OrderLine[]>([{ id: generateId(), itemId: '', itemLabel: '', qty: '1' }]);
+  const isEdit = !!editOrder;
+  const [title, setTitle] = useState(editOrder?.title || '');
+  const [number, setNumber] = useState(editOrder?.number || `ЗС-${String(state.orderCounter).padStart(3, '0')}`);
+  const [comment, setComment] = useState(editOrder?.comment || '');
+  const [recipientLabel, setRecipientLabel] = useState(editOrder?.recipientName || '');
+  const [recipientId, setRecipientId] = useState(editOrder?.recipientId || '');
+  const [receiverRank, setReceiverRank] = useState(editOrder?.receiverRank || '');
+  const [receiverName, setReceiverName] = useState(editOrder?.receiverName || '');
+  const [issuerRank, setIssuerRank] = useState(editOrder?.issuerRank || '');
+  const [issuerName, setIssuerName] = useState(editOrder?.issuerName || '');
+  const [lines, setLines] = useState<OrderLine[]>(
+    editOrder && editOrder.items.length > 0
+      ? editOrder.items.map(oi => {
+          const it = state.items.find(i => i.id === oi.itemId);
+          return { id: oi.id, itemId: oi.itemId, itemLabel: it?.name || '', qty: String(oi.requiredQty) };
+        })
+      : [{ id: generateId(), itemId: '', itemLabel: '', qty: '1' }]
+  );
   const [showConflict, setShowConflict] = useState(false);
 
   const recipientOptions: AutocompleteOption[] = useMemo(() =>
@@ -114,13 +125,16 @@ export function CreateOrderModal({
   const doCreate = (status: OrderStatus = 'draft') => {
     const orderItems: OrderItem[] = validLines
       .filter(ln => !duplicates.has(ln.itemId))
-      .map(ln => ({
-        id: generateId(),
-        itemId: ln.itemId,
-        requiredQty: parseInt(ln.qty),
-        pickedQty: 0,
-        status: 'pending',
-      }));
+      .map(ln => {
+        const existing = isEdit ? editOrder!.items.find(oi => oi.id === ln.id) : null;
+        return {
+          id: existing?.id || generateId(),
+          itemId: ln.itemId,
+          requiredQty: parseInt(ln.qty),
+          pickedQty: existing?.pickedQty || 0,
+          status: existing?.status || 'pending',
+        };
+      });
 
     let finalRecipientId = recipientId;
     let newPartners = [...state.partners];
@@ -133,6 +147,37 @@ export function CreateOrderModal({
       finalRecipientId = newPartner.id;
     }
 
+    if (isEdit && editOrder) {
+      const updated: WorkOrder = {
+        ...editOrder,
+        number: number.trim() || editOrder.number,
+        title: title.trim(),
+        status,
+        recipientId: finalRecipientId || undefined,
+        recipientName: recipientLabel.trim() || undefined,
+        receiverRank: receiverRank.trim() || undefined,
+        receiverName: receiverName.trim() || undefined,
+        issuerRank: issuerRank.trim() || undefined,
+        issuerName: issuerName.trim() || undefined,
+        comment: comment.trim() || undefined,
+        updatedAt: new Date().toISOString(),
+        items: orderItems,
+      };
+      const next = {
+        ...state,
+        partners: newPartners,
+        workOrders: state.workOrders.map(o => o.id === updated.id ? updated : o),
+      };
+      onStateChange(next);
+      crudAction('upsert_work_order', { workOrder: updated, orderItems: updated.items });
+      if (recipientLabel.trim() && !recipientId) {
+        const newPartner = newPartners[newPartners.length - 1];
+        crudAction('upsert_partner', { partner: newPartner });
+      }
+      onClose();
+      return;
+    }
+
     const order: WorkOrder = {
       id: generateId(),
       number: number.trim() || `ЗС-${String(state.orderCounter).padStart(3, '0')}`,
@@ -143,6 +188,8 @@ export function CreateOrderModal({
       recipientName: recipientLabel.trim() || undefined,
       receiverRank: receiverRank.trim() || undefined,
       receiverName: receiverName.trim() || undefined,
+      issuerRank: issuerRank.trim() || undefined,
+      issuerName: issuerName.trim() || undefined,
       comment: comment.trim() || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -168,7 +215,7 @@ export function CreateOrderModal({
   const handleSubmit = () => {
     if (!canCreate) return;
     if (conflicts.length > 0) { setShowConflict(true); return; }
-    doCreate('draft');
+    doCreate(isEdit ? editOrder!.status : 'draft');
   };
 
   return (
@@ -178,9 +225,9 @@ export function CreateOrderModal({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                <Icon name="ClipboardPlus" size={16} />
+                <Icon name={isEdit ? 'Pencil' : 'ClipboardPlus'} size={16} />
               </div>
-              Новая сборочная заявка
+              {isEdit ? 'Редактировать заявку' : 'Новая сборочная заявка'}
             </DialogTitle>
           </DialogHeader>
 
@@ -212,14 +259,38 @@ export function CreateOrderModal({
             </div>
 
             {/* Receiver for invoice */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Получил — звание / должность</Label>
-                <Input value={receiverRank} onChange={e => setReceiverRank(e.target.value)} placeholder="Напр.: кладовщик" />
+            <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <Icon name="UserCheck" size={12} />
+                Получил (кто забирает ТМЦ)
               </div>
-              <div className="space-y-1.5">
-                <Label>Получил — ФИО (расшифровка)</Label>
-                <Input value={receiverName} onChange={e => setReceiverName(e.target.value)} placeholder="Иванов И.И." />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Звание / должность</Label>
+                  <Input value={receiverRank} onChange={e => setReceiverRank(e.target.value)} placeholder="Напр.: кладовщик" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">ФИО (расшифровка)</Label>
+                  <Input value={receiverName} onChange={e => setReceiverName(e.target.value)} placeholder="Иванов И.И." />
+                </div>
+              </div>
+            </div>
+
+            {/* Issuer / signer for invoice */}
+            <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <Icon name="PenLine" size={12} />
+                Подписант (кто выдаёт / отпускает)
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Должность</Label>
+                  <Input value={issuerRank} onChange={e => setIssuerRank(e.target.value)} placeholder="Напр.: начальник склада" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">ФИО подписанта</Label>
+                  <Input value={issuerName} onChange={e => setIssuerName(e.target.value)} placeholder="Петров П.П." />
+                </div>
               </div>
             </div>
 
@@ -344,8 +415,8 @@ export function CreateOrderModal({
             <div className="flex gap-2 pt-1">
               <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
               <Button onClick={handleSubmit} disabled={!canCreate} className="flex-1">
-                <Icon name="Plus" size={15} className="mr-1.5" />
-                Создать заявку
+                <Icon name={isEdit ? 'Save' : 'Plus'} size={15} className="mr-1.5" />
+                {isEdit ? 'Сохранить' : 'Создать заявку'}
               </Button>
             </div>
           </div>
