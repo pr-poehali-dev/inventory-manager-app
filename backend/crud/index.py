@@ -176,7 +176,9 @@ def _truncate(cur, table: str):
 # Used to filter incoming data to only valid columns
 
 TABLE_COLUMNS = {
-    "warehouses": ["id", "name", "address", "description", "created_at"],
+    "warehouses": ["id", "name", "address", "description", "created_at",
+                     "institution", "sender_dept", "issuer_rank", "issuer_name",
+                     "approver_role", "approver_name"],
     "categories": ["id", "name", "parent_id", "color"],
     "locations": ["id", "name", "parent_id", "description", "warehouse_id"],
     "items": ["id", "name", "category_id", "location_id", "description", "unit",
