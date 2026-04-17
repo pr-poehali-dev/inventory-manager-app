@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState, Partner, PartnerType, crudAction, generateId } from '@/data/store';
+import { AppState, Partner, PartnerType, Operation, crudAction, generateId } from '@/data/store';
 
 type Props = {
   state: AppState;
@@ -13,31 +13,161 @@ type Props = {
 
 type PartnerTab = 'suppliers' | 'recipients';
 
-function PartnerHistory({ partner, state, onClose }: {
-  partner: Partner; state: AppState; onClose: () => void;
-}) {
-  const history = useMemo(() => {
-    const ops = state.operations.filter(op => {
-      if (partner.type === 'supplier') return op.type === 'in' && (op.from === partner.name);
-      return op.type === 'out' && (op.to === partner.name);
-    });
+// ───── Период ─────
+type PeriodPreset = 'all' | 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
 
+function getPeriodDates(preset: PeriodPreset, customFrom?: string, customTo?: string): { from: Date | null; to: Date | null } {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  switch (preset) {
+    case 'today': return { from: todayStart, to: todayEnd };
+    case 'week': {
+      const d = new Date(todayStart); d.setDate(d.getDate() - 6);
+      return { from: d, to: todayEnd };
+    }
+    case 'month': {
+      const d = new Date(todayStart); d.setDate(d.getDate() - 29);
+      return { from: d, to: todayEnd };
+    }
+    case 'quarter': {
+      const d = new Date(todayStart); d.setDate(d.getDate() - 89);
+      return { from: d, to: todayEnd };
+    }
+    case 'year': {
+      const d = new Date(todayStart); d.setFullYear(d.getFullYear() - 1);
+      return { from: d, to: todayEnd };
+    }
+    case 'custom': {
+      const from = customFrom ? new Date(customFrom) : null;
+      const to = customTo ? new Date(customTo + 'T23:59:59') : null;
+      return { from, to };
+    }
+    default: return { from: null, to: null };
+  }
+}
+
+function inPeriod(dateStr: string, from: Date | null, to: Date | null): boolean {
+  const t = new Date(dateStr).getTime();
+  if (from && t < from.getTime()) return false;
+  if (to && t > to.getTime()) return false;
+  return true;
+}
+
+function PeriodFilter({ preset, onPresetChange, customFrom, customTo, onCustomChange }: {
+  preset: PeriodPreset;
+  onPresetChange: (p: PeriodPreset) => void;
+  customFrom: string;
+  customTo: string;
+  onCustomChange: (from: string, to: string) => void;
+}) {
+  const presets: { id: PeriodPreset; label: string }[] = [
+    { id: 'all', label: 'Всё время' },
+    { id: 'today', label: 'Сегодня' },
+    { id: 'week', label: 'Неделя' },
+    { id: 'month', label: 'Месяц' },
+    { id: 'quarter', label: '3 месяца' },
+    { id: 'year', label: 'Год' },
+    { id: 'custom', label: 'Период' },
+  ];
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Icon name="Calendar" size={14} className="text-muted-foreground" />
+        <span className="text-xs font-medium text-muted-foreground">Период:</span>
+        {presets.map(p => (
+          <button
+            key={p.id}
+            onClick={() => onPresetChange(p.id)}
+            className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all
+              ${preset === p.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+          >{p.label}</button>
+        ))}
+      </div>
+      {preset === 'custom' && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label className="text-[11px]">С</Label>
+            <Input
+              type="date"
+              value={customFrom}
+              onChange={e => onCustomChange(e.target.value, customTo)}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-[11px]">По</Label>
+            <Input
+              type="date"
+              value={customTo}
+              onChange={e => onCustomChange(customFrom, e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───── Разбивка по номенклатурам ─────
+type NomenRow = {
+  itemId: string;
+  itemName: string;
+  unit: string;
+  qty: number;
+  opCount: number;
+};
+
+function aggregateByItem(ops: Operation[], state: AppState): NomenRow[] {
+  const map = new Map<string, NomenRow>();
+  for (const op of ops) {
+    const it = state.items.find(i => i.id === op.itemId);
+    const key = op.itemId;
+    const existing = map.get(key);
+    if (existing) {
+      existing.qty += op.quantity;
+      existing.opCount += 1;
+    } else {
+      map.set(key, {
+        itemId: op.itemId,
+        itemName: it?.name || '—',
+        unit: it?.unit || '',
+        qty: op.quantity,
+        opCount: 1,
+      });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.qty - a.qty);
+}
+
+function PartnerHistory({ partner, state, periodFrom, periodTo, onClose }: {
+  partner: Partner; state: AppState;
+  periodFrom: Date | null; periodTo: Date | null;
+  onClose: () => void;
+}) {
+  const { history, byItem } = useMemo(() => {
+    const ops = state.operations.filter(op => {
+      if (!inPeriod(op.date, periodFrom, periodTo)) return false;
+      if (partner.type === 'supplier') return op.type === 'in' && op.from === partner.name;
+      return op.type === 'out' && op.to === partner.name;
+    });
     const orderOps = partner.type === 'recipient'
       ? state.operations.filter(op => {
+          if (!inPeriod(op.date, periodFrom, periodTo)) return false;
           const order = state.workOrders?.find(o => o.id === op.orderId && o.recipientName === partner.name);
           return !!order;
         })
       : [];
-
     const combined = [...ops, ...orderOps].filter((op, i, arr) => arr.findIndex(x => x.id === op.id) === i);
-    return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [partner, state]);
-
-  const totalQty = history.reduce((s, op) => s + op.quantity, 0);
+    const sorted = combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return { history: sorted, byItem: aggregateByItem(combined, state) };
+  }, [partner, state, periodFrom, periodTo]);
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto animate-scale-in">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto animate-scale-in">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0
@@ -53,21 +183,29 @@ function PartnerHistory({ partner, state, onClose }: {
               <Icon name="Phone" size={13} />{partner.contact}
             </div>
           )}
-          {partner.note && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Icon name="FileText" size={13} />{partner.note}
-            </div>
-          )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-muted rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold tabular-nums">{history.length}</div>
-              <div className="text-xs text-muted-foreground">операций</div>
+          <div className="bg-muted/50 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name="Package" size={13} />
+              <span className="text-sm font-semibold">
+                {partner.type === 'supplier' ? 'Что поставлено' : 'Что получено'}
+              </span>
+              <span className="ml-auto text-xs text-muted-foreground">{byItem.length} позиций</span>
             </div>
-            <div className="bg-muted rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold tabular-nums">{totalQty}</div>
-              <div className="text-xs text-muted-foreground">единиц {partner.type === 'supplier' ? 'поставлено' : 'выдано'}</div>
-            </div>
+            {byItem.length === 0 ? (
+              <div className="text-center py-3 text-xs text-muted-foreground">За выбранный период нет операций</div>
+            ) : (
+              <div className="space-y-1">
+                {byItem.map(r => (
+                  <div key={r.itemId} className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-card text-sm">
+                    <Icon name="Box" size={12} className="text-muted-foreground shrink-0" />
+                    <span className="flex-1 truncate">{r.itemName}</span>
+                    <span className="text-xs text-muted-foreground">{r.opCount} оп.</span>
+                    <span className="font-bold tabular-nums">{r.qty} {r.unit}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -151,48 +289,59 @@ function AddPartnerModal({ type, onSave, onClose }: {
   );
 }
 
-type RecipientRow = {
+// ───── Отчёт получателей с разбивкой по номенклатурам ─────
+type RecipientGroupRow = {
   department: string;
   receiverName: string;
   receiverRank: string;
+  items: NomenRow[];
+  totalQty: number;
   orderCount: number;
-  qty: number;
   lastDate: string;
 };
 
-function RecipientsReport({ state }: { state: AppState }) {
+function RecipientsReport({ state, periodFrom, periodTo }: {
+  state: AppState;
+  periodFrom: Date | null;
+  periodTo: Date | null;
+}) {
   const [deptFilter, setDeptFilter] = useState('');
   const [receiverFilter, setReceiverFilter] = useState('');
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
-  const rows: RecipientRow[] = useMemo(() => {
-    const map = new Map<string, RecipientRow>();
+  const rows: RecipientGroupRow[] = useMemo(() => {
+    const map = new Map<string, { dept: string; name: string; rank: string; ops: Operation[]; orders: Set<string>; lastDate: string }>();
     for (const o of state.workOrders || []) {
       const dept = (o.recipientName || '').trim();
       const rName = (o.receiverName || '').trim();
       const rRank = (o.receiverRank || '').trim();
       if (!dept && !rName) continue;
       const key = `${dept}||${rName}`;
-      const ops = state.operations.filter(op => op.orderId === o.id && op.type === 'out');
-      const qty = ops.reduce((s, op) => s + op.quantity, 0);
+      const ops = state.operations.filter(op => op.orderId === o.id && op.type === 'out' && inPeriod(op.date, periodFrom, periodTo));
+      if (ops.length === 0) continue;
       const existing = map.get(key);
       if (existing) {
-        existing.orderCount += 1;
-        existing.qty += qty;
-        if (!existing.receiverRank && rRank) existing.receiverRank = rRank;
+        existing.ops.push(...ops);
+        existing.orders.add(o.id);
+        if (!existing.rank && rRank) existing.rank = rRank;
         if (new Date(o.updatedAt).getTime() > new Date(existing.lastDate).getTime()) existing.lastDate = o.updatedAt;
       } else {
-        map.set(key, {
-          department: dept,
-          receiverName: rName,
-          receiverRank: rRank,
-          orderCount: 1,
-          qty,
-          lastDate: o.updatedAt,
-        });
+        map.set(key, { dept, name: rName, rank: rRank, ops: [...ops], orders: new Set([o.id]), lastDate: o.updatedAt });
       }
     }
-    return Array.from(map.values()).sort((a, b) => new Date(b.lastDate).getTime() - new Date(a.lastDate).getTime());
-  }, [state.workOrders, state.operations]);
+    return Array.from(map.entries()).map(([, v]) => {
+      const items = aggregateByItem(v.ops, state);
+      return {
+        department: v.dept,
+        receiverName: v.name,
+        receiverRank: v.rank,
+        items,
+        totalQty: items.reduce((s, i) => s + i.qty, 0),
+        orderCount: v.orders.size,
+        lastDate: v.lastDate,
+      };
+    }).sort((a, b) => new Date(b.lastDate).getTime() - new Date(a.lastDate).getTime());
+  }, [state.workOrders, state.operations, state.items, periodFrom, periodTo]);
 
   const departments = useMemo(() => {
     const s = new Set<string>();
@@ -212,18 +361,13 @@ function RecipientsReport({ state }: { state: AppState }) {
     return matchDept && matchRcv;
   });
 
-  const totalOrders = filtered.reduce((s, r) => s + r.orderCount, 0);
-  const totalQty = filtered.reduce((s, r) => s + r.qty, 0);
-
   return (
     <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
       <div className="p-3 border-b border-border space-y-2">
         <div className="flex items-center gap-2">
           <Icon name="Filter" size={14} className="text-muted-foreground" />
-          <span className="text-sm font-semibold">Кто и сколько получал</span>
-          <span className="ml-auto text-xs text-muted-foreground">
-            {filtered.length} записей · {totalOrders} заявок · {totalQty} ед.
-          </span>
+          <span className="text-sm font-semibold">Кто и что получал (по номенклатурам)</span>
+          <span className="ml-auto text-xs text-muted-foreground">{filtered.length} записей</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -264,45 +408,190 @@ function RecipientsReport({ state }: { state: AppState }) {
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 text-center">
           <Icon name="Inbox" size={22} className="text-muted-foreground mb-2 opacity-50" />
-          <p className="text-sm text-muted-foreground">Нет данных по выдачам</p>
+          <p className="text-sm text-muted-foreground">Нет данных по выдачам за выбранный период</p>
         </div>
       ) : (
         <div className="divide-y divide-border/50">
-          {filtered.map((r, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30">
-              <div className="w-8 h-8 rounded-lg bg-success/12 text-success flex items-center justify-center shrink-0">
-                <Icon name="UserCheck" size={13} />
+          {filtered.map((r, i) => {
+            const key = `${r.department}||${r.receiverName}`;
+            const isOpen = expandedKey === key;
+            return (
+              <div key={i}>
+                <button
+                  onClick={() => setExpandedKey(isOpen ? null : key)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 text-left"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-success/12 text-success flex items-center justify-center shrink-0">
+                    <Icon name={isOpen ? 'ChevronDown' : 'ChevronRight'} size={13} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {r.department && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/12 text-primary">
+                          {r.department}
+                        </span>
+                      )}
+                      <span className="font-medium text-sm">
+                        {r.receiverRank && <span className="text-muted-foreground font-normal">{r.receiverRank} </span>}
+                        {r.receiverName || <span className="text-muted-foreground italic">без ФИО</span>}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      {r.items.length} позиций · {r.orderCount} заявок · последняя: {new Date(r.lastDate).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-bold tabular-nums">{r.totalQty} ед.</div>
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="bg-muted/30 px-4 py-2 space-y-1 border-t border-border/30">
+                    {r.items.map(it => (
+                      <div key={it.itemId} className="flex items-center gap-2 py-1 text-sm">
+                        <Icon name="Box" size={11} className="text-muted-foreground shrink-0" />
+                        <span className="flex-1 truncate">{it.itemName}</span>
+                        <span className="text-xs text-muted-foreground">{it.opCount} оп.</span>
+                        <span className="font-bold tabular-nums">{it.qty} {it.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {r.department && (
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/12 text-primary">
-                      {r.department}
-                    </span>
-                  )}
-                  <span className="font-medium text-sm">
-                    {r.receiverRank && <span className="text-muted-foreground font-normal">{r.receiverRank} </span>}
-                    {r.receiverName || <span className="text-muted-foreground italic">без ФИО</span>}
-                  </span>
-                </div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
-                  Последняя выдача: {new Date(r.lastDate).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-sm font-bold tabular-nums">{r.qty} ед.</div>
-                <div className="text-[11px] text-muted-foreground">{r.orderCount} заявок</div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function PartnerTable({ partners, type, state, onStateChange }: {
+// ───── Отчёт поставщиков с разбивкой по номенклатурам ─────
+type SupplierGroupRow = {
+  supplierName: string;
+  items: NomenRow[];
+  totalQty: number;
+  opCount: number;
+  lastDate: string;
+};
+
+function SuppliersReport({ state, periodFrom, periodTo }: {
+  state: AppState;
+  periodFrom: Date | null;
+  periodTo: Date | null;
+}) {
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
+  const rows: SupplierGroupRow[] = useMemo(() => {
+    const map = new Map<string, { name: string; ops: Operation[]; lastDate: string }>();
+    for (const op of state.operations) {
+      if (op.type !== 'in') continue;
+      if (!inPeriod(op.date, periodFrom, periodTo)) continue;
+      const name = (op.from || '').trim();
+      if (!name) continue;
+      const existing = map.get(name);
+      if (existing) {
+        existing.ops.push(op);
+        if (new Date(op.date).getTime() > new Date(existing.lastDate).getTime()) existing.lastDate = op.date;
+      } else {
+        map.set(name, { name, ops: [op], lastDate: op.date });
+      }
+    }
+    return Array.from(map.values()).map(v => {
+      const items = aggregateByItem(v.ops, state);
+      return {
+        supplierName: v.name,
+        items,
+        totalQty: items.reduce((s, i) => s + i.qty, 0),
+        opCount: v.ops.length,
+        lastDate: v.lastDate,
+      };
+    }).sort((a, b) => new Date(b.lastDate).getTime() - new Date(a.lastDate).getTime());
+  }, [state.operations, state.items, periodFrom, periodTo]);
+
+  const suppliers = useMemo(() => rows.map(r => r.supplierName).sort(), [rows]);
+
+  const filtered = rows.filter(r => !supplierFilter || r.supplierName.toLowerCase().includes(supplierFilter.toLowerCase()));
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
+      <div className="p-3 border-b border-border space-y-2">
+        <div className="flex items-center gap-2">
+          <Icon name="Filter" size={14} className="text-muted-foreground" />
+          <span className="text-sm font-semibold">Кто и что поставил (по номенклатурам)</span>
+          <span className="ml-auto text-xs text-muted-foreground">{filtered.length} записей</span>
+        </div>
+        <div>
+          <Input
+            list="sup-list"
+            value={supplierFilter}
+            onChange={e => setSupplierFilter(e.target.value)}
+            placeholder="Поиск поставщика..."
+            className="h-8 text-sm"
+          />
+          <datalist id="sup-list">
+            {suppliers.map(s => <option key={s} value={s} />)}
+          </datalist>
+        </div>
+        {supplierFilter && (
+          <button onClick={() => setSupplierFilter('')} className="text-xs text-primary hover:underline flex items-center gap-1">
+            <Icon name="X" size={11} />Сбросить
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <Icon name="Inbox" size={22} className="text-muted-foreground mb-2 opacity-50" />
+          <p className="text-sm text-muted-foreground">Нет данных о поставках за выбранный период</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-border/50">
+          {filtered.map((r, i) => {
+            const isOpen = expandedKey === r.supplierName;
+            return (
+              <div key={i}>
+                <button
+                  onClick={() => setExpandedKey(isOpen ? null : r.supplierName)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 text-left"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300 flex items-center justify-center shrink-0">
+                    <Icon name={isOpen ? 'ChevronDown' : 'ChevronRight'} size={13} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{r.supplierName}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      {r.items.length} позиций · {r.opCount} операций · последняя: {new Date(r.lastDate).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-bold tabular-nums">{r.totalQty} ед.</div>
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="bg-muted/30 px-4 py-2 space-y-1 border-t border-border/30">
+                    {r.items.map(it => (
+                      <div key={it.itemId} className="flex items-center gap-2 py-1 text-sm">
+                        <Icon name="Box" size={11} className="text-muted-foreground shrink-0" />
+                        <span className="flex-1 truncate">{it.itemName}</span>
+                        <span className="text-xs text-muted-foreground">{it.opCount} оп.</span>
+                        <span className="font-bold tabular-nums">{it.qty} {it.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PartnerTable({ partners, type, state, onStateChange, periodFrom, periodTo }: {
   partners: Partner[]; type: PartnerType; state: AppState; onStateChange: (s: AppState) => void;
+  periodFrom: Date | null; periodTo: Date | null;
 }) {
   const [search, setSearch] = useState('');
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
@@ -314,17 +603,18 @@ function PartnerTable({ partners, type, state, onStateChange }: {
   );
 
   const getPartnerStats = (p: Partner) => {
-    if (p.type === 'supplier') {
-      const ops = state.operations.filter(op => op.type === 'in' && op.from === p.name);
-      return { opCount: ops.length, qty: ops.reduce((s, op) => s + op.quantity, 0) };
-    }
-    const ops = state.operations.filter(op => op.type === 'out' && op.to === p.name);
-    const orderOps = state.operations.filter(op => {
-      const order = state.workOrders?.find(o => o.id === op.orderId && o.recipientName === p.name);
-      return !!order;
-    });
-    const combined = [...ops, ...orderOps].filter((op, i, arr) => arr.findIndex(x => x.id === op.id) === i);
-    return { opCount: combined.length, qty: combined.reduce((s, op) => s + op.quantity, 0) };
+    const allOps = p.type === 'supplier'
+      ? state.operations.filter(op => op.type === 'in' && op.from === p.name)
+      : (() => {
+          const direct = state.operations.filter(op => op.type === 'out' && op.to === p.name);
+          const byOrder = state.operations.filter(op => {
+            const order = state.workOrders?.find(o => o.id === op.orderId && o.recipientName === p.name);
+            return !!order;
+          });
+          return [...direct, ...byOrder].filter((op, i, arr) => arr.findIndex(x => x.id === op.id) === i);
+        })();
+    const ops = allOps.filter(op => inPeriod(op.date, periodFrom, periodTo));
+    return { opCount: ops.length, qty: ops.reduce((s, op) => s + op.quantity, 0) };
   };
 
   const handleDelete = (id: string) => {
@@ -383,8 +673,9 @@ function PartnerTable({ partners, type, state, onStateChange }: {
                 </div>
                 <div className="flex gap-1">
                   <button onClick={() => setSelectedPartner(p)}
-                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors">
-                    <Icon name="History" size={14} />
+                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
+                    title="Разбивка по номенклатурам">
+                    <Icon name="Package" size={14} />
                   </button>
                   <button onClick={() => setDeleteConfirm(p)}
                     className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
@@ -397,9 +688,18 @@ function PartnerTable({ partners, type, state, onStateChange }: {
         </div>
       )}
 
-      {type === 'recipient' && <RecipientsReport state={state} />}
+      {type === 'recipient' && <RecipientsReport state={state} periodFrom={periodFrom} periodTo={periodTo} />}
+      {type === 'supplier' && <SuppliersReport state={state} periodFrom={periodFrom} periodTo={periodTo} />}
 
-      {selectedPartner && <PartnerHistory partner={selectedPartner} state={state} onClose={() => setSelectedPartner(null)} />}
+      {selectedPartner && (
+        <PartnerHistory
+          partner={selectedPartner}
+          state={state}
+          periodFrom={periodFrom}
+          periodTo={periodTo}
+          onClose={() => setSelectedPartner(null)}
+        />
+      )}
       {showAdd && <AddPartnerModal type={type} onSave={handleAdd} onClose={() => setShowAdd(false)} />}
       {deleteConfirm && (
         <Dialog open onOpenChange={() => setDeleteConfirm(null)}>
@@ -433,12 +733,24 @@ function PartnerTable({ partners, type, state, onStateChange }: {
 
 export default function PartnersPage({ state, onStateChange }: Props) {
   const [tab, setTab] = useState<PartnerTab>('suppliers');
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('all');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  const { from: periodFrom, to: periodTo } = useMemo(
+    () => getPeriodDates(periodPreset, customFrom, customTo),
+    [periodPreset, customFrom, customTo]
+  );
 
   const suppliers = state.partners.filter(p => p.type === 'supplier');
   const recipients = state.partners.filter(p => p.type === 'recipient');
 
-  const totalSupplied = state.operations.filter(o => o.type === 'in').reduce((s, o) => s + o.quantity, 0);
-  const totalIssued = state.operations.filter(o => o.type === 'out').reduce((s, o) => s + o.quantity, 0);
+  const opsInPeriod = useMemo(
+    () => state.operations.filter(op => inPeriod(op.date, periodFrom, periodTo)),
+    [state.operations, periodFrom, periodTo]
+  );
+  const totalSupplied = opsInPeriod.filter(o => o.type === 'in').reduce((s, o) => s + o.quantity, 0);
+  const totalIssued = opsInPeriod.filter(o => o.type === 'out').reduce((s, o) => s + o.quantity, 0);
 
   return (
     <div className="space-y-5 pb-20 md:pb-0">
@@ -447,13 +759,23 @@ export default function PartnersPage({ state, onStateChange }: Props) {
         <p className="text-sm text-muted-foreground mt-0.5">{suppliers.length} поставщиков · {recipients.length} получателей</p>
       </div>
 
+      <div className="bg-card border border-border rounded-xl p-3 shadow-card">
+        <PeriodFilter
+          preset={periodPreset}
+          onPresetChange={setPeriodPreset}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomChange={(f, t) => { setCustomFrom(f); setCustomTo(t); }}
+        />
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
           { label: 'Поставщиков', value: suppliers.length, icon: 'Truck', color: 'text-blue-600 dark:text-blue-400' },
           { label: 'Получателей', value: recipients.length, icon: 'Users', color: 'text-success' },
-          { label: 'Всего принято', value: totalSupplied, icon: 'ArrowDownToLine', color: 'text-success' },
-          { label: 'Всего выдано', value: totalIssued, icon: 'ArrowUpFromLine', color: 'text-primary' },
+          { label: 'Принято за период', value: totalSupplied, icon: 'ArrowDownToLine', color: 'text-success' },
+          { label: 'Выдано за период', value: totalIssued, icon: 'ArrowUpFromLine', color: 'text-primary' },
         ].map(s => (
           <div key={s.label} className="bg-card border border-border rounded-xl p-3 shadow-card text-center">
             <Icon name={s.icon} size={16} className={`mx-auto mb-1 ${s.color}`} />
@@ -481,12 +803,11 @@ export default function PartnersPage({ state, onStateChange }: Props) {
         </button>
       </div>
 
-      {/* Table */}
       <div className="animate-fade-in">
         {tab === 'suppliers' ? (
-          <PartnerTable partners={suppliers} type="supplier" state={state} onStateChange={onStateChange} />
+          <PartnerTable partners={suppliers} type="supplier" state={state} onStateChange={onStateChange} periodFrom={periodFrom} periodTo={periodTo} />
         ) : (
-          <PartnerTable partners={recipients} type="recipient" state={state} onStateChange={onStateChange} />
+          <PartnerTable partners={recipients} type="recipient" state={state} onStateChange={onStateChange} periodFrom={periodFrom} periodTo={periodTo} />
         )}
       </div>
     </div>

@@ -380,12 +380,12 @@ function InvoicePreviewPage({ order, state, onClose }: { order: WorkOrder; state
   const totRel = rows.reduce((s, r) => s + (parseFloat(r.qtyRel) || 0), 0);
 
   const EF = ({ k, w, a }: { k: string; w?: string; a?: string }) => {
-    if (editing) return <input type="text" value={f[k] || ''} onChange={e => uf(k, e.target.value)} className="bg-blue-50/70 border-b border-blue-300 outline-none px-0.5 print:bg-transparent print:border-black" style={{ width: w || '100%', fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'left') as never }} />;
+    if (editing) return <input type="text" value={f[k] || ''} onChange={e => uf(k, e.target.value)} className="invoice-input bg-blue-50/70 border-b border-blue-300 outline-none px-0.5" style={{ width: w || '100%', fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'left') as never }} />;
     return <span className="border-b border-black inline-block align-bottom" style={{ width: w || '100%', minHeight: '1.1em', textAlign: (a || 'left') as never }}>{f[k] || '\u00A0'}</span>;
   };
 
   const EC = ({ value, onChange, a }: { value: string; onChange: (v: string) => void; a?: string }) => {
-    if (editing) return <input type="text" value={value} onChange={e => onChange(e.target.value)} className="bg-blue-50/70 border-0 outline-none w-full px-0 print:bg-transparent" style={{ fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'center') as never, minWidth: 0 }} />;
+    if (editing) return <input type="text" value={value} onChange={e => onChange(e.target.value)} className="invoice-input bg-blue-50/70 border-0 outline-none w-full px-0" style={{ fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'center') as never, minWidth: 0 }} />;
     return <span className="block" style={{ textAlign: (a || 'center') as never }}>{value || '\u00A0'}</span>;
   };
 
@@ -446,7 +446,11 @@ table.m{width:100%;border-collapse:collapse;font-size:7.5pt;margin:4pt 0}table.m
 
   return (
     <div className="h-full flex flex-col bg-gray-200 overflow-hidden" style={serif}>
-      <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-300 shrink-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
+      <style>{`@media print {
+        .invoice-toolbar { display: none !important; }
+        .invoice-input, input.invoice-input { border: none !important; background: transparent !important; box-shadow: none !important; }
+      }`}</style>
+      <div className="invoice-toolbar flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-300 shrink-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
         <Button variant="outline" size="sm" onClick={onClose} className="gap-1.5">
           <Icon name="ArrowLeft" size={14} />Назад
         </Button>

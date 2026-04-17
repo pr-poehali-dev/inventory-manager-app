@@ -254,7 +254,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
         <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, fontFamily: "'Times New Roman', serif", fontSize: el.fontSize, fontWeight: el.bold ? 'bold' : 'normal', fontStyle: el.italic ? 'italic' : 'normal', textAlign: el.align || 'left', lineHeight: 1.3, minHeight: el.h }}>
           {editing ? (
             <input value={val} onChange={e => updVal(el.id, e.target.value)}
-              className={`w-full bg-transparent border-b outline-none px-0.5 print:border-black print:bg-transparent ${isEmpty ? 'border-blue-300 bg-blue-50/50' : 'border-gray-300'}`}
+              className={`invoice-input-underline w-full bg-transparent border-b outline-none px-0.5 ${isEmpty ? 'border-blue-300 bg-blue-50/50' : 'border-gray-300'}`}
               style={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 'inherit', textAlign: 'inherit' }} />
           ) : (
             <span className="border-b border-black inline-block w-full" style={{ minHeight: '1.1em' }}>{val || '\u00A0'}</span>
@@ -284,7 +284,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
                     <td key={ci} className="border border-black px-1 py-0.5 relative">
                       {editing ? (
                         <input value={cell} onChange={e => updCell(el.id, ri, ci, e.target.value)}
-                          className="w-full bg-transparent border-0 outline-none text-center px-0"
+                          className="invoice-input w-full bg-transparent border-0 outline-none text-center px-0"
                           style={{ fontSize: 'inherit', fontFamily: 'inherit' }} />
                       ) : (
                         <span className="block text-center">{cell || '\u00A0'}</span>
@@ -292,7 +292,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
                       {editing && ci === row.length - 1 && (
                         <button
                           onClick={() => removeRow(el.id, ri)}
-                          className="absolute -right-6 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
+                          className="invoice-row-del absolute -right-6 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Удалить строку"
                         >×</button>
                       )}
@@ -312,7 +312,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
           {editing && (
             <button
               onClick={() => addRow(el.id)}
-              className="mt-1 w-full py-1 text-xs border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50 rounded print:hidden"
+              className="invoice-add-row mt-1 w-full py-1 text-xs border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50 rounded"
             >+ Добавить строку</button>
           )}
         </div>
@@ -385,7 +385,12 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
 
   return (
     <div className="h-full flex flex-col bg-gray-200 overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-300 shrink-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
+      <style>{`@media print {
+        .invoice-toolbar, .invoice-row-del, .invoice-add-row { display: none !important; }
+        .invoice-input { border: none !important; background: transparent !important; box-shadow: none !important; }
+        .invoice-input-underline { border-bottom: 1px solid #000 !important; background: transparent !important; }
+      }`}</style>
+      <div className="invoice-toolbar flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-300 shrink-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
         <Button variant="outline" size="sm" onClick={onClose} className="gap-1.5"><Icon name="ArrowLeft" size={14} />Назад</Button>
         <span className="text-sm font-medium">{template.name} — {'\u2116'}{order.number}</span>
         <div className="flex-1" />
