@@ -702,6 +702,11 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     const doc = parser.parseFromString(html, 'text/html');
     const result: Block[] = [];
 
+    const svg = doc.querySelector('svg');
+    if (svg) {
+      return parseSvgTemplate(svg);
+    }
+
     const getEmScale = (): number => {
       const candidates = doc.querySelectorAll('[class*="pdf24_05"], [class*="pdf24_02"]');
       for (const c of Array.from(candidates)) {
@@ -787,6 +792,113 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
         italic,
         align: 'left',
       });
+    });
+
+    return result;
+  };
+
+  const parseSvgTemplate = (svg: Element): Block[] => {
+    const result: Block[] = [];
+
+    let svgW = 0;
+    const viewBox = svg.getAttribute('viewBox');
+    if (viewBox) {
+      const parts = viewBox.split(/\s+/).map(parseFloat);
+      if (parts.length >= 4) svgW = parts[2];
+    }
+    if (!svgW) {
+      const wAttr = svg.getAttribute('width');
+      svgW = wAttr ? parseFloat(wAttr) : 841;
+    }
+    const K = CANVAS_W / svgW;
+
+    const getNum = (el: Element, attr: string): number => {
+      const v = el.getAttribute(attr);
+      if (!v) return 0;
+      return parseFloat(v.split(/\s+/)[0]) || 0;
+    };
+
+    svg.querySelectorAll('text').forEach(textEl => {
+      const baseX = getNum(textEl, 'x');
+      const baseY = getNum(textEl, 'y');
+      const tspans = textEl.querySelectorAll('tspan');
+      const collect = (el: Element, fallbackX: number, fallbackY: number) => {
+        const xAttr = el.getAttribute('x');
+        const yAttr = el.getAttribute('y');
+        const x = xAttr ? parseFloat(xAttr.split(/\s+/)[0]) : fallbackX;
+        const y = yAttr ? parseFloat(yAttr.split(/\s+/)[0]) : fallbackY;
+        const txt = (el.textContent || '').replace(/\u00A0/g, ' ');
+        if (!txt.trim()) return;
+
+        const ff = el.getAttribute('font-family') || textEl.getAttribute('font-family') || '';
+        const fsAttr = el.getAttribute('font-size') || textEl.getAttribute('font-size') || '10';
+        const fw = el.getAttribute('font-weight') || textEl.getAttribute('font-weight') || '';
+        const fst = el.getAttribute('font-style') || textEl.getAttribute('font-style') || '';
+        const svgFontSize = parseFloat(fsAttr) || 10;
+        const fontSize = Math.max(5, Math.round(svgFontSize * K * 1.1));
+        const bold = fw === 'bold' || parseInt(fw, 10) >= 600 || /Bold/i.test(ff);
+        const italic = fst === 'italic' || /Italic/i.test(ff);
+
+        const charW = fontSize * (bold ? 0.72 : 0.58);
+        const widthGuess = Math.max(50, Math.ceil(txt.length * charW) + 16);
+
+        result.push({
+          id: uid(),
+          type: 'text',
+          x: Math.round(x * K),
+          y: Math.round((y - svgFontSize * 0.85) * K),
+          w: widthGuess,
+          h: Math.round(fontSize * 1.4),
+          text: txt.trim(),
+          fontSize,
+          bold,
+          italic,
+          align: 'left',
+        });
+      };
+
+      if (tspans.length === 0) {
+        collect(textEl, baseX, baseY);
+      } else {
+        let lastX = baseX;
+        let lastY = baseY;
+        tspans.forEach(ts => {
+          const xAttr = ts.getAttribute('x');
+          const yAttr = ts.getAttribute('y');
+          if (xAttr) lastX = parseFloat(xAttr.split(/\s+/)[0]);
+          if (yAttr) lastY = parseFloat(yAttr.split(/\s+/)[0]);
+          collect(ts, lastX, lastY);
+        });
+      }
+    });
+
+    svg.querySelectorAll('image').forEach(img => {
+      const x = getNum(img, 'x');
+      const y = getNum(img, 'y');
+      const w = getNum(img, 'width');
+      const h = getNum(img, 'height');
+      if (w > 20 && h < 6) {
+        result.push({
+          id: uid(),
+          type: 'line',
+          x: Math.round(x * K),
+          y: Math.round(y * K),
+          w: Math.round(w * K),
+          h: 1,
+          lineWidth: 1,
+        });
+      } else if (w > 30 && h > 20) {
+        result.push({
+          id: uid(),
+          type: 'frame',
+          x: Math.round(x * K),
+          y: Math.round(y * K),
+          w: Math.round(w * K),
+          h: Math.round(h * K),
+          borderStyle: 'dashed',
+          children: [],
+        });
+      }
     });
 
     return result;
