@@ -64,6 +64,13 @@ export type Warehouse = {
   address?: string;
   description?: string;
   createdAt: string;
+  // Профиль выдачи — подставляется в накладную
+  institution?: string;              // Учреждение
+  senderDept?: string;               // Структурное подразделение - отправитель
+  issuerRank?: string;               // Отпустил: звание
+  issuerName?: string;               // Отпустил: расшифровка подписи
+  approverRole?: string;             // Разрешил: должность
+  approverName?: string;             // Разрешил: расшифровка подписи
 };
 
 // ─── Barcodes / QR-codes ──────────────────────────────────────────────────────

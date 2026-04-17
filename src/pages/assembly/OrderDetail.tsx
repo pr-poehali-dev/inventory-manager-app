@@ -619,14 +619,27 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
     const totalReq = order.items.reduce((s, i) => s + (i.requiredQty || 0), 0);
     const totalRel = order.items.reduce((s, i) => s + (i.pickedQty || 0), 0);
 
+    const orderWhIds = Array.from(new Set(
+      (state.operations || [])
+        .filter(op => op.orderId === order.id && op.warehouseId)
+        .map(op => op.warehouseId as string)
+    ));
+    const wh = (state.warehouses || []).find(w => w.id === orderWhIds[0])
+      || (state.warehouses || [])[0];
+
     const values: Record<string, string> = {
       number: order.number || '',
       date: longDate,
       dateShort: shortDate,
       recipient: order.recipientName || '',
-      senderDept: '',
+      senderDept: wh?.senderDept || '',
       receiverDept: order.recipientName || '',
-      institution: tpl?.companyName || '',
+      institution: wh?.institution || tpl?.companyName || '',
+      senderDeptProfile: wh?.senderDept || '',
+      issuerRank: wh?.issuerRank || '',
+      issuerName: wh?.issuerName || '',
+      approverRole: wh?.approverRole || '',
+      approverName: wh?.approverName || '',
       signatory: tpl?.signatory || '',
       signatoryRole: tpl?.signatoryRole || '',
       okud: '0504204',

@@ -16,6 +16,7 @@ export function WarehousesSection({ state, onStateChange, onDeleteConfirm }: Ent
   const [newWhName, setNewWhName] = useState('');
   const [newWhAddress, setNewWhAddress] = useState('');
   const [newWhDesc, setNewWhDesc] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const addWarehouse = () => {
     if (!newWhName.trim()) return;
@@ -41,6 +42,13 @@ export function WarehousesSection({ state, onStateChange, onDeleteConfirm }: Ent
     onStateChange(next); crudAction('delete_warehouse', { warehouseId: id });
   };
 
+  const updateWh = (id: string, patch: Partial<Warehouse>) => {
+    const warehouses = (state.warehouses || []).map(w => w.id === id ? { ...w, ...patch } : w);
+    const updated = warehouses.find(w => w.id === id);
+    onStateChange({ ...state, warehouses });
+    if (updated) crudAction('upsert_warehouse', { warehouse: updated });
+  };
+
   return (
     <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
       <h2 className="font-semibold text-foreground">Склады</h2>
@@ -63,22 +71,65 @@ export function WarehousesSection({ state, onStateChange, onDeleteConfirm }: Ent
           const totalStock = (state.warehouseStocks || [])
             .filter(ws => ws.warehouseId === wh.id)
             .reduce((s, ws) => s + ws.quantity, 0);
+          const isOpen = expandedId === wh.id;
           return (
-            <div key={wh.id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <Icon name="Warehouse" size={16} className="text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold">{wh.name}</div>
-                {wh.address && <div className="text-xs text-muted-foreground">{wh.address}</div>}
-                {wh.description && <div className="text-xs text-muted-foreground">{wh.description}</div>}
-              </div>
-              <span className="text-xs text-muted-foreground shrink-0">{totalStock} ед.</span>
-              {(state.warehouses || []).length > 1 && (
-                <button onClick={() => onDeleteConfirm(`склад «${wh.name}»`, () => deleteWarehouse(wh.id))}
-                  className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
-                  <Icon name="Trash2" size={13} />
+            <div key={wh.id} className="rounded-xl border border-border bg-card">
+              <div className="flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Icon name="Warehouse" size={16} className="text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold">{wh.name}</div>
+                  {wh.address && <div className="text-xs text-muted-foreground">{wh.address}</div>}
+                  {wh.description && <div className="text-xs text-muted-foreground">{wh.description}</div>}
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">{totalStock} ед.</span>
+                <button
+                  onClick={() => setExpandedId(isOpen ? null : wh.id)}
+                  className="w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
+                  title="Профиль выдачи для накладной"
+                >
+                  <Icon name={isOpen ? 'ChevronUp' : 'Settings2'} size={13} />
                 </button>
+                {(state.warehouses || []).length > 1 && (
+                  <button onClick={() => onDeleteConfirm(`склад «${wh.name}»`, () => deleteWarehouse(wh.id))}
+                    className="w-7 h-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
+                    <Icon name="Trash2" size={13} />
+                  </button>
+                )}
+              </div>
+              {isOpen && (
+                <div className="px-3 pb-3 pt-1 border-t border-border space-y-3 bg-muted/20">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">
+                    Профиль выдачи (для накладной)
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    <label className="text-xs text-muted-foreground">Учреждение
+                      <Input className="mt-1" value={wh.institution || ''} onChange={e => updateWh(wh.id, { institution: e.target.value })} placeholder="Название организации" />
+                    </label>
+                    <label className="text-xs text-muted-foreground">Структурное подразделение — отправитель
+                      <Input className="mt-1" value={wh.senderDept || ''} onChange={e => updateWh(wh.id, { senderDept: e.target.value })} placeholder="Например: Склад №1" />
+                    </label>
+                  </div>
+                  <div className="text-xs font-semibold text-muted-foreground pt-1">Отпустил</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs text-muted-foreground">Звание / должность
+                      <Input className="mt-1" value={wh.issuerRank || ''} onChange={e => updateWh(wh.id, { issuerRank: e.target.value })} placeholder="Напр.: кладовщик" />
+                    </label>
+                    <label className="text-xs text-muted-foreground">ФИО (расшифровка)
+                      <Input className="mt-1" value={wh.issuerName || ''} onChange={e => updateWh(wh.id, { issuerName: e.target.value })} placeholder="Иванов И.И." />
+                    </label>
+                  </div>
+                  <div className="text-xs font-semibold text-muted-foreground pt-1">Разрешил</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs text-muted-foreground">Должность
+                      <Input className="mt-1" value={wh.approverRole || ''} onChange={e => updateWh(wh.id, { approverRole: e.target.value })} placeholder="Напр.: начальник склада" />
+                    </label>
+                    <label className="text-xs text-muted-foreground">ФИО (расшифровка)
+                      <Input className="mt-1" value={wh.approverName || ''} onChange={e => updateWh(wh.id, { approverName: e.target.value })} placeholder="Петров П.П." />
+                    </label>
+                  </div>
+                </div>
               )}
             </div>
           );
