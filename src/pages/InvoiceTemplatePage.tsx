@@ -818,6 +818,13 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       return parseFloat(v.split(/\s+/)[0]) || 0;
     };
 
+    type Frag = {
+      x: number; y: number; text: string;
+      fontSize: number; bold: boolean; italic: boolean;
+      svgFontSize: number;
+    };
+    const frags: Frag[] = [];
+
     svg.querySelectorAll('text').forEach(textEl => {
       const baseX = getNum(textEl, 'x');
       const baseY = getNum(textEl, 'y');
@@ -835,26 +842,11 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
         const fw = el.getAttribute('font-weight') || textEl.getAttribute('font-weight') || '';
         const fst = el.getAttribute('font-style') || textEl.getAttribute('font-style') || '';
         const svgFontSize = parseFloat(fsAttr) || 10;
-        const fontSize = Math.max(5, Math.round(svgFontSize * K * 1.1));
+        const fontSize = Math.max(6, Math.round(svgFontSize * K * 1.15));
         const bold = fw === 'bold' || parseInt(fw, 10) >= 600 || /Bold/i.test(ff);
         const italic = fst === 'italic' || /Italic/i.test(ff);
 
-        const charW = fontSize * (bold ? 0.72 : 0.58);
-        const widthGuess = Math.max(50, Math.ceil(txt.length * charW) + 16);
-
-        result.push({
-          id: uid(),
-          type: 'text',
-          x: Math.round(x * K),
-          y: Math.round((y - svgFontSize * 0.85) * K),
-          w: widthGuess,
-          h: Math.round(fontSize * 1.4),
-          text: txt.trim(),
-          fontSize,
-          bold,
-          italic,
-          align: 'left',
-        });
+        frags.push({ x, y, text: txt, fontSize, bold, italic, svgFontSize });
       };
 
       if (tspans.length === 0) {
@@ -872,11 +864,112 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       }
     });
 
+    frags.sort((a, b) => a.y - b.y || a.x - b.x);
+    const merged: Frag[] = [];
+    frags.forEach(f => {
+      const last = merged[merged.length - 1];
+      if (
+        last &&
+        Math.abs(last.y - f.y) < 1 &&
+        last.bold === f.bold &&
+        last.italic === f.italic &&
+        Math.abs(last.fontSize - f.fontSize) < 2
+      ) {
+        const approxEnd = last.x + last.text.length * last.svgFontSize * 0.55;
+        if (f.x - approxEnd < last.svgFontSize * 1.5) {
+          const gap = f.x - approxEnd;
+          const sep = gap > last.svgFontSize * 0.3 ? ' ' : '';
+          last.text = last.text + sep + f.text;
+          return;
+        }
+      }
+      merged.push({ ...f });
+    });
+
+    merged.forEach(f => {
+      const txt = f.text.trim();
+      if (!txt) return;
+      const charW = f.fontSize * (f.bold ? 0.72 : 0.58);
+      const widthGuess = Math.max(60, Math.ceil(txt.length * charW) + 20);
+      result.push({
+        id: uid(),
+        type: 'text',
+        x: Math.round(f.x * K),
+        y: Math.round((f.y - f.svgFontSize * 0.85) * K),
+        w: widthGuess,
+        h: Math.round(f.fontSize * 1.4),
+        text: txt,
+        fontSize: f.fontSize,
+        bold: f.bold,
+        italic: f.italic,
+        align: 'left',
+      });
+    });
+
+    let mainTableAdded = false;
     svg.querySelectorAll('image').forEach(img => {
       const x = getNum(img, 'x');
       const y = getNum(img, 'y');
       const w = getNum(img, 'width');
       const h = getNum(img, 'height');
+
+      if (w > svgW * 0.7 && h > 100 && !mainTableAdded) {
+        mainTableAdded = true;
+        result.push({
+          id: uid(),
+          type: 'table',
+          x: Math.round(x * K),
+          y: Math.round(y * K),
+          w: Math.round(w * K),
+          h: Math.round(h * K),
+          headerRows: [
+            [
+              { text: 'Материальные ценности', colspan: 3 },
+              { text: 'Единица\nизмерения', colspan: 2 },
+              { text: 'Цена', rowspan: 3 },
+              { text: 'Количество', colspan: 2 },
+              { text: 'Сумма\n(без НДС)', rowspan: 3 },
+              { text: 'Корреспондирующие счета', colspan: 2 },
+              { text: 'Примечание', rowspan: 3 },
+            ],
+            [
+              { text: 'наименование', rowspan: 2 },
+              { text: 'номер', colspan: 2 },
+              { text: 'наимено-\nвание', rowspan: 2 },
+              { text: 'код по\nОКЕИ', rowspan: 2 },
+              { text: 'затре-\nбовано', rowspan: 2 },
+              { text: 'отпу-\nщено', rowspan: 2 },
+              { text: 'дебет', rowspan: 2 },
+              { text: 'кредит', rowspan: 2 },
+            ],
+            [
+              { text: 'номенкла-\nтурный' },
+              { text: 'паспорта (иной)' },
+            ],
+          ],
+          showRowNumbers: true,
+          showTotals: true,
+          totalsLabel: 'Итого',
+          totalsLabelCol: 5,
+          columns: [
+            { label: 'наименование', width: 140 },
+            { label: 'номенклатурный', width: 78 },
+            { label: 'паспорта (иной)', width: 78 },
+            { label: 'наименование', width: 62 },
+            { label: 'код по ОКЕИ', width: 48 },
+            { label: 'Цена', width: 50 },
+            { label: 'затребовано', width: 56 },
+            { label: 'отпущено', width: 52 },
+            { label: 'Сумма', width: 60 },
+            { label: 'дебет', width: 62 },
+            { label: 'кредит', width: 60 },
+            { label: 'Примечание', width: 66 },
+          ],
+          rows: [],
+        });
+        return;
+      }
+
       if (w > 20 && h < 6) {
         result.push({
           id: uid(),
@@ -887,7 +980,7 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
           h: 1,
           lineWidth: 1,
         });
-      } else if (w > 30 && h > 20) {
+      } else if (w > 30 && h > 20 && h < 150) {
         result.push({
           id: uid(),
           type: 'frame',
@@ -896,10 +989,24 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
           w: Math.round(w * K),
           h: Math.round(h * K),
           borderStyle: 'dashed',
-          children: [],
+          children: [
+            { id: uid(), type: 'label', text: 'Отметка бухгалтерии', fontSize: 8, bold: false, align: 'center' },
+          ],
         });
       }
     });
+
+    const tableBlock = result.find(b => b.type === 'table');
+    if (tableBlock) {
+      const inside = result.filter(
+        b => b.type === 'text' && b.x >= tableBlock.x && b.x <= tableBlock.x + tableBlock.w &&
+             b.y >= tableBlock.y && b.y <= tableBlock.y + tableBlock.h
+      );
+      inside.forEach(b => {
+        const idx = result.indexOf(b);
+        if (idx !== -1) result.splice(idx, 1);
+      });
+    }
 
     return result;
   };
