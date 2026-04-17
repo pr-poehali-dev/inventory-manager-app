@@ -719,16 +719,34 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       return m ? parseFloat(m[1]) * EM : parseFloat(v) || 0;
     };
 
-    const nodes = Array.from(doc.querySelectorAll('[style*="position:absolute"], [style*="position: absolute"]'));
+    const selectors = [
+      '.pdf24_01',
+      '[class*="pdf24_01"]',
+      '[style*="position:absolute"]',
+      '[style*="position: absolute"]',
+    ];
+    const seen = new Set<Element>();
+    const nodes: Element[] = [];
+    selectors.forEach(sel => {
+      doc.querySelectorAll(sel).forEach(n => {
+        if (!seen.has(n)) {
+          seen.add(n);
+          nodes.push(n);
+        }
+      });
+    });
+
     nodes.forEach(n => {
       const el = n as HTMLElement;
       const style = el.getAttribute('style') || '';
-      const left = style.match(/left:\s*([\d.-]+em)/);
-      const top = style.match(/top:\s*([\d.-]+em)/);
+      const left = style.match(/left:\s*([\d.-]+)(em|px)?/);
+      const top = style.match(/top:\s*([\d.-]+)(em|px)?/);
       if (!left || !top) return;
 
-      const x = Math.round(parseEm(left[1]));
-      const y = Math.round(parseEm(top[1]));
+      const leftUnit = left[2] || 'em';
+      const topUnit = top[2] || 'em';
+      const x = Math.round(leftUnit === 'px' ? parseFloat(left[1]) : parseEm(left[1] + 'em'));
+      const y = Math.round(topUnit === 'px' ? parseFloat(top[1]) : parseEm(top[1] + 'em'));
       const text = (el.textContent || '').replace(/\u00A0/g, ' ').trim();
       if (!text) return;
 
@@ -738,15 +756,19 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
 
       let fontSize = 8;
       const fsMatch = spanStyle.match(/font-size:\s*([\d.]+)em/);
-      if (fsMatch) fontSize = Math.round(parseFloat(fsMatch[1]) * 10);
-      else if (spanClass.includes('pdf24_10')) fontSize = 10;
-      else if (spanClass.includes('pdf24_33')) fontSize = 9;
-      else if (spanClass.includes('pdf24_54')) fontSize = 8;
-      else if (spanClass.includes('pdf24_07') || spanClass.includes('pdf24_14') || spanClass.includes('pdf24_24')) fontSize = 7;
-      else if (spanClass.includes('pdf24_26') || spanClass.includes('pdf24_58') || spanClass.includes('pdf24_60')) fontSize = 6;
+      if (fsMatch) {
+        const relSize = parseFloat(fsMatch[1]);
+        fontSize = Math.max(5, Math.round(relSize * 13));
+      } else if (spanClass.match(/pdf24_10\b/)) fontSize = 10;
+      else if (spanClass.match(/pdf24_33\b/)) fontSize = 9;
+      else if (spanClass.match(/pdf24_54\b/)) fontSize = 8;
+      else if (spanClass.match(/pdf24_(07|14|24|28)\b/)) fontSize = 7;
+      else if (spanClass.match(/pdf24_(26|58|60)\b/)) fontSize = 6;
 
-      const bold = spanClass.includes('Bold') || spanClass.includes('pdf24_10') || spanClass.includes('pdf24_54');
-      const italic = spanClass.includes('Italic') || spanClass.includes('pdf24_24') || spanClass.includes('pdf24_28');
+      const fontFamily = spanStyle.match(/font-family:\s*"?([^";]+)"?/);
+      const ff = fontFamily ? fontFamily[1] : '';
+      const bold = /Bold/i.test(ff) || spanClass.match(/pdf24_(10|54)\b/) !== null;
+      const italic = /Italic/i.test(ff) || spanClass.match(/pdf24_(24|28)\b/) !== null;
 
       const widthGuess = Math.max(40, text.length * fontSize * 0.6);
       result.push({
