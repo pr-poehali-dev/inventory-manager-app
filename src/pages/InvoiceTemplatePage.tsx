@@ -870,16 +870,19 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       const last = merged[merged.length - 1];
       if (
         last &&
-        Math.abs(last.y - f.y) < 1 &&
+        Math.abs(last.y - f.y) < Math.max(last.svgFontSize, f.svgFontSize) * 0.3 &&
         last.bold === f.bold &&
         last.italic === f.italic &&
-        Math.abs(last.fontSize - f.fontSize) < 2
+        Math.abs(last.fontSize - f.fontSize) < 3
       ) {
-        const approxEnd = last.x + last.text.length * last.svgFontSize * 0.55;
-        if (f.x - approxEnd < last.svgFontSize * 1.5) {
-          const gap = f.x - approxEnd;
-          const sep = gap > last.svgFontSize * 0.3 ? ' ' : '';
-          last.text = last.text + sep + f.text;
+        const charW = last.svgFontSize * (last.bold ? 0.6 : 0.5);
+        const approxEnd = last.x + last.text.length * charW;
+        const gap = f.x - approxEnd;
+        if (gap < last.svgFontSize * 3 && gap > -last.svgFontSize * 3) {
+          const endsWithSpace = /\s$/.test(last.text);
+          const startsWithSpace = /^\s/.test(f.text);
+          const needSpace = gap > last.svgFontSize * 0.35 && !endsWithSpace && !startsWithSpace;
+          last.text = last.text + (needSpace ? ' ' : '') + f.text;
           return;
         }
       }
@@ -906,14 +909,22 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       });
     });
 
+    const imageEls = Array.from(svg.querySelectorAll('image'));
+    imageEls.sort((a, b) => getNum(b, 'width') * getNum(b, 'height') - getNum(a, 'width') * getNum(a, 'height'));
     let mainTableAdded = false;
-    svg.querySelectorAll('image').forEach(img => {
+    let bgSkipped = false;
+    imageEls.forEach(img => {
       const x = getNum(img, 'x');
       const y = getNum(img, 'y');
       const w = getNum(img, 'width');
       const h = getNum(img, 'height');
 
-      if (w > svgW * 0.7 && h > 100 && !mainTableAdded) {
+      if (!bgSkipped && w > svgW * 0.85 && h > 300) {
+        bgSkipped = true;
+        return;
+      }
+
+      if (w > svgW * 0.7 && h > 100 && h < 300 && !mainTableAdded) {
         mainTableAdded = true;
         result.push({
           id: uid(),
