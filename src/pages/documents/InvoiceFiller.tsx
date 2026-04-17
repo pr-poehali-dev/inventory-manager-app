@@ -30,11 +30,34 @@ function resolveSource(source: string, order: WorkOrder, state: AppState, tpl: I
   return map[source] || '';
 }
 
+const OKEI_CODES: Record<string, string> = {
+  'шт': '796', 'шт.': '796', 'штука': '796', 'штуки': '796',
+  'кг': '166', 'кг.': '166', 'килограмм': '166',
+  'г': '163', 'г.': '163', 'грамм': '163',
+  'т': '168', 'т.': '168', 'тонна': '168',
+  'л': '112', 'л.': '112', 'литр': '112',
+  'мл': '111', 'мл.': '111',
+  'м': '006', 'м.': '006', 'метр': '006',
+  'см': '004', 'см.': '004',
+  'мм': '003', 'мм.': '003',
+  'м2': '055', 'кв.м': '055',
+  'м3': '113', 'куб.м': '113',
+  'упак': '778', 'упак.': '778', 'упаковка': '778',
+  'компл': '839', 'компл.': '839', 'комплект': '839',
+  'пара': '715',
+  'рулон': '736',
+  'пачка': '728',
+};
+
 function resolveItemSource(source: string, oi: WorkOrder['items'][0], state: AppState): string {
   const it = state.items.find(i => i.id === oi.itemId);
+  const unit = (it?.unit || 'шт.').trim();
+  const unitLower = unit.toLowerCase();
+  const unitCode = OKEI_CODES[unitLower] || OKEI_CODES[unitLower.replace('.', '')] || '';
   const map: Record<string, string> = {
     '{{item.name}}': it?.name || '',
-    '{{item.unit}}': it?.unit || 'шт.',
+    '{{item.unit}}': unit,
+    '{{item.unitCode}}': unitCode,
     '{{item.qtyReq}}': String(oi.requiredQty),
     '{{item.qtyRel}}': String(oi.pickedQty),
     '{{item.price}}': '',

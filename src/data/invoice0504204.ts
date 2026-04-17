@@ -69,7 +69,7 @@ export function create0504204Template(): InvoiceTemplate {
       { key: generateId(), label: 'Номенкл. номер', width: 60, source: '{{item.nomenNum}}' },
       { key: generateId(), label: 'Паспорта (иной)', width: 70, source: '' },
       { key: generateId(), label: 'Ед. изм.', width: 50, source: '{{item.unit}}' },
-      { key: generateId(), label: 'Код ОКЕИ', width: 45, source: '' },
+      { key: generateId(), label: 'Код ОКЕИ', width: 45, source: '{{item.unitCode}}' },
       { key: generateId(), label: 'Цена', width: 50, source: '{{item.price}}' },
       { key: generateId(), label: 'Затребовано', width: 65, source: '{{item.qtyReq}}' },
       { key: generateId(), label: 'Отпущено', width: 65, source: '{{item.qtyRel}}' },
