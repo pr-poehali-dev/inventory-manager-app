@@ -695,6 +695,106 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     setTimeout(() => setSaveFlash(false), 1500);
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const parseHtmlTemplate = (html: string): Block[] => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const result: Block[] = [];
+
+    const getEmScale = (): number => {
+      const pageEl = doc.querySelector('[class*="pdf24_02"], [class*="pdf24_05"]');
+      if (pageEl) {
+        const style = (pageEl as HTMLElement).getAttribute('style') || '';
+        const m = style.match(/width:\s*([\d.]+)em/);
+        if (m) return CANVAS_W / parseFloat(m[1]);
+      }
+      return 13.6;
+    };
+
+    const EM = getEmScale();
+    const parseEm = (v: string | null): number => {
+      if (!v) return 0;
+      const m = v.match(/([\d.-]+)em/);
+      return m ? parseFloat(m[1]) * EM : parseFloat(v) || 0;
+    };
+
+    const nodes = Array.from(doc.querySelectorAll('[style*="position:absolute"], [style*="position: absolute"]'));
+    nodes.forEach(n => {
+      const el = n as HTMLElement;
+      const style = el.getAttribute('style') || '';
+      const left = style.match(/left:\s*([\d.-]+em)/);
+      const top = style.match(/top:\s*([\d.-]+em)/);
+      if (!left || !top) return;
+
+      const x = Math.round(parseEm(left[1]));
+      const y = Math.round(parseEm(top[1]));
+      const text = (el.textContent || '').replace(/\u00A0/g, ' ').trim();
+      if (!text) return;
+
+      const span = el.querySelector('span');
+      const spanStyle = span?.getAttribute('style') || '';
+      const spanClass = span?.getAttribute('class') || '';
+
+      let fontSize = 8;
+      const fsMatch = spanStyle.match(/font-size:\s*([\d.]+)em/);
+      if (fsMatch) fontSize = Math.round(parseFloat(fsMatch[1]) * 10);
+      else if (spanClass.includes('pdf24_10')) fontSize = 10;
+      else if (spanClass.includes('pdf24_33')) fontSize = 9;
+      else if (spanClass.includes('pdf24_54')) fontSize = 8;
+      else if (spanClass.includes('pdf24_07') || spanClass.includes('pdf24_14') || spanClass.includes('pdf24_24')) fontSize = 7;
+      else if (spanClass.includes('pdf24_26') || spanClass.includes('pdf24_58') || spanClass.includes('pdf24_60')) fontSize = 6;
+
+      const bold = spanClass.includes('Bold') || spanClass.includes('pdf24_10') || spanClass.includes('pdf24_54');
+      const italic = spanClass.includes('Italic') || spanClass.includes('pdf24_24') || spanClass.includes('pdf24_28');
+
+      const widthGuess = Math.max(40, text.length * fontSize * 0.6);
+      result.push({
+        id: uid(),
+        type: 'text',
+        x, y,
+        w: Math.round(widthGuess),
+        h: Math.round(fontSize * 1.4),
+        text,
+        fontSize,
+        bold,
+        italic,
+        align: 'left',
+      });
+    });
+
+    return result;
+  };
+
+  const handleLoadHtml = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const html = String(evt.target?.result || '');
+        const parsed = parseHtmlTemplate(html);
+        if (parsed.length === 0) {
+          alert('Не удалось найти блоки в HTML-файле.\nУбедитесь, что это HTML-экспорт накладной.');
+          return;
+        }
+        setSelectedId(null);
+        setEditingCell(null);
+        updateBlocks(parsed);
+        setSaveFlash(true);
+        setTimeout(() => setSaveFlash(false), 1500);
+      } catch (err) {
+        alert('Ошибка при чтении файла: ' + (err instanceof Error ? err.message : String(err)));
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+    e.target.value = '';
+  };
+
   const handleClear = () => {
     const def = defaultBlocks();
     setSelectedId(null);
@@ -1776,6 +1876,16 @@ body { font-family:'Times New Roman',serif; }
           <Button variant="ghost" size="sm" onClick={handleClear} title="Очистить">
             <Icon name="Trash2" size={16} />
           </Button>
+          <Button variant="ghost" size="sm" onClick={handleLoadHtml} title="Загрузить HTML-шаблон">
+            <Icon name="Upload" size={16} />
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".html,.htm,text/html"
+            onChange={handleFileSelected}
+            className="hidden"
+          />
           <Button variant="ghost" size="sm" onClick={handleSave} title="Сохранить" className={saveFlash ? 'text-green-600' : ''}>
             <Icon name={saveFlash ? 'Check' : 'Save'} size={16} />
           </Button>
