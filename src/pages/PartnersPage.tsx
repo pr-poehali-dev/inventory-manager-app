@@ -92,6 +92,7 @@ function PartnerHistory({ partner, state, onClose }: {
                         <div className="font-medium truncate">{item?.name || '—'}</div>
                         <div className="text-xs text-muted-foreground">
                           {order ? `Заявка ${order.number}` : op.comment || '—'}
+                          {order?.receiverName && <span> · {order.receiverRank ? `${order.receiverRank} ` : ''}{order.receiverName}</span>}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
@@ -147,6 +148,156 @@ function AddPartnerModal({ type, onSave, onClose }: {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type RecipientRow = {
+  department: string;
+  receiverName: string;
+  receiverRank: string;
+  orderCount: number;
+  qty: number;
+  lastDate: string;
+};
+
+function RecipientsReport({ state }: { state: AppState }) {
+  const [deptFilter, setDeptFilter] = useState('');
+  const [receiverFilter, setReceiverFilter] = useState('');
+
+  const rows: RecipientRow[] = useMemo(() => {
+    const map = new Map<string, RecipientRow>();
+    for (const o of state.workOrders || []) {
+      const dept = (o.recipientName || '').trim();
+      const rName = (o.receiverName || '').trim();
+      const rRank = (o.receiverRank || '').trim();
+      if (!dept && !rName) continue;
+      const key = `${dept}||${rName}`;
+      const ops = state.operations.filter(op => op.orderId === o.id && op.type === 'out');
+      const qty = ops.reduce((s, op) => s + op.quantity, 0);
+      const existing = map.get(key);
+      if (existing) {
+        existing.orderCount += 1;
+        existing.qty += qty;
+        if (!existing.receiverRank && rRank) existing.receiverRank = rRank;
+        if (new Date(o.updatedAt).getTime() > new Date(existing.lastDate).getTime()) existing.lastDate = o.updatedAt;
+      } else {
+        map.set(key, {
+          department: dept,
+          receiverName: rName,
+          receiverRank: rRank,
+          orderCount: 1,
+          qty,
+          lastDate: o.updatedAt,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => new Date(b.lastDate).getTime() - new Date(a.lastDate).getTime());
+  }, [state.workOrders, state.operations]);
+
+  const departments = useMemo(() => {
+    const s = new Set<string>();
+    rows.forEach(r => r.department && s.add(r.department));
+    return Array.from(s).sort();
+  }, [rows]);
+
+  const receivers = useMemo(() => {
+    const s = new Set<string>();
+    rows.forEach(r => r.receiverName && s.add(r.receiverName));
+    return Array.from(s).sort();
+  }, [rows]);
+
+  const filtered = rows.filter(r => {
+    const matchDept = !deptFilter || r.department.toLowerCase().includes(deptFilter.toLowerCase());
+    const matchRcv = !receiverFilter || r.receiverName.toLowerCase().includes(receiverFilter.toLowerCase());
+    return matchDept && matchRcv;
+  });
+
+  const totalOrders = filtered.reduce((s, r) => s + r.orderCount, 0);
+  const totalQty = filtered.reduce((s, r) => s + r.qty, 0);
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
+      <div className="p-3 border-b border-border space-y-2">
+        <div className="flex items-center gap-2">
+          <Icon name="Filter" size={14} className="text-muted-foreground" />
+          <span className="text-sm font-semibold">Кто и сколько получал</span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {filtered.length} записей · {totalOrders} заявок · {totalQty} ед.
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Input
+              list="dept-list"
+              value={deptFilter}
+              onChange={e => setDeptFilter(e.target.value)}
+              placeholder="Подразделение..."
+              className="h-8 text-sm"
+            />
+            <datalist id="dept-list">
+              {departments.map(d => <option key={d} value={d} />)}
+            </datalist>
+          </div>
+          <div>
+            <Input
+              list="rcv-list"
+              value={receiverFilter}
+              onChange={e => setReceiverFilter(e.target.value)}
+              placeholder="ФИО получателя..."
+              className="h-8 text-sm"
+            />
+            <datalist id="rcv-list">
+              {receivers.map(r => <option key={r} value={r} />)}
+            </datalist>
+          </div>
+        </div>
+        {(deptFilter || receiverFilter) && (
+          <button
+            onClick={() => { setDeptFilter(''); setReceiverFilter(''); }}
+            className="text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            <Icon name="X" size={11} />Сбросить фильтры
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <Icon name="Inbox" size={22} className="text-muted-foreground mb-2 opacity-50" />
+          <p className="text-sm text-muted-foreground">Нет данных по выдачам</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-border/50">
+          {filtered.map((r, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30">
+              <div className="w-8 h-8 rounded-lg bg-success/12 text-success flex items-center justify-center shrink-0">
+                <Icon name="UserCheck" size={13} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {r.department && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/12 text-primary">
+                      {r.department}
+                    </span>
+                  )}
+                  <span className="font-medium text-sm">
+                    {r.receiverRank && <span className="text-muted-foreground font-normal">{r.receiverRank} </span>}
+                    {r.receiverName || <span className="text-muted-foreground italic">без ФИО</span>}
+                  </span>
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  Последняя выдача: {new Date(r.lastDate).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-sm font-bold tabular-nums">{r.qty} ед.</div>
+                <div className="text-[11px] text-muted-foreground">{r.orderCount} заявок</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -245,6 +396,8 @@ function PartnerTable({ partners, type, state, onStateChange }: {
           })}
         </div>
       )}
+
+      {type === 'recipient' && <RecipientsReport state={state} />}
 
       {selectedPartner && <PartnerHistory partner={selectedPartner} state={state} onClose={() => setSelectedPartner(null)} />}
       {showAdd && <AddPartnerModal type={type} onSave={handleAdd} onClose={() => setShowAdd(false)} />}

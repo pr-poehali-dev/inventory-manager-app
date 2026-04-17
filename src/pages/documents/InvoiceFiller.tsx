@@ -254,7 +254,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
         <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, fontFamily: "'Times New Roman', serif", fontSize: el.fontSize, fontWeight: el.bold ? 'bold' : 'normal', fontStyle: el.italic ? 'italic' : 'normal', textAlign: el.align || 'left', lineHeight: 1.3, minHeight: el.h }}>
           {editing ? (
             <input value={val} onChange={e => updVal(el.id, e.target.value)}
-              className={`w-full bg-transparent border-b outline-none px-0.5 ${isEmpty ? 'border-blue-300 bg-blue-50/50' : 'border-gray-300'}`}
+              className={`w-full bg-transparent border-b outline-none px-0.5 print:border-black print:bg-transparent ${isEmpty ? 'border-blue-300 bg-blue-50/50' : 'border-gray-300'}`}
               style={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 'inherit', textAlign: 'inherit' }} />
           ) : (
             <span className="border-b border-black inline-block w-full" style={{ minHeight: '1.1em' }}>{val || '\u00A0'}</span>

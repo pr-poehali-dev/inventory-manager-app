@@ -380,12 +380,12 @@ function InvoicePreviewPage({ order, state, onClose }: { order: WorkOrder; state
   const totRel = rows.reduce((s, r) => s + (parseFloat(r.qtyRel) || 0), 0);
 
   const EF = ({ k, w, a }: { k: string; w?: string; a?: string }) => {
-    if (editing) return <input type="text" value={f[k] || ''} onChange={e => uf(k, e.target.value)} className="bg-blue-50/70 border-b border-blue-300 outline-none px-0.5" style={{ width: w || '100%', fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'left') as never }} />;
+    if (editing) return <input type="text" value={f[k] || ''} onChange={e => uf(k, e.target.value)} className="bg-blue-50/70 border-b border-blue-300 outline-none px-0.5 print:bg-transparent print:border-black" style={{ width: w || '100%', fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'left') as never }} />;
     return <span className="border-b border-black inline-block align-bottom" style={{ width: w || '100%', minHeight: '1.1em', textAlign: (a || 'left') as never }}>{f[k] || '\u00A0'}</span>;
   };
 
   const EC = ({ value, onChange, a }: { value: string; onChange: (v: string) => void; a?: string }) => {
-    if (editing) return <input type="text" value={value} onChange={e => onChange(e.target.value)} className="bg-blue-50/70 border-0 outline-none w-full px-0" style={{ fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'center') as never, minWidth: 0 }} />;
+    if (editing) return <input type="text" value={value} onChange={e => onChange(e.target.value)} className="bg-blue-50/70 border-0 outline-none w-full px-0 print:bg-transparent" style={{ fontSize: 'inherit', fontFamily: 'inherit', textAlign: (a || 'center') as never, minWidth: 0 }} />;
     return <span className="block" style={{ textAlign: (a || 'center') as never }}>{value || '\u00A0'}</span>;
   };
 
