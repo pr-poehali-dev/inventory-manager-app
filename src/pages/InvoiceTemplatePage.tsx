@@ -703,13 +703,16 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
     const result: Block[] = [];
 
     const getEmScale = (): number => {
-      const pageEl = doc.querySelector('[class*="pdf24_02"], [class*="pdf24_05"]');
-      if (pageEl) {
-        const style = (pageEl as HTMLElement).getAttribute('style') || '';
+      const candidates = doc.querySelectorAll('[class*="pdf24_05"], [class*="pdf24_02"]');
+      for (const c of Array.from(candidates)) {
+        const style = (c as HTMLElement).getAttribute('style') || '';
         const m = style.match(/width:\s*([\d.]+)em/);
-        if (m) return CANVAS_W / parseFloat(m[1]);
+        if (m) {
+          const w = parseFloat(m[1]);
+          if (w > 20) return CANVAS_W / w;
+        }
       }
-      return 13.6;
+      return CANVAS_W / 70;
     };
 
     const EM = getEmScale();
@@ -770,13 +773,14 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
       const bold = /Bold/i.test(ff) || spanClass.match(/pdf24_(10|54)\b/) !== null;
       const italic = /Italic/i.test(ff) || spanClass.match(/pdf24_(24|28)\b/) !== null;
 
-      const widthGuess = Math.max(40, text.length * fontSize * 0.6);
+      const charW = fontSize * (bold ? 0.75 : 0.62);
+      const widthGuess = Math.max(60, Math.ceil(text.length * charW) + 20);
       result.push({
         id: uid(),
         type: 'text',
         x, y,
-        w: Math.round(widthGuess),
-        h: Math.round(fontSize * 1.4),
+        w: widthGuess,
+        h: Math.round(fontSize * 1.6),
         text,
         fontSize,
         bold,
