@@ -23,7 +23,14 @@ const FIELDS: FieldDef[] = [
   { key: 'totalReq', label: 'Итого затребовано', group: 'Итоги' },
   { key: 'totalRel', label: 'Итого отпущено', group: 'Итоги' },
   { key: 'totalSum', label: 'Итого сумма', group: 'Итоги' },
-  { key: 'itemsRows', label: 'Строки товаров (в эту строку таблицы)', group: 'Таблица товаров' },
+  { key: 'itemsRows', label: 'Шаблонная строка (клонируется по товарам)', group: 'Таблица товаров' },
+  { key: 'rowIndex', label: 'Ячейка: № по порядку', group: 'Ячейки строки' },
+  { key: 'rowName', label: 'Ячейка: Наименование', group: 'Ячейки строки' },
+  { key: 'rowUnit', label: 'Ячейка: Ед. изм.', group: 'Ячейки строки' },
+  { key: 'rowQtyReq', label: 'Ячейка: Затребовано', group: 'Ячейки строки' },
+  { key: 'rowQtyRel', label: 'Ячейка: Отпущено', group: 'Ячейки строки' },
+  { key: 'rowPrice', label: 'Ячейка: Цена', group: 'Ячейки строки' },
+  { key: 'rowSum', label: 'Ячейка: Сумма', group: 'Ячейки строки' },
 ];
 
 const PLACEHOLDER_HTML = `<!DOCTYPE html>
@@ -133,9 +140,9 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
         e.stopPropagation();
         const target = e.target as HTMLElement;
         if (!target || target === doc.body) return;
-        const text = (target.textContent || '').trim();
         let el: HTMLElement = target;
-        if (!text && target.parentElement) el = target.parentElement;
+        const cell = el.closest('td,th') as HTMLElement | null;
+        if (cell) el = cell;
         if (!el.dataset.bindId) el.dataset.bindId = `b_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
         const frameRect = f.getBoundingClientRect();
         const r = el.getBoundingClientRect();
@@ -238,8 +245,15 @@ export default function InvoiceTemplatePage({ state, onStateChange }: Props) {
   const applyBind = useCallback((field: string) => {
     const doc = iframeRef.current?.contentDocument;
     if (!doc || !picker) return;
-    const el = doc.querySelector(`[data-bind-id="${picker.targetId}"]`) as HTMLElement | null;
+    let el = doc.querySelector(`[data-bind-id="${picker.targetId}"]`) as HTMLElement | null;
     if (el) {
+      if (field === 'itemsRows' && el.tagName !== 'TR') {
+        const tr = el.closest('tr') as HTMLElement | null;
+        if (tr) {
+          if (!tr.dataset.bindId) tr.dataset.bindId = `b_${Date.now().toString(36)}_r`;
+          el = tr;
+        }
+      }
       if (field === '__clear__') {
         el.removeAttribute('data-bind');
       } else {

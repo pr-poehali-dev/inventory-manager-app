@@ -642,38 +642,37 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
 
+      const rowKeys = new Set(['rowIndex','rowName','rowUnit','rowQtyReq','rowQtyRel','rowPrice','rowSum']);
+      const templateRow = doc.querySelector('tr[data-bind="itemsRows"]') as HTMLElement | null;
+      if (templateRow && templateRow.parentElement) {
+        const parent = templateRow.parentElement;
+        const ref = templateRow.nextSibling;
+        parent.removeChild(templateRow);
+        itemRows.forEach((r, i) => {
+          const row = templateRow.cloneNode(true) as HTMLElement;
+          row.removeAttribute('data-bind');
+          const rowVals: Record<string, string> = {
+            rowIndex: String(i + 1),
+            rowName: r.name,
+            rowUnit: r.unit,
+            rowQtyReq: r.qtyReq,
+            rowQtyRel: r.qtyRel,
+            rowPrice: '',
+            rowSum: '',
+          };
+          row.querySelectorAll('[data-bind]').forEach(sub => {
+            const k = sub.getAttribute('data-bind') || '';
+            if (rowKeys.has(k)) {
+              sub.textContent = rowVals[k] ?? '';
+            }
+          });
+          parent.insertBefore(row, ref);
+        });
+      }
+
       doc.querySelectorAll('[data-bind]').forEach(el => {
         const key = el.getAttribute('data-bind') || '';
-        if (key === 'itemsRows') {
-          const tr = el.closest('tr');
-          if (tr && tr.parentElement) {
-            const parent = tr.parentElement;
-            const template = tr.cloneNode(true) as HTMLElement;
-            template.removeAttribute('data-bind');
-            template.querySelectorAll('[data-bind]').forEach(sub => {
-              sub.removeAttribute('data-bind');
-            });
-            const cells = Array.from(template.children);
-            parent.removeChild(tr);
-            itemRows.forEach((r, i) => {
-              const row = template.cloneNode(true) as HTMLElement;
-              const rowCells = Array.from(row.children) as HTMLElement[];
-              const fill = (idx: number, val: string) => {
-                if (rowCells[idx]) rowCells[idx].textContent = val;
-              };
-              fill(0, String(i + 1));
-              fill(1, r.name);
-              fill(2, r.unit);
-              fill(3, r.qtyReq);
-              fill(4, r.qtyRel);
-              parent.appendChild(row);
-            });
-            cells.forEach(() => {});
-          } else {
-            el.textContent = itemRows.map((r, i) => `${i + 1}. ${r.name} — ${r.qtyReq}/${r.qtyRel} ${r.unit}`).join('\n');
-          }
-          return;
-        }
+        if (key === 'itemsRows' || rowKeys.has(key)) return;
         if (key in values) {
           el.textContent = values[key];
         }
