@@ -319,18 +319,21 @@ export function CreateOrderModal({
             </div>
 
             {/* Receiver for invoice */}
-            <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <div className="rounded-xl border-2 border-success/30 bg-success/5 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-success uppercase tracking-wide">
                 <Icon name="UserCheck" size={12} />
-                Получил (кто забирает ТМЦ)
+                Получил — кто фактически забирает ТМЦ
               </div>
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                Подразделение укажи выше в «Кому выдаём». Здесь — должность и ФИО того, кто расписывается.
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Звание / должность</Label>
+                  <Label className="text-xs">Должность / звание</Label>
                   <Input value={receiverRank} onChange={e => setReceiverRank(e.target.value)} placeholder="Напр.: кладовщик" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">ФИО (расшифровка)</Label>
+                  <Label className="text-xs">ФИО (расшифровка подписи)</Label>
                   <Input value={receiverName} onChange={e => setReceiverName(e.target.value)} placeholder="Иванов И.И." />
                 </div>
               </div>
