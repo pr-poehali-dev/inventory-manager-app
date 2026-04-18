@@ -363,7 +363,6 @@ function RecipientsReport({ state, periodFrom, periodTo }: {
 }) {
   const [deptFilter, setDeptFilter] = useState('');
   const [receiverFilter, setReceiverFilter] = useState('');
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const rows: RecipientGroupRow[] = useMemo(() => {
     const map = new Map<string, { dept: string; name: string; rank: string; ops: Operation[]; orders: Set<string>; lastDate: string }>();
@@ -469,16 +468,11 @@ function RecipientsReport({ state, periodFrom, periodTo }: {
       ) : (
         <div className="divide-y divide-border/50">
           {filtered.map((r, i) => {
-            const key = `${r.department}||${r.receiverName}`;
-            const isOpen = expandedKey === key;
             return (
               <div key={i}>
-                <button
-                  onClick={() => setExpandedKey(isOpen ? null : key)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 text-left"
-                >
+                <div className="w-full flex items-center gap-3 px-4 py-2.5 text-left">
                   <div className="w-8 h-8 rounded-lg bg-success/12 text-success flex items-center justify-center shrink-0">
-                    <Icon name={isOpen ? 'ChevronDown' : 'ChevronRight'} size={13} />
+                    <Icon name="ChevronDown" size={13} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -499,19 +493,17 @@ function RecipientsReport({ state, periodFrom, periodTo }: {
                   <div className="text-right shrink-0">
                     <div className="text-sm font-bold tabular-nums">{r.totalQty} ед.</div>
                   </div>
-                </button>
-                {isOpen && (
-                  <div className="bg-muted/30 px-4 py-2 space-y-1 border-t border-border/30">
-                    {r.items.map(it => (
-                      <div key={it.itemId} className="flex items-center gap-2 py-1 text-sm">
-                        <Icon name="Box" size={11} className="text-muted-foreground shrink-0" />
-                        <span className="flex-1 truncate">{it.itemName}</span>
-                        <span className="text-xs text-muted-foreground">{it.opCount} оп.</span>
-                        <span className="font-bold tabular-nums">{it.qty} {it.unit}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                </div>
+                <div className="bg-muted/30 px-4 py-2 space-y-1 border-t border-border/30">
+                  {r.items.map(it => (
+                    <div key={it.itemId} className="flex items-center gap-2 py-1 text-sm">
+                      <Icon name="Box" size={11} className="text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{it.itemName}</span>
+                      <span className="text-xs text-muted-foreground">{it.opCount} оп.</span>
+                      <span className="font-bold tabular-nums">{it.qty} {it.unit}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}
@@ -536,7 +528,6 @@ function SuppliersReport({ state, periodFrom, periodTo }: {
   periodTo: Date | null;
 }) {
   const [supplierFilter, setSupplierFilter] = useState('');
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const rows: SupplierGroupRow[] = useMemo(() => {
     const map = new Map<string, { name: string; ops: Operation[]; lastDate: string }>();
@@ -604,15 +595,11 @@ function SuppliersReport({ state, periodFrom, periodTo }: {
       ) : (
         <div className="divide-y divide-border/50">
           {filtered.map((r, i) => {
-            const isOpen = expandedKey === r.supplierName;
             return (
               <div key={i}>
-                <button
-                  onClick={() => setExpandedKey(isOpen ? null : r.supplierName)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 text-left"
-                >
+                <div className="w-full flex items-center gap-3 px-4 py-2.5 text-left">
                   <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300 flex items-center justify-center shrink-0">
-                    <Icon name={isOpen ? 'ChevronDown' : 'ChevronRight'} size={13} />
+                    <Icon name="ChevronDown" size={13} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{r.supplierName}</div>
@@ -623,19 +610,17 @@ function SuppliersReport({ state, periodFrom, periodTo }: {
                   <div className="text-right shrink-0">
                     <div className="text-sm font-bold tabular-nums">{r.totalQty} ед.</div>
                   </div>
-                </button>
-                {isOpen && (
-                  <div className="bg-muted/30 px-4 py-2 space-y-1 border-t border-border/30">
-                    {r.items.map(it => (
-                      <div key={it.itemId} className="flex items-center gap-2 py-1 text-sm">
-                        <Icon name="Box" size={11} className="text-muted-foreground shrink-0" />
-                        <span className="flex-1 truncate">{it.itemName}</span>
-                        <span className="text-xs text-muted-foreground">{it.opCount} оп.</span>
-                        <span className="font-bold tabular-nums">{it.qty} {it.unit}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                </div>
+                <div className="bg-muted/30 px-4 py-2 space-y-1 border-t border-border/30">
+                  {r.items.map(it => (
+                    <div key={it.itemId} className="flex items-center gap-2 py-1 text-sm">
+                      <Icon name="Box" size={11} className="text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{it.itemName}</span>
+                      <span className="text-xs text-muted-foreground">{it.opCount} оп.</span>
+                      <span className="font-bold tabular-nums">{it.qty} {it.unit}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}
