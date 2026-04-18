@@ -489,16 +489,13 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
       // Strip editor-only bind-highlight style that leaks dashed green/blue outlines
       const bindStyle = doc.getElementById('__bind_style');
       if (bindStyle) bindStyle.remove();
-      // Strip inline dashed/dotted borders and outlines from any element (came from editor)
+      // Strip ONLY outline (editor selection highlight). Keep dashed/dotted borders — they are legit (e.g. "Отметка бухгалтерии" frame)
       doc.querySelectorAll<HTMLElement>('*').forEach(el => {
         const s = el.getAttribute('style');
         if (!s) return;
         const lower = s.toLowerCase();
-        if (lower.includes('dashed') || lower.includes('dotted') || lower.includes('outline')) {
-          let cleaned = s
-            .replace(/border[^;]*?(dashed|dotted)[^;]*;?/gi, '')
-            .replace(/outline[^;]*;?/gi, '')
-            .replace(/border-style\s*:\s*(dashed|dotted)\s*;?/gi, '');
+        if (lower.includes('outline')) {
+          let cleaned = s.replace(/outline[^;]*;?/gi, '');
           cleaned = cleaned.trim();
           if (cleaned) el.setAttribute('style', cleaned);
           else el.removeAttribute('style');
