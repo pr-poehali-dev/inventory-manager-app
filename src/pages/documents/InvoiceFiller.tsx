@@ -255,7 +255,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
     if (el.type === 'text') {
       const val = values[el.id] || '';
       return (
-        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, fontFamily: "'Times New Roman', serif", fontSize: el.fontSize, fontWeight: el.bold ? 'bold' : 'normal', fontStyle: el.italic ? 'italic' : 'normal', textAlign: el.align || 'left', lineHeight: 1.3, minHeight: el.h }}>
+        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, fontFamily: "'Times New Roman', serif", fontSize: el.fontSize, fontWeight: el.bold ? 'bold' : 'normal', fontStyle: el.italic ? 'italic' : 'normal', textAlign: el.align || 'left', lineHeight: 1.3, minHeight: el.h, zIndex: 10 }}>
           {editing ? (
             <input value={val} onChange={e => updVal(el.id, e.target.value)}
               className="invoice-input-underline w-full outline-none px-0.5 focus:bg-blue-50/30"
@@ -341,7 +341,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
 
     if (el.type === 'grid' && el.gridCells && el.gridCols && el.gridRows) {
       return (
-        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y }}>
+        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, zIndex: 1 }}>
           <table className="border-collapse" style={{ fontFamily: "'Times New Roman', serif", fontSize: 10, tableLayout: 'fixed', width: el.gridCols.reduce((a, b) => a + b, 0) }}>
             <colgroup>
               {el.gridCols.map((w, i) => <col key={i} style={{ width: w }} />)}
@@ -367,10 +367,10 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
                           borderBottom: bd?.bottom ? '1px solid #000' : '1px solid transparent',
                           borderLeft: bd?.left ? '1px solid #000' : '1px solid transparent',
                           padding: '1px 3px',
-                          overflow: 'hidden',
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
                           lineHeight: 1.2,
+                          background: 'transparent',
                         }}>
                         {cell.text}
                       </td>
@@ -390,11 +390,23 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
   return (
     <div className="h-full flex flex-col bg-gray-200 overflow-hidden">
       <style>{`
-        .invoice-input, .invoice-input-underline { background: transparent !important; }
-        .invoice-input:focus, .invoice-input-underline:focus { background: rgba(59, 130, 246, 0.06) !important; }
+        .invoice-input, .invoice-input-underline {
+          background: transparent !important;
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
+          -webkit-appearance: none !important;
+          appearance: none !important;
+          padding: 0 2px !important;
+          margin: 0 !important;
+          height: auto !important;
+          line-height: inherit !important;
+        }
+        .invoice-input:focus, .invoice-input-underline:focus { background: rgba(59, 130, 246, 0.08) !important; }
+        .invoice-input:hover, .invoice-input-underline:hover { background: rgba(59, 130, 246, 0.04); }
         @media print {
           .invoice-toolbar, .invoice-row-del, .invoice-add-row { display: none !important; }
-          .invoice-input, .invoice-input-underline { border: none !important; background: transparent !important; box-shadow: none !important; outline: none !important; }
+          .invoice-input, .invoice-input-underline { background: transparent !important; }
         }
       `}</style>
       <div className="invoice-toolbar flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-300 shrink-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
