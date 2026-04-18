@@ -122,7 +122,7 @@ export function CreateOrderModal({
     return result;
   }, [validLines, state]);
 
-  const canCreate = title.trim() && validLines.length > 0 && duplicates.size === 0;
+  const canCreate = validLines.length > 0 && duplicates.size === 0;
 
   const doCreate = (status: OrderStatus = 'draft') => {
     const orderItems: OrderItem[] = validLines
@@ -238,16 +238,10 @@ export function CreateOrderModal({
           </DialogHeader>
 
           <div className="space-y-4 pt-2">
-            {/* Number + Title */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label>Номер</Label>
-                <Input value={number} onChange={e => setNumber(e.target.value)} placeholder="ЗС-001" />
-              </div>
-              <div className="col-span-2 space-y-1.5">
-                <Label>Название заявки *</Label>
-                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Комплектация заказа..." />
-              </div>
+            {/* Number */}
+            <div className="space-y-1.5 max-w-[200px]">
+              <Label>Номер</Label>
+              <Input value={number} onChange={e => setNumber(e.target.value)} placeholder="ЗС-001" />
             </div>
 
             {/* Recipient autocomplete */}

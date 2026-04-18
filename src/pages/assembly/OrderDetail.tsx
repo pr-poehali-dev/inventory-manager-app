@@ -104,7 +104,7 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
               </span>
             )}
           </div>
-          <h2 className="text-xl font-bold mt-0.5">{liveOrder.title}</h2>
+          {liveOrder.title && <h2 className="text-xl font-bold mt-0.5">{liveOrder.title}</h2>}
           {liveOrder.comment && <p className="text-sm text-muted-foreground mt-0.5">{liveOrder.comment}</p>}
         </div>
       </div>
