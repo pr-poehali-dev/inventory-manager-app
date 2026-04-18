@@ -254,14 +254,48 @@ function PartnerHistory({ partner, state, periodFrom, periodTo, onClose }: {
 function AddPartnerModal({ type, partner, onSave, onClose }: {
   type: PartnerType; partner?: Partner; onSave: (p: Omit<Partner, 'id' | 'createdAt'>) => void; onClose: () => void;
 }) {
-  const [name, setName] = useState(partner?.name || '');
-  const [contact, setContact] = useState(partner?.contact || '');
-  const [note, setNote] = useState(partner?.note || '');
-  const [rank, setRank] = useState(partner?.rank || '');
-  const [fullName, setFullName] = useState(partner?.fullName || '');
-  const [department, setDepartment] = useState(partner?.department || '');
   const isRecipient = type === 'recipient';
   const isEdit = !!partner;
+
+  // Для поставщика работаем с "name". Для получателя — три отдельных поля.
+  const [supplierName, setSupplierName] = useState(partner?.name || '');
+  const [department, setDepartment] = useState(
+    partner?.department || (isRecipient ? partner?.name || '' : '')
+  );
+  const [rank, setRank] = useState(partner?.rank || '');
+  const [fullName, setFullName] = useState(partner?.fullName || '');
+  const [contact, setContact] = useState(partner?.contact || '');
+  const [note, setNote] = useState(partner?.note || '');
+
+  const canSave = isRecipient ? department.trim().length > 0 : supplierName.trim().length > 0;
+
+  const handleSave = () => {
+    if (!canSave) return;
+    if (isRecipient) {
+      const dept = department.trim();
+      const rk = rank.trim();
+      const fn = fullName.trim();
+      // Название = подразделение + ФИО (для удобного поиска и печати)
+      const composedName = [dept, fn].filter(Boolean).join(' — ') || dept;
+      onSave({
+        name: composedName,
+        department: dept || undefined,
+        rank: rk || undefined,
+        fullName: fn || undefined,
+        contact: contact.trim() || undefined,
+        note: note.trim() || undefined,
+        type,
+      });
+    } else {
+      onSave({
+        name: supplierName.trim(),
+        contact: contact.trim() || undefined,
+        note: note.trim() || undefined,
+        type,
+      });
+    }
+    onClose();
+  };
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -270,27 +304,26 @@ function AddPartnerModal({ type, partner, onSave, onClose }: {
           <DialogTitle>{isEdit ? 'Редактировать' : 'Добавить'} {type === 'supplier' ? 'поставщика' : 'получателя'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 pt-2">
-          <div className="space-y-1.5">
-            <Label>{isRecipient ? 'Подразделение / название *' : 'Название *'}</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder={type === 'supplier' ? 'ООО Поставщик' : 'Напр.: 8-я рота'} />
-          </div>
-          {isRecipient && (
+          {isRecipient ? (
             <>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Звание / должность</Label>
-                  <Input value={rank} onChange={e => setRank(e.target.value)} placeholder="кладовщик" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">ФИО получателя</Label>
-                  <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Иванов И.И." />
-                </div>
+              <div className="space-y-1.5">
+                <Label>Структурное подразделение *</Label>
+                <Input value={department} onChange={e => setDepartment(e.target.value)} placeholder="Напр.: 8-я рота" autoFocus />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Подразделение (если отличается)</Label>
-                <Input value={department} onChange={e => setDepartment(e.target.value)} placeholder="Можно оставить пустым" />
+                <Label>Должность / звание</Label>
+                <Input value={rank} onChange={e => setRank(e.target.value)} placeholder="Напр.: кладовщик, ст. сержант" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>ФИО получателя</Label>
+                <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Иванов И.И." />
               </div>
             </>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>Название *</Label>
+              <Input value={supplierName} onChange={e => setSupplierName(e.target.value)} placeholder="ООО Поставщик" autoFocus />
+            </div>
           )}
           <div className="space-y-1.5">
             <Label>Контакт</Label>
@@ -302,22 +335,7 @@ function AddPartnerModal({ type, partner, onSave, onClose }: {
           </div>
           <div className="flex gap-2 pt-1">
             <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
-            <Button
-              disabled={!name.trim()}
-              onClick={() => {
-                onSave({
-                  name: name.trim(),
-                  contact: contact.trim() || undefined,
-                  note: note.trim() || undefined,
-                  rank: isRecipient ? (rank.trim() || undefined) : undefined,
-                  fullName: isRecipient ? (fullName.trim() || undefined) : undefined,
-                  department: isRecipient ? (department.trim() || name.trim() || undefined) : undefined,
-                  type,
-                });
-                onClose();
-              }}
-              className="flex-1"
-            >
+            <Button disabled={!canSave} onClick={handleSave} className="flex-1">
               {isEdit ? 'Сохранить' : 'Добавить'}
             </Button>
           </div>
