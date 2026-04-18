@@ -204,65 +204,9 @@ export type Receipt = {
   attachments?: Attachment[];
 };
 
-export type InvoiceTemplate = {
-  id: string;
-  name: string;
-  companyName: string;
-  companyAddress?: string;
-  companyInn?: string;
-  companyKpp?: string;
-  bankDetails?: string;
-  headerText?: string;
-  footerText?: string;
-  signatory?: string;
-  signatoryRole?: string;
-  logoUrl?: string;
-  createdAt: string;
-  updatedAt: string;
-  elements?: InvElement[];
-  canvasWidth?: number;
-  canvasHeight?: number;
-};
 
-export type InvElementType = 'text' | 'table' | 'line' | 'frame' | 'grid';
 
-export type InvTableCol = { key: string; label: string; width: number; source?: string };
 
-export type InvGridCell = {
-  text: string;
-  colspan?: number;
-  rowspan?: number;
-  bold?: boolean;
-  italic?: boolean;
-  fontSize?: number;
-  align?: 'left' | 'center' | 'right';
-  valign?: 'top' | 'middle' | 'bottom';
-  border?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
-  skip?: boolean;
-};
-
-export type InvElement = {
-  id: string;
-  type: InvElementType;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  text?: string;
-  fontSize?: number;
-  bold?: boolean;
-  italic?: boolean;
-  align?: 'left' | 'center' | 'right';
-  source?: string;
-  columns?: InvTableCol[];
-  lineStyle?: 'solid' | 'dashed' | 'dotted';
-  lineWidth?: number;
-  frameLabel?: string;
-  vertical?: boolean;
-  gridCols?: number[];
-  gridRows?: number[];
-  gridCells?: InvGridCell[][];
-};
 
 // ─── Technician Documents (база данных документов и вложений) ─────────────────
 
@@ -304,7 +248,6 @@ export type AppState = {
   warehouses: Warehouse[];
   warehouseStocks: WarehouseStock[];
   barcodes: Barcode[];
-  invoiceTemplates: InvoiceTemplate[];
   darkMode: boolean;
   defaultLowStockThreshold: number;
   currentUser: string;
@@ -325,7 +268,6 @@ const initialState: AppState = {
   receipts: [],
   techDocs: [],
   barcodes: [],
-  invoiceTemplates: [],
   warehouses: [
     { id: 'wh-1', name: 'Главный склад', address: 'ул. Складская, 1', description: 'Основной склад хранения', createdAt: '2024-01-01' },
     { id: 'wh-2', name: 'Склад №2', address: 'ул. Промышленная, 5', description: 'Дополнительный склад', createdAt: '2024-01-01' },
