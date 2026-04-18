@@ -33,6 +33,9 @@ export function CreateOrderModal({
   const [issuerName, setIssuerName] = useState(editOrder?.issuerName || '');
   const [requesterRank, setRequesterRank] = useState(editOrder?.requesterRank || '');
   const [requesterName, setRequesterName] = useState(editOrder?.requesterName || '');
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState(
+    editOrder?.warehouseId || (state.warehouses?.length === 1 ? state.warehouses[0].id : '')
+  );
   const [lines, setLines] = useState<OrderLine[]>(
     editOrder && editOrder.items.length > 0
       ? editOrder.items.map(oi => {
@@ -50,18 +53,31 @@ export function CreateOrderModal({
       sublabel: [p.rank, p.fullName].filter(Boolean).join(' · ') || p.contact || p.note || undefined,
     })), [state.partners]);
 
-  const itemOptions: AutocompleteOption[] = useMemo(() =>
-    state.items.map(item => {
-      const cat = state.categories.find(c => c.id === item.categoryId);
-      const freeQty = getFreeQty(state, item.id);
-      return {
-        id: item.id,
-        label: item.name,
-        sublabel: cat?.name,
-        badge: `${freeQty} ${item.unit}`,
-        badgeColor: freeQty === 0 ? '#ef4444' : freeQty <= item.lowStockThreshold ? '#f59e0b' : '#10b981',
-      };
-    }), [state]);
+  const itemOptions: AutocompleteOption[] = useMemo(() => {
+    const warehouseItemIds = selectedWarehouseId
+      ? new Set(
+          (state.warehouseStocks || [])
+            .filter(ws => ws.warehouseId === selectedWarehouseId && ws.quantity > 0)
+            .map(ws => ws.itemId)
+        )
+      : null;
+
+    return state.items
+      .filter(item => !warehouseItemIds || warehouseItemIds.has(item.id))
+      .map(item => {
+        const cat = state.categories.find(c => c.id === item.categoryId);
+        const whStock = selectedWarehouseId
+          ? (state.warehouseStocks || []).find(ws => ws.warehouseId === selectedWarehouseId && ws.itemId === item.id)?.quantity ?? 0
+          : getFreeQty(state, item.id);
+        return {
+          id: item.id,
+          label: item.name,
+          sublabel: cat?.name,
+          badge: `${whStock} ${item.unit}`,
+          badgeColor: whStock === 0 ? '#ef4444' : whStock <= item.lowStockThreshold ? '#f59e0b' : '#10b981',
+        };
+      });
+  }, [state, selectedWarehouseId]);
 
   const addLine = () => setLines(l => [...l, { id: generateId(), itemId: '', itemLabel: '', qty: '1' }]);
   const removeLine = (id: string) => setLines(l => l.filter(ln => ln.id !== id));
@@ -187,6 +203,7 @@ export function CreateOrderModal({
         number: number.trim() || editOrder.number,
         title: editOrder.title || '',
         status,
+        warehouseId: selectedWarehouseId || undefined,
         recipientId: finalRecipientId || undefined,
         recipientName: recipientLabel.trim() || undefined,
         receiverRank: receiverRank.trim() || undefined,
@@ -219,6 +236,7 @@ export function CreateOrderModal({
       title: '',
       status,
       createdBy: state.currentUser,
+      warehouseId: selectedWarehouseId || undefined,
       recipientId: finalRecipientId || undefined,
       recipientName: recipientLabel.trim() || undefined,
       receiverRank: receiverRank.trim() || undefined,
@@ -273,6 +291,36 @@ export function CreateOrderModal({
               <Label>Номер</Label>
               <Input value={number} onChange={e => setNumber(e.target.value)} placeholder="ЗС-001" />
             </div>
+
+            {/* Warehouse selector */}
+            {(state.warehouses || []).length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Склад-отправитель</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(state.warehouses || []).map(wh => (
+                    <button
+                      key={wh.id}
+                      type="button"
+                      onClick={() => setSelectedWarehouseId(wh.id === selectedWarehouseId ? '' : wh.id)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all
+                        ${selectedWarehouseId === wh.id
+                          ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                          : 'bg-muted/40 border-border text-foreground hover:bg-muted'
+                        }`}
+                    >
+                      <Icon name="Warehouse" size={14} />
+                      {wh.name}
+                    </button>
+                  ))}
+                </div>
+                {!selectedWarehouseId && (
+                  <p className="text-xs text-warning">Выберите склад — список товаров будет ограничен его остатками</p>
+                )}
+                {selectedWarehouseId && (
+                  <p className="text-xs text-muted-foreground">Показаны только товары с остатком на выбранном складе</p>
+                )}
+              </div>
+            )}
 
             {/* Recipient autocomplete */}
             <div className="space-y-1.5">

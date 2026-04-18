@@ -124,6 +124,28 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
           <Icon name="FileText" size={14} className="text-muted-foreground" />
           <h3 className="font-semibold text-sm">Данные для накладной</h3>
         </div>
+        {(state.warehouses || []).length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Склад-отправитель</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {(state.warehouses || []).map(wh => (
+                <button
+                  key={wh.id}
+                  type="button"
+                  onClick={() => patchOrder({ warehouseId: wh.id === liveOrder.warehouseId ? undefined : wh.id })}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all
+                    ${liveOrder.warehouseId === wh.id
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted/40 border-border text-foreground hover:bg-muted'
+                    }`}
+                >
+                  <Icon name="Warehouse" size={12} />
+                  {wh.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label className="text-xs">Структурное подразделение — получатель</Label>
           <Input
@@ -421,13 +443,16 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
     const totalReq = order.items.reduce((s, i) => s + (i.requiredQty || 0), 0);
     const totalRel = order.items.reduce((s, i) => s + (i.pickedQty || 0), 0);
 
-    const orderWhIds = Array.from(new Set(
-      (state.operations || [])
-        .filter(op => op.orderId === order.id && op.warehouseId)
-        .map(op => op.warehouseId as string)
-    ));
-    const wh = (state.warehouses || []).find(w => w.id === orderWhIds[0])
-      || (state.warehouses || [])[0];
+    const wh = (state.warehouses || []).find(w => w.id === order.warehouseId)
+      || (() => {
+        const orderWhIds = Array.from(new Set(
+          (state.operations || [])
+            .filter(op => op.orderId === order.id && op.warehouseId)
+            .map(op => op.warehouseId as string)
+        ));
+        return (state.warehouses || []).find(w => w.id === orderWhIds[0])
+          || (state.warehouses || [])[0];
+      })();
 
     const values: Record<string, string> = {
       number: order.number || '',

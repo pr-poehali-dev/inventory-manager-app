@@ -136,6 +136,7 @@ export type WorkOrder = {
   title: string;
   status: OrderStatus;
   createdBy: string;
+  warehouseId?: string;
   recipientId?: string;
   recipientName?: string;
   receiverRank?: string;
