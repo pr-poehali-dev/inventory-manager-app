@@ -19,8 +19,6 @@ import AuditPage from '@/pages/AuditPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import InvoiceTemplatePage from '@/pages/InvoiceTemplatePage';
 import { AuthContext, AuthUser, apiLogin, apiLogout, apiMe, setToken, getToken } from '@/data/auth';
-import LoginPage from '@/pages/LoginPage';
-import Icon from '@/components/ui/icon';
 
 const POLL_INTERVAL = 5000;
 
@@ -33,16 +31,22 @@ function parseQRParams() {
   };
 }
 
+const GUEST_USER: AuthUser = {
+  id: 'guest',
+  username: 'guest',
+  displayName: 'Гость',
+  role: 'admin',
+};
+
 export default function App() {
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(GUEST_USER);
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
     const token = getToken();
-    if (!token) { setAuthLoading(false); return; }
+    if (!token) return;
     apiMe().then(user => {
-      setAuthUser(user);
-      setAuthLoading(false);
+      if (user) setAuthUser(user);
     });
   }, []);
 
@@ -57,7 +61,7 @@ export default function App() {
 
   const logout = async () => {
     await apiLogout();
-    setAuthUser(null);
+    setAuthUser(GUEST_USER);
   };
 
   const refreshAuth = async () => {
@@ -228,13 +232,6 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={authCtx}>
-      {authLoading ? (
-        <div className="min-h-screen flex items-center justify-center">
-          <Icon name="Loader2" size={32} className="animate-spin text-primary" />
-        </div>
-      ) : !authUser ? (
-        <LoginPage />
-      ) : (
       <TooltipProvider>
         <Toaster position="top-right" />
         <Layout
@@ -261,7 +258,6 @@ export default function App() {
           {page === 'settings'     && <SettingsPage state={state} onStateChange={handleStateChange} />}
         </Layout>
       </TooltipProvider>
-      )}
     </AuthContext.Provider>
   );
 }
