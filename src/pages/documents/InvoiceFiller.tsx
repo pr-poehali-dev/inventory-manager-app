@@ -291,79 +291,90 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
         const allNum = rows.length > 0 && rows.every(r => r[ci] === '' || !isNaN(parseFloat(r[ci])));
         return allNum && nums.some(n => n > 0) ? nums.reduce((a, b) => a + b, 0) : null;
       });
-      const hasGrid = elements.some(e => e.type === 'grid');
-      const ROW_H = el.h && rows.length > 0 ? Math.floor(el.h / rows.length) : 18;
-      const cellStyle: React.CSSProperties = {
-        position: 'absolute',
-        background: 'transparent',
-        backgroundColor: 'transparent',
-        border: 'none',
-        outline: 'none',
-        padding: '0 2px',
-        margin: 0,
-        boxShadow: 'none',
-        appearance: 'none',
-        WebkitAppearance: 'none',
-        fontFamily: "'Times New Roman', serif",
-        fontSize: 9,
-        textAlign: 'center',
-        lineHeight: `${ROW_H}px`,
-        height: ROW_H,
-        color: 'inherit',
-      };
+      const gridEl = elements.find(e => e.type === 'grid');
+      const hasGrid = !!gridEl;
+
+      // Высота строки: берём из grid если есть — ищем строки ниже el.y
+      // Иначе — стандартная высота из Excel строк (~15px)
+      const ROW_H = (() => {
+        if (gridEl?.gridRows && gridEl.gridRows.length > 0) {
+          // Находим ряды grid, которые лежат в зоне таблицы (el.y .. el.y+el.h)
+          let cumY = gridEl.y || 0;
+          for (let i = 0; i < gridEl.gridRows.length; i++) {
+            const rh = gridEl.gridRows[i];
+            if (cumY >= el.y && rh > 2) return rh; // первая строка данных
+            cumY += rh;
+          }
+        }
+        return 16;
+      })();
 
       if (hasGrid) {
-        // Рисуем строки как абсолютно позиционированные инпуты поверх grid
-        let colOffset = 0;
+        // Рисуем каждую строку товаров как набор абсолютно позиционированных инпутов
+        // без блочного контейнера — чтобы не перекрывать линии grid
+        const inputBase: React.CSSProperties = {
+          position: 'absolute',
+          background: 'transparent',
+          backgroundColor: 'transparent',
+          border: 'none',
+          outline: 'none',
+          padding: '0 2px',
+          margin: 0,
+          boxShadow: 'none',
+          appearance: 'none',
+          WebkitAppearance: 'none',
+          fontFamily: "'Times New Roman', serif",
+          fontSize: 9,
+          textAlign: 'center',
+          height: ROW_H,
+          lineHeight: `${ROW_H}px`,
+          color: 'inherit',
+          zIndex: 10,
+        };
+
+        // Вычисляем смещения колонок один раз
+        const colOffsets = cols.reduce<number[]>((acc, c, i) => {
+          acc.push(i === 0 ? 0 : acc[i - 1] + cols[i - 1].width);
+          return acc;
+        }, []);
+
         return (
-          <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, height: el.h, zIndex: 10, pointerEvents: 'none' }}>
+          <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, height: el.h, pointerEvents: 'none', zIndex: 10 }}>
             {rows.map((row, ri) => (
-              <div key={ri} style={{ position: 'relative', height: ROW_H, pointerEvents: 'auto' }} className="group">
-                {(() => { colOffset = 0; return null; })()}
-                {row.map((cell, ci) => {
-                  const cw = cols[ci]?.width || 60;
-                  const left = colOffset;
-                  colOffset += cw;
-                  return (
-                    <input
-                      key={ci}
-                      className="invoice-input"
-                      value={cell}
-                      onChange={e => updCell(el.id, ri, ci, e.target.value)}
-                      style={{ ...cellStyle, left, width: cw }}
-                    />
-                  );
-                })}
+              <div key={ri} className="group" style={{ position: 'absolute', top: ri * ROW_H, left: 0, width: el.w, height: ROW_H, pointerEvents: 'auto' }}>
+                {row.map((cell, ci) => (
+                  <input
+                    key={ci}
+                    className="invoice-input"
+                    value={cell}
+                    onChange={e => updCell(el.id, ri, ci, e.target.value)}
+                    style={{ ...inputBase, left: colOffsets[ci], width: cols[ci]?.width || 60 }}
+                  />
+                ))}
                 {editing && (
                   <button
                     onClick={() => removeRow(el.id, ri)}
-                    className="invoice-row-del absolute -right-6 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ pointerEvents: 'auto' }}
+                    className="invoice-row-del"
+                    style={{ position: 'absolute', right: -24, top: '50%', transform: 'translateY(-50%)', width: 20, height: 20, borderRadius: '50%', background: '#ef4444', color: '#fff', fontSize: 12, border: 'none', cursor: 'pointer', opacity: 0, transition: 'opacity 0.15s', pointerEvents: 'auto' }}
                     title="Удалить строку"
                   >×</button>
                 )}
               </div>
             ))}
             {totals.some(t => t !== null) && (
-              <div style={{ position: 'relative', height: ROW_H, pointerEvents: 'none' }}>
-                {(() => { colOffset = 0; return null; })()}
-                {totals.map((t, ci) => {
-                  const cw = cols[ci]?.width || 60;
-                  const left = colOffset;
-                  colOffset += cw;
-                  return (
-                    <span key={ci} style={{ ...cellStyle, left, width: cw, fontWeight: 'bold', display: 'block' }}>
-                      {ci === 0 ? 'Итого' : (t !== null ? t : '')}
-                    </span>
-                  );
-                })}
+              <div style={{ position: 'absolute', top: rows.length * ROW_H, left: 0, width: el.w, height: ROW_H, pointerEvents: 'none' }}>
+                {totals.map((t, ci) => (
+                  <span key={ci} style={{ ...inputBase, position: 'absolute', left: colOffsets[ci], width: cols[ci]?.width || 60, fontWeight: 'bold', display: 'block' }}>
+                    {ci === 0 ? 'Итого' : (t !== null ? t : '')}
+                  </span>
+                ))}
               </div>
             )}
             {editing && (
               <button
                 onClick={() => addRow(el.id)}
-                className="invoice-add-row w-full py-1 text-xs border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50 rounded"
-                style={{ pointerEvents: 'auto', position: 'relative', marginTop: 2 }}
+                className="invoice-add-row"
+                style={{ position: 'absolute', top: (rows.length + (totals.some(t => t !== null) ? 1 : 0)) * ROW_H + 2, left: 0, width: '100%', padding: '2px 0', fontSize: 11, border: '1px dashed #60a5fa', color: '#2563eb', background: 'transparent', cursor: 'pointer', borderRadius: 3, pointerEvents: 'auto' }}
               >+ Добавить строку</button>
             )}
           </div>
@@ -508,6 +519,9 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
           <span>{Math.round(zoom * 100)}%</span>
           <Button variant="ghost" size="sm" onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}><Icon name="ZoomIn" size={14} /></Button>
         </div>
+        <Button variant="ghost" size="sm" title="Сбросить все поля к исходным значениям" onClick={() => { setValues(initValues()); setTableValues(initTableValues()); }} className="gap-1.5 text-gray-500">
+          <Icon name="RotateCcw" size={14} />Сбросить
+        </Button>
         <Button variant={editing ? 'default' : 'outline'} size="sm" onClick={() => setEditing(p => !p)} className="gap-1.5">
           <Icon name={editing ? 'Eye' : 'Pencil'} size={14} />{editing ? 'Просмотр' : 'Редактировать'}
         </Button>
