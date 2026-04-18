@@ -505,14 +505,32 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
       const cleanStyle = doc.createElement('style');
       cleanStyle.id = '__clean_bind_style';
       cleanStyle.textContent = `
-        [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; }
+        [data-bind], [data-bindable-hover] {
+          background: transparent !important;
+          outline: none !important;
+          height: auto !important;
+          min-height: 0 !important;
+          line-height: 1.15 !important;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          vertical-align: baseline !important;
+        }
         *, *::before, *::after {
           outline: none !important;
         }
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
           html, body { margin: 0 !important; background: #fff !important; }
-          [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; }
+          [data-bind], [data-bindable-hover] {
+            background: transparent !important;
+            outline: none !important;
+            height: auto !important;
+            min-height: 0 !important;
+            line-height: 1.15 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            vertical-align: baseline !important;
+          }
           * { outline: none !important; }
         }
       `;
