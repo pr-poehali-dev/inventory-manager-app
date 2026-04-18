@@ -174,7 +174,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
     const serif = "'Times New Roman', serif";
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Накладная ${order.number}</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:${serif};position:relative;width:${CW}px;height:${CH}px;padding:0}
-.el{position:absolute}.tbl{border-collapse:collapse;width:100%}.tbl th,.tbl td{border:1px solid #000;padding:2pt 4pt;font-size:9pt}
+.el{position:absolute}.tbl{border-collapse:collapse;width:100%;background:transparent}.tbl th,.tbl td{border:none;background:transparent;padding:2pt 4pt;font-size:9pt}
 @media print{@page{size:landscape;margin:6mm}body{width:100%;height:auto}}</style></head><body>`;
 
     elements.forEach(el => {
@@ -254,15 +254,14 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
   const renderElement = (el: InvElement) => {
     if (el.type === 'text') {
       const val = values[el.id] || '';
-      const isEmpty = !val && !el.source;
       return (
         <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, fontFamily: "'Times New Roman', serif", fontSize: el.fontSize, fontWeight: el.bold ? 'bold' : 'normal', fontStyle: el.italic ? 'italic' : 'normal', textAlign: el.align || 'left', lineHeight: 1.3, minHeight: el.h }}>
           {editing ? (
             <input value={val} onChange={e => updVal(el.id, e.target.value)}
-              className="invoice-input-underline w-full bg-transparent border-b border-transparent outline-none px-0.5 focus:border-gray-400"
-              style={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 'inherit', textAlign: 'inherit' }} />
+              className="invoice-input-underline w-full outline-none px-0.5 focus:bg-blue-50/30"
+              style={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 'inherit', textAlign: 'inherit', background: 'transparent', border: 'none' }} />
           ) : (
-            <span className="border-b border-black inline-block w-full" style={{ minHeight: '1.1em' }}>{val || '\u00A0'}</span>
+            <span className="inline-block w-full" style={{ minHeight: '1.1em', background: 'transparent' }}>{val || '\u00A0'}</span>
           )}
         </div>
       );
@@ -278,21 +277,21 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
       });
       return (
         <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w }}>
-          <table className="w-full border-collapse" style={{ fontFamily: "'Times New Roman', serif", fontSize: 9, border: '1px solid #000' }}>
+          <table className="w-full border-collapse" style={{ fontFamily: "'Times New Roman', serif", fontSize: 9, background: 'transparent' }}>
             <thead>
-              <tr>{cols.map(c => <th key={c.key} className="border border-black px-1 py-0.5 text-center" style={{ width: c.width, fontSize: 8 }}>{c.label}</th>)}</tr>
+              <tr>{cols.map(c => <th key={c.key} className="px-1 py-0.5 text-center" style={{ width: c.width, fontSize: 8, background: 'transparent', border: 'none' }}>{c.label}</th>)}</tr>
             </thead>
             <tbody>
               {rows.map((row, ri) => (
                 <tr key={ri} className="group relative">
                   {row.map((cell, ci) => (
-                    <td key={ci} className="border border-black px-1 py-0.5 relative">
+                    <td key={ci} className="px-1 py-0.5 relative" style={{ background: 'transparent', border: 'none' }}>
                       {editing ? (
                         <input value={cell} onChange={e => updCell(el.id, ri, ci, e.target.value)}
-                          className="invoice-input w-full bg-transparent border-0 outline-none text-center px-0"
-                          style={{ fontSize: 'inherit', fontFamily: 'inherit' }} />
+                          className="invoice-input w-full outline-none text-center px-0"
+                          style={{ fontSize: 'inherit', fontFamily: 'inherit', background: 'transparent', border: 'none' }} />
                       ) : (
-                        <span className="block text-center">{cell || '\u00A0'}</span>
+                        <span className="block text-center" style={{ background: 'transparent' }}>{cell || '\u00A0'}</span>
                       )}
                       {editing && ci === row.length - 1 && (
                         <button
@@ -308,7 +307,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
               {totals.some(t => t !== null) && (
                 <tr className="font-bold">
                   {totals.map((t, ci) => (
-                    <td key={ci} className="border border-black px-1 py-0.5 text-center">{ci === 0 ? 'Итого' : (t !== null ? t : '')}</td>
+                    <td key={ci} className="px-1 py-0.5 text-center" style={{ background: 'transparent', border: 'none' }}>{ci === 0 ? 'Итого' : (t !== null ? t : '')}</td>
                   ))}
                 </tr>
               )}
@@ -390,11 +389,14 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
 
   return (
     <div className="h-full flex flex-col bg-gray-200 overflow-hidden">
-      <style>{`@media print {
-        .invoice-toolbar, .invoice-row-del, .invoice-add-row { display: none !important; }
-        .invoice-input { border: none !important; background: transparent !important; box-shadow: none !important; }
-        .invoice-input-underline { border-bottom: 1px solid #000 !important; background: transparent !important; }
-      }`}</style>
+      <style>{`
+        .invoice-input, .invoice-input-underline { background: transparent !important; }
+        .invoice-input:focus, .invoice-input-underline:focus { background: rgba(59, 130, 246, 0.06) !important; }
+        @media print {
+          .invoice-toolbar, .invoice-row-del, .invoice-add-row { display: none !important; }
+          .invoice-input, .invoice-input-underline { border: none !important; background: transparent !important; box-shadow: none !important; outline: none !important; }
+        }
+      `}</style>
       <div className="invoice-toolbar flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-300 shrink-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
         <Button variant="outline" size="sm" onClick={onClose} className="gap-1.5"><Icon name="ArrowLeft" size={14} />Назад</Button>
         <span className="text-sm font-medium">{template.name} — {'\u2116'}{order.number}</span>
