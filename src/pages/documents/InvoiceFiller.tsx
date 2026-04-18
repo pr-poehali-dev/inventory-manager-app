@@ -257,9 +257,13 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
       return (
         <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, fontFamily: "'Times New Roman', serif", fontSize: el.fontSize, fontWeight: el.bold ? 'bold' : 'normal', fontStyle: el.italic ? 'italic' : 'normal', textAlign: el.align || 'left', lineHeight: 1.3, minHeight: el.h, zIndex: 10 }}>
           {editing ? (
-            <input value={val} onChange={e => updVal(el.id, e.target.value)}
-              className="invoice-input-underline w-full outline-none px-0.5 focus:bg-blue-50/30"
-              style={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 'inherit', textAlign: 'inherit', background: 'transparent', border: 'none' }} />
+            <span
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={e => updVal(el.id, e.currentTarget.textContent || '')}
+              className="invoice-input-underline block outline-none"
+              style={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 'inherit', textAlign: 'inherit', minHeight: '1em', cursor: 'text' }}
+            >{val}</span>
           ) : (
             <span className="inline-block w-full" style={{ minHeight: '1.1em', background: 'transparent' }}>{val || '\u00A0'}</span>
           )}
@@ -275,21 +279,33 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
         const allNum = rows.length > 0 && rows.every(r => r[ci] === '' || !isNaN(parseFloat(r[ci])));
         return allNum && nums.some(n => n > 0) ? nums.reduce((a, b) => a + b, 0) : null;
       });
+      const hasGridTemplate = elements.some(e => e.type === 'grid');
       return (
-        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w }}>
-          <table className="w-full border-collapse" style={{ fontFamily: "'Times New Roman', serif", fontSize: 9, background: 'transparent' }}>
-            <thead>
-              <tr>{cols.map(c => <th key={c.key} className="px-1 py-0.5 text-center" style={{ width: c.width, fontSize: 8, background: 'transparent', border: 'none' }}>{c.label}</th>)}</tr>
-            </thead>
-            <tbody>
+        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, zIndex: 10, background: 'transparent' }}>
+          <table className="w-full" style={{ fontFamily: "'Times New Roman', serif", fontSize: 9, background: 'transparent', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
+            {!hasGridTemplate && (
+              <thead style={{ background: 'transparent' }}>
+                <tr style={{ background: 'transparent' }}>
+                  {cols.map(c => <th key={c.key} className="px-1 py-0.5 text-center" style={{ width: c.width, fontSize: 8, background: 'transparent', border: 'none' }}>{c.label}</th>)}
+                </tr>
+              </thead>
+            )}
+            <colgroup>
+              {cols.map(c => <col key={c.key} style={{ width: c.width }} />)}
+            </colgroup>
+            <tbody style={{ background: 'transparent' }}>
               {rows.map((row, ri) => (
-                <tr key={ri} className="group relative">
+                <tr key={ri} className="group relative" style={{ background: 'transparent' }}>
                   {row.map((cell, ci) => (
-                    <td key={ci} className="px-1 py-0.5 relative" style={{ background: 'transparent', border: 'none' }}>
+                    <td key={ci} className="px-1 py-0.5 relative" style={{ background: 'transparent', border: 'none', verticalAlign: 'middle' }}>
                       {editing ? (
-                        <input value={cell} onChange={e => updCell(el.id, ri, ci, e.target.value)}
-                          className="invoice-input w-full outline-none text-center px-0"
-                          style={{ fontSize: 'inherit', fontFamily: 'inherit', background: 'transparent', border: 'none' }} />
+                        <span
+                          contentEditable
+                          suppressContentEditableWarning
+                          onBlur={e => updCell(el.id, ri, ci, e.currentTarget.textContent || '')}
+                          className="invoice-input block text-center outline-none"
+                          style={{ fontSize: 'inherit', fontFamily: 'inherit', minHeight: '1em', cursor: 'text' }}
+                        >{cell}</span>
                       ) : (
                         <span className="block text-center" style={{ background: 'transparent' }}>{cell || '\u00A0'}</span>
                       )}
@@ -305,7 +321,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
                 </tr>
               ))}
               {totals.some(t => t !== null) && (
-                <tr className="font-bold">
+                <tr className="font-bold" style={{ background: 'transparent' }}>
                   {totals.map((t, ci) => (
                     <td key={ci} className="px-1 py-0.5 text-center" style={{ background: 'transparent', border: 'none' }}>{ci === 0 ? 'Итого' : (t !== null ? t : '')}</td>
                   ))}
@@ -391,22 +407,29 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
     <div className="h-full flex flex-col bg-gray-200 overflow-hidden">
       <style>{`
         .invoice-input, .invoice-input-underline {
+          background-color: transparent !important;
           background: transparent !important;
           border: none !important;
           outline: none !important;
           box-shadow: none !important;
           -webkit-appearance: none !important;
+          -moz-appearance: none !important;
           appearance: none !important;
           padding: 0 2px !important;
           margin: 0 !important;
           height: auto !important;
           line-height: inherit !important;
+          color: inherit !important;
         }
-        .invoice-input:focus, .invoice-input-underline:focus { background: rgba(59, 130, 246, 0.08) !important; }
-        .invoice-input:hover, .invoice-input-underline:hover { background: rgba(59, 130, 246, 0.04); }
+        .invoice-input:-webkit-autofill, .invoice-input-underline:-webkit-autofill {
+          -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+          transition: background-color 99999s ease-in-out 0s !important;
+        }
+        .invoice-input:focus, .invoice-input-underline:focus { background-color: rgba(59, 130, 246, 0.08) !important; }
+        .invoice-input:hover, .invoice-input-underline:hover { background-color: rgba(59, 130, 246, 0.04) !important; }
         @media print {
           .invoice-toolbar, .invoice-row-del, .invoice-add-row { display: none !important; }
-          .invoice-input, .invoice-input-underline { background: transparent !important; }
+          .invoice-input, .invoice-input-underline { background: transparent !important; background-color: transparent !important; }
         }
       `}</style>
       <div className="invoice-toolbar flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-300 shrink-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
