@@ -29,8 +29,6 @@ export function CreateOrderModal({
   const [recipientId, setRecipientId] = useState(editOrder?.recipientId || '');
   const [receiverRank, setReceiverRank] = useState(editOrder?.receiverRank || '');
   const [receiverName, setReceiverName] = useState(editOrder?.receiverName || '');
-  const [issuerRank, setIssuerRank] = useState(editOrder?.issuerRank || '');
-  const [issuerName, setIssuerName] = useState(editOrder?.issuerName || '');
   const [requesterRank, setRequesterRank] = useState(editOrder?.requesterRank || '');
   const [requesterName, setRequesterName] = useState(editOrder?.requesterName || '');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState(
@@ -208,8 +206,8 @@ export function CreateOrderModal({
         recipientName: recipientLabel.trim() || undefined,
         receiverRank: receiverRank.trim() || undefined,
         receiverName: receiverName.trim() || undefined,
-        issuerRank: issuerRank.trim() || undefined,
-        issuerName: issuerName.trim() || undefined,
+        issuerRank: undefined,
+        issuerName: undefined,
         requesterRank: requesterRank.trim() || undefined,
         requesterName: requesterName.trim() || undefined,
         comment: comment.trim() || undefined,
@@ -241,8 +239,6 @@ export function CreateOrderModal({
       recipientName: recipientLabel.trim() || undefined,
       receiverRank: receiverRank.trim() || undefined,
       receiverName: receiverName.trim() || undefined,
-      issuerRank: issuerRank.trim() || undefined,
-      issuerName: issuerName.trim() || undefined,
       requesterRank: requesterRank.trim() || undefined,
       requesterName: requesterName.trim() || undefined,
       comment: comment.trim() || undefined,
@@ -382,24 +378,6 @@ export function CreateOrderModal({
                 <div className="space-y-1.5">
                   <Label className="text-xs">ФИО (расшифровка подписи)</Label>
                   <Input value={receiverName} onChange={e => setReceiverName(e.target.value)} placeholder="Иванов И.И." />
-                </div>
-              </div>
-            </div>
-
-            {/* Issuer / signer for invoice */}
-            <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                <Icon name="PenLine" size={12} />
-                Подписант (кто выдаёт / отпускает)
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Должность</Label>
-                  <Input value={issuerRank} onChange={e => setIssuerRank(e.target.value)} placeholder="Напр.: начальник склада" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">ФИО подписанта</Label>
-                  <Input value={issuerName} onChange={e => setIssuerName(e.target.value)} placeholder="Петров П.П." />
                 </div>
               </div>
             </div>

@@ -218,9 +218,27 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
           const item = state.items.find(i => i.id === oi.itemId);
           if (!item) return null;
           const remaining = oi.requiredQty - oi.pickedQty;
-          const locStocks = (state.locationStocks || []).filter(ls => ls.itemId === item.id && ls.quantity > 0);
+          const orderWhId = liveOrder.warehouseId;
+          const allLocStocks = (state.locationStocks || []).filter(ls => ls.itemId === item.id && ls.quantity > 0);
+          // Локации только выбранного склада заявки
+          const locStocks = orderWhId
+            ? allLocStocks.filter(ls => {
+                const loc = state.locations.find(l => l.id === ls.locationId);
+                return loc?.warehouseId === orderWhId;
+              })
+            : allLocStocks;
           const totalAvailable = locStocks.reduce((s, ls) => s + ls.quantity, 0);
           const isInsufficient = totalAvailable < remaining && oi.status !== 'done';
+          // Подсказка по другим складам
+          const otherWarehouseStocks = orderWhId
+            ? (state.warehouseStocks || [])
+                .filter(ws => ws.itemId === item.id && ws.warehouseId !== orderWhId && ws.quantity > 0)
+                .map(ws => {
+                  const wh = (state.warehouses || []).find(w => w.id === ws.warehouseId);
+                  return wh ? { name: wh.name, qty: ws.quantity } : null;
+                })
+                .filter((x): x is { name: string; qty: number } => !!x)
+            : [];
           const pct = Math.min(100, Math.round((oi.pickedQty / oi.requiredQty) * 100));
           const cat = state.categories.find(c => c.id === item.categoryId);
 
@@ -258,9 +276,19 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
                     <div className={`h-full rounded-full transition-all ${oi.status === 'done' ? 'bg-success' : 'bg-primary'}`} style={{ width: `${pct}%` }} />
                   </div>
                   {isInsufficient && (
-                    <div className="flex items-center gap-1.5 mt-2 text-[11px] text-warning">
-                      <Icon name="AlertTriangle" size={12} />
-                      Не хватает {remaining - totalAvailable} {item.unit}
+                    <div className="mt-2 p-2 rounded-lg bg-warning/10 border border-warning/20 text-[11px] text-warning space-y-0.5">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <Icon name="AlertTriangle" size={12} />
+                        {orderWhId
+                          ? <>На этом складе больше нет · не хватает {remaining - totalAvailable} {item.unit}</>
+                          : <>Не хватает {remaining - totalAvailable} {item.unit}</>
+                        }
+                      </div>
+                      {otherWarehouseStocks.length > 0 && (
+                        <div className="text-muted-foreground">
+                          Есть на других складах: {otherWarehouseStocks.map(s => `${s.name} (${s.qty} ${item.unit})`).join(', ')}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -463,8 +491,8 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
       receiverDept: order.recipientName || '',
       institution: wh?.institution || '',
       senderDeptProfile: wh?.senderDept || '',
-      issuerRank: order.issuerRank || wh?.issuerRank || '',
-      issuerName: order.issuerName || wh?.issuerName || '',
+      issuerRank: wh?.issuerRank || '',
+      issuerName: wh?.issuerName || '',
       requesterRank: order.requesterRank || '',
       requesterName: order.requesterName || '',
       receiverRank: order.receiverRank || '',

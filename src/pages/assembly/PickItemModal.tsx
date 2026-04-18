@@ -24,18 +24,36 @@ export default function PickItemModal({
   const [selectedLocation, setSelectedLocation] = useState('');
   const [qty, setQty] = useState(String(remaining));
 
+  const orderWhId = order.warehouseId;
   const locStocksReal = (state.locationStocks || [])
     .filter(ls => ls.itemId === item.id && ls.quantity > 0)
     .map(ls => ({ ...ls, location: state.locations.find(l => l.id === ls.locationId) }))
-    .filter(ls => ls.location);
+    .filter(ls => ls.location)
+    // Если в заявке задан склад — показываем только локации этого склада
+    .filter(ls => !orderWhId || ls.location?.warehouseId === orderWhId);
 
   const hasStocksInLocations = locStocksReal.length > 0;
   const itemDefaultLoc = item.locationId ? state.locations.find(l => l.id === item.locationId) : null;
+  const itemDefaultLocMatchesWh = !orderWhId || itemDefaultLoc?.warehouseId === orderWhId;
   const locStocks = hasStocksInLocations
     ? locStocksReal
-    : (item.quantity > 0 && itemDefaultLoc)
+    : (item.quantity > 0 && itemDefaultLoc && itemDefaultLocMatchesWh)
       ? [{ itemId: item.id, locationId: item.locationId, quantity: item.quantity, location: itemDefaultLoc }]
       : [];
+
+  // Остатки на других складах — для подсказки
+  const otherWarehouseStocks = orderWhId
+    ? (state.warehouseStocks || [])
+        .filter(ws => ws.itemId === item.id && ws.warehouseId !== orderWhId && ws.quantity > 0)
+        .map(ws => {
+          const wh = (state.warehouses || []).find(w => w.id === ws.warehouseId);
+          return wh ? { name: wh.name, qty: ws.quantity } : null;
+        })
+        .filter((x): x is { name: string; qty: number } => !!x)
+    : [];
+  const orderWhName = orderWhId ? (state.warehouses || []).find(w => w.id === orderWhId)?.name : '';
+  const totalOnOrderWh = locStocksReal.reduce((s, ls) => s + ls.quantity, 0);
+  const lackQty = Math.max(0, remaining - totalOnOrderWh);
 
   const locStock = selectedLocation
     ? (hasStocksInLocations ? getLocationStock(state, item.id, selectedLocation) : item.quantity)
@@ -103,24 +121,36 @@ export default function PickItemModal({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Выберите склад и стеллаж</Label>
-            {(state.warehouseStocks || []).filter(ws => ws.itemId === item.id && ws.quantity > 0).length > 0 && (
+            <Label>
+              {orderWhId ? <>Стеллажи склада «{orderWhName}»</> : 'Выберите склад и стеллаж'}
+            </Label>
+            {orderWhId && (
               <div className="flex flex-wrap gap-1.5 mb-1">
-                {(state.warehouseStocks || [])
-                  .filter(ws => ws.itemId === item.id && ws.quantity > 0)
-                  .map(ws => {
-                    const wh = (state.warehouses || []).find(w => w.id === ws.warehouseId);
-                    return wh ? (
-                      <span key={ws.warehouseId} className="text-[11px] bg-primary/8 border border-primary/20 px-2 py-0.5 rounded-full text-primary font-medium">
-                        {wh.name}: {ws.quantity} {item.unit}
-                      </span>
-                    ) : null;
-                  })}
+                <span className="text-[11px] bg-primary/10 border border-primary/25 px-2 py-0.5 rounded-full text-primary font-semibold">
+                  <Icon name="Warehouse" size={10} className="inline -mt-0.5 mr-1" />
+                  {orderWhName}: {totalOnOrderWh} {item.unit}
+                </span>
+              </div>
+            )}
+            {lackQty > 0 && orderWhId && (
+              <div className="p-2.5 rounded-lg bg-warning/10 border border-warning/25 text-xs text-warning space-y-0.5">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Icon name="AlertTriangle" size={12} />
+                  На складе «{orderWhName}» не хватает {lackQty} {item.unit}
+                </div>
+                {otherWarehouseStocks.length > 0 ? (
+                  <div className="text-muted-foreground">
+                    Есть на других складах: {otherWarehouseStocks.map(s => `${s.name} (${s.qty} ${item.unit})`).join(', ')}. Перемести товар или измени склад в заявке.
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground">На других складах тоже нет — нужно оприходовать поступление.</div>
+                )}
               </div>
             )}
             {locStocks.length === 0 ? (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive flex items-center gap-2">
-                <Icon name="AlertCircle" size={14} />Нет в наличии на складе
+                <Icon name="AlertCircle" size={14} />
+                {orderWhId ? <>Нет в наличии на складе «{orderWhName}»</> : 'Нет в наличии на складе'}
               </div>
             ) : (
               <div className="space-y-2">
