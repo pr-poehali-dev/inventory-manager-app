@@ -134,6 +134,24 @@ export function OrderDetail({ order, state, onStateChange, onBack }: {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
+            <Label className="text-xs">Затребовал — звание / должность</Label>
+            <Input
+              value={liveOrder.requesterRank || ''}
+              onChange={e => patchOrder({ requesterRank: e.target.value })}
+              placeholder="Напр.: командир взвода"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Затребовал — ФИО</Label>
+            <Input
+              value={liveOrder.requesterName || ''}
+              onChange={e => patchOrder({ requesterName: e.target.value })}
+              placeholder="Сидоров С.С."
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
             <Label className="text-xs">Получил — звание / должность</Label>
             <Input
               value={liveOrder.receiverRank || ''}
