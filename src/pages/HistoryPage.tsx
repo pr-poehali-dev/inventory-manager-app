@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import { AppState } from '@/data/store';
+import { AppState, OperationType } from '@/data/store';
 import { exportOperationsToExcel } from '@/utils/exportExcel';
 
 type Props = {
@@ -20,6 +20,23 @@ export default function HistoryPage({ state }: Props) {
   // Pre-build item map for O(1) lookup instead of nested finds
   const itemMap = useMemo(() => new Map(state.items.map(i => [i.id, i])), [state.items]);
   const categoryMap = useMemo(() => new Map(state.categories.map(c => [c.id, c])), [state.categories]);
+  const warehouseMap = useMemo(() => new Map((state.warehouses || []).map(w => [w.id, w])), [state.warehouses]);
+  const partnerByName = useMemo(() => new Map((state.partners || []).map(p => [p.name, p])), [state.partners]);
+  const orderMap = useMemo(() => new Map((state.workOrders || []).map(o => [o.id, o])), [state.workOrders]);
+
+  const getFromTo = (op: { type: OperationType; from?: string; to?: string; warehouseId?: string; orderId?: string }) => {
+    const warehouse = op.warehouseId ? warehouseMap.get(op.warehouseId) : undefined;
+    if (op.type === 'in') {
+      return { fromLabel: op.from || '—', toLabel: warehouse?.name || '—' };
+    }
+    // out
+    const fromLabel = warehouse?.name || '—';
+    const order = op.orderId ? orderMap.get(op.orderId) : undefined;
+    const recipientName = order?.recipientName || op.to || '';
+    const partner = recipientName ? partnerByName.get(recipientName) : undefined;
+    const toLabel = partner?.department || recipientName || '—';
+    return { fromLabel, toLabel };
+  };
 
   const enriched = useMemo(() => {
     return (state.operations || [])
@@ -52,6 +69,45 @@ export default function HistoryPage({ state }: Props) {
   const totalIn = enriched.filter(o => o.type === 'in').reduce((s, o) => s + o.quantity, 0);
   const totalOut = enriched.filter(o => o.type === 'out').reduce((s, o) => s + o.quantity, 0);
 
+  // Итого по товарам за ВСЁ время (расход), с разбивкой по подразделениям
+  const totalsAllTime = useMemo(() => {
+    type Row = {
+      itemId: string;
+      itemName: string;
+      unit: string;
+      totalOut: number;
+      byDept: Map<string, number>;
+    };
+    const rows = new Map<string, Row>();
+    const allDepts = new Set<string>();
+
+    (state.operations || []).forEach(op => {
+      if (op.type !== 'out') return;
+      const item = itemMap.get(op.itemId);
+      if (!item) return;
+      const order = op.orderId ? orderMap.get(op.orderId) : undefined;
+      const recipientName = order?.recipientName || op.to || '';
+      const partner = recipientName ? partnerByName.get(recipientName) : undefined;
+      const dept = partner?.department || recipientName || 'Без подразделения';
+      allDepts.add(dept);
+
+      let row = rows.get(op.itemId);
+      if (!row) {
+        row = { itemId: op.itemId, itemName: item.name, unit: item.unit, totalOut: 0, byDept: new Map() };
+        rows.set(op.itemId, row);
+      }
+      row.totalOut += op.quantity;
+      row.byDept.set(dept, (row.byDept.get(dept) || 0) + op.quantity);
+    });
+
+    const depts = Array.from(allDepts).sort((a, b) => a.localeCompare(b, 'ru'));
+    const list = Array.from(rows.values()).sort((a, b) => b.totalOut - a.totalOut);
+    return { depts, list };
+  }, [state.operations, itemMap, orderMap, partnerByName]);
+
+  const [showTotals, setShowTotals] = useState(false);
+  const [totalsDeptFilter, setTotalsDeptFilter] = useState<string>('all');
+
   const activeFilters = [typeFilter !== 'all', dateFrom !== '', dateTo !== '', categoryFilter !== 'all', search !== '', warehouseFilter !== 'all'].filter(Boolean).length;
 
   const resetFilters = () => {
@@ -68,17 +124,20 @@ export default function HistoryPage({ state }: Props) {
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => {
-          const itemMap = new Map(state.items.map(i => [i.id, i.name]));
-          exportOperationsToExcel(state.operations.map(op => ({
-            date: new Date(op.date).toLocaleString('ru'),
-            item: itemMap.get(op.itemId) || op.itemId,
-            type: op.type === 'in' ? 'Приход' : 'Расход',
-            quantity: op.quantity,
-            from: op.from || '',
-            to: op.to || '',
-            performedBy: op.performedBy,
-            comment: op.comment,
-          })));
+          const itemNameMap = new Map(state.items.map(i => [i.id, i.name]));
+          exportOperationsToExcel(state.operations.map(op => {
+            const { fromLabel, toLabel } = getFromTo(op);
+            return {
+              date: new Date(op.date).toLocaleString('ru'),
+              item: itemNameMap.get(op.itemId) || op.itemId,
+              type: op.type === 'in' ? 'Приход' : 'Расход',
+              quantity: op.quantity,
+              from: fromLabel,
+              to: toLabel,
+              performedBy: op.performedBy,
+              comment: op.comment,
+            };
+          }));
         }}>
           <Icon name="Download" size={14} className="mr-1.5" />Excel
         </Button>
@@ -98,6 +157,93 @@ export default function HistoryPage({ state }: Props) {
           <div className="text-2xl font-bold text-destructive tabular-nums">-{totalOut}</div>
           <div className="text-xs text-muted-foreground mt-0.5">Единиц выдано</div>
         </div>
+      </div>
+
+      {/* Итого по товарам за всё время */}
+      <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
+        <button
+          onClick={() => setShowTotals(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Icon name="Sigma" size={16} className="text-primary" />
+            <span className="font-semibold text-sm">Итого по товарам за всё время</span>
+            <span className="text-xs text-muted-foreground">· {totalsAllTime.list.length} позиций</span>
+          </div>
+          <Icon name={showTotals ? 'ChevronUp' : 'ChevronDown'} size={16} className="text-muted-foreground" />
+        </button>
+        {showTotals && (
+          <div className="border-t border-border">
+            {totalsAllTime.list.length === 0 ? (
+              <div className="text-center py-6 text-sm text-muted-foreground">Расходов пока нет</div>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2 px-4 py-3 border-b border-border bg-muted/30">
+                  <button
+                    onClick={() => setTotalsDeptFilter('all')}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all
+                      ${totalsDeptFilter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground border border-border'}`}
+                  >
+                    Все подразделения
+                  </button>
+                  {totalsAllTime.depts.map(d => (
+                    <button
+                      key={d}
+                      onClick={() => setTotalsDeptFilter(d)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all
+                        ${totalsDeptFilter === d ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground border border-border'}`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/40 border-b border-border">
+                        <th className="text-left px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Товар</th>
+                        <th className="text-right px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Итого</th>
+                        {totalsDeptFilter === 'all'
+                          ? totalsAllTime.depts.map(d => (
+                              <th key={d} className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{d}</th>
+                            ))
+                          : (
+                              <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{totalsDeptFilter}</th>
+                            )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {totalsAllTime.list
+                        .filter(r => totalsDeptFilter === 'all' || (r.byDept.get(totalsDeptFilter) || 0) > 0)
+                        .map(r => (
+                          <tr key={r.itemId} className="border-b border-border/50 hover:bg-muted/30">
+                            <td className="px-4 py-2 font-medium text-foreground">{r.itemName}</td>
+                            <td className="px-4 py-2 text-right font-bold tabular-nums text-destructive whitespace-nowrap">
+                              {r.totalOut} <span className="text-xs font-normal text-muted-foreground">{r.unit}</span>
+                            </td>
+                            {totalsDeptFilter === 'all'
+                              ? totalsAllTime.depts.map(d => {
+                                  const q = r.byDept.get(d) || 0;
+                                  return (
+                                    <td key={d} className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${q > 0 ? 'text-foreground' : 'text-muted-foreground/40'}`}>
+                                      {q > 0 ? q : '—'}
+                                    </td>
+                                  );
+                                })
+                              : (
+                                  <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                    {r.byDept.get(totalsDeptFilter) || 0} <span className="text-xs text-muted-foreground">{r.unit}</span>
+                                  </td>
+                                )}
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -193,11 +339,14 @@ export default function HistoryPage({ state }: Props) {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Товар</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Кол-во</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Комментарий</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">От / Кому</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">От кого</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Кому</th>
                 </tr>
               </thead>
               <tbody>
-                {enriched.map((op, idx) => (
+                {enriched.map((op, idx) => {
+                  const { fromLabel, toLabel } = getFromTo(op);
+                  return (
                   <tr key={op.id} className={`border-b border-border/50 hover:bg-muted/30 transition-colors animate-fade-in`} style={{ animationDelay: `${idx * 20}ms` }}>
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                       {new Date(op.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })}
@@ -224,23 +373,29 @@ export default function HistoryPage({ state }: Props) {
                       <span className="line-clamp-1">{op.comment || '—'}</span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {op.from && <div className="text-xs">← {op.from}</div>}
-                      {op.to && <div className="text-xs">→ {op.to}</div>}
-                      {!op.from && !op.to && <span>—</span>}
-                      {op.warehouseId && (() => {
-                        const wh = (state.warehouses || []).find(w => w.id === op.warehouseId);
-                        return wh ? <div className="text-xs mt-0.5 flex items-center gap-0.5 text-primary/70"><Icon name="Warehouse" size={9} />{wh.name}</div> : null;
-                      })()}
+                      <div className="text-xs flex items-center gap-1">
+                        <Icon name="Warehouse" size={10} className="text-primary/70" />
+                        {fromLabel}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <div className="text-xs flex items-center gap-1">
+                        <Icon name="Building2" size={10} className="text-primary/70" />
+                        {toLabel}
+                      </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile cards */}
           <div className="md:hidden space-y-2">
-            {enriched.map((op, idx) => (
+            {enriched.map((op, idx) => {
+              const { fromLabel, toLabel } = getFromTo(op);
+              return (
               <div key={op.id} className="bg-card rounded-xl border border-border p-3.5 shadow-card animate-fade-in" style={{ animationDelay: `${idx * 20}ms` }}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5">
@@ -259,14 +414,16 @@ export default function HistoryPage({ state }: Props) {
                     {op.type === 'in' ? '+' : '-'}{op.quantity} {op.item?.unit}
                   </span>
                 </div>
-                {(op.comment || op.from || op.to) && (
-                  <div className="mt-2 pl-10 space-y-0.5 text-xs text-muted-foreground">
-                    {op.comment && <div>{op.comment}</div>}
-                    {(op.from || op.to) && <div>{op.from && `← ${op.from}`}{op.from && op.to ? ' · ' : ''}{op.to && `→ ${op.to}`}</div>}
+                <div className="mt-2 pl-10 space-y-0.5 text-xs text-muted-foreground">
+                  {op.comment && <div>{op.comment}</div>}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="flex items-center gap-1"><Icon name="Warehouse" size={10} className="text-primary/70" />От: {fromLabel}</span>
+                    <span className="flex items-center gap-1"><Icon name="Building2" size={10} className="text-primary/70" />Кому: {toLabel}</span>
                   </div>
-                )}
+                </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
