@@ -23,7 +23,6 @@ export function CreateOrderModal({
   editOrder?: WorkOrder;
 }) {
   const isEdit = !!editOrder;
-  const [title, setTitle] = useState(editOrder?.title || '');
   const [number, setNumber] = useState(editOrder?.number || `ЗС-${String(state.orderCounter).padStart(3, '0')}`);
   const [comment, setComment] = useState(editOrder?.comment || '');
   const [recipientLabel, setRecipientLabel] = useState(editOrder?.recipientName || '');
@@ -186,7 +185,7 @@ export function CreateOrderModal({
       const updated: WorkOrder = {
         ...editOrder,
         number: number.trim() || editOrder.number,
-        title: title.trim(),
+        title: editOrder.title || '',
         status,
         recipientId: finalRecipientId || undefined,
         recipientName: recipientLabel.trim() || undefined,
@@ -217,7 +216,7 @@ export function CreateOrderModal({
     const order: WorkOrder = {
       id: generateId(),
       number: number.trim() || `ЗС-${String(state.orderCounter).padStart(3, '0')}`,
-      title: title.trim(),
+      title: '',
       status,
       createdBy: state.currentUser,
       recipientId: finalRecipientId || undefined,
