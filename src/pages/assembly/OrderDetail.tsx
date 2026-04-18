@@ -760,16 +760,42 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
       // Strip editor-only bind-highlight style that leaks dashed green/blue outlines
       const bindStyle = doc.getElementById('__bind_style');
       if (bindStyle) bindStyle.remove();
-      // Inject clean style that guarantees no dashed highlights in preview/print
+      // Strip inline dashed/dotted borders and outlines from any element (came from editor)
+      doc.querySelectorAll<HTMLElement>('*').forEach(el => {
+        const s = el.getAttribute('style');
+        if (!s) return;
+        const lower = s.toLowerCase();
+        if (lower.includes('dashed') || lower.includes('dotted') || lower.includes('outline')) {
+          let cleaned = s
+            .replace(/border[^;]*?(dashed|dotted)[^;]*;?/gi, '')
+            .replace(/outline[^;]*;?/gi, '')
+            .replace(/border-style\s*:\s*(dashed|dotted)\s*;?/gi, '');
+          cleaned = cleaned.trim();
+          if (cleaned) el.setAttribute('style', cleaned);
+          else el.removeAttribute('style');
+        }
+      });
+      // Inject clean style — kills any remaining dashed/outline visuals in preview & print
       const cleanStyle = doc.createElement('style');
       cleanStyle.id = '__clean_bind_style';
       cleanStyle.textContent = `
         [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; }
+        *, *::before, *::after {
+          outline: none !important;
+        }
+        *[style*="dashed"], *[style*="dotted"] {
+          border-style: solid !important;
+          border-color: transparent !important;
+        }
+        @media screen {
+          [data-bind] { border-color: transparent !important; }
+        }
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
           html, body { margin: 0 !important; background: #fff !important; }
-          [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; }
-          *[style*="dashed"] { border-style: solid !important; border-color: transparent !important; }
+          [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; border-color: transparent !important; }
+          *[style*="dashed"], *[style*="dotted"] { border-style: solid !important; border-color: transparent !important; }
+          * { outline: none !important; }
         }
       `;
       if (doc.head) doc.head.appendChild(cleanStyle);

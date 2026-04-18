@@ -110,6 +110,9 @@ export type Partner = {
   type: PartnerType;
   contact?: string;
   note?: string;
+  rank?: string;
+  fullName?: string;
+  department?: string;
   createdAt: string;
 };
 

@@ -188,7 +188,7 @@ TABLE_COLUMNS = {
                     "warehouse_id", "scanned_codes"],
     "location_stocks": ["item_id", "location_id", "quantity"],
     "warehouse_stocks": ["item_id", "warehouse_id", "quantity"],
-    "partners": ["id", "name", "type", "contact", "note", "created_at"],
+    "partners": ["id", "name", "type", "contact", "note", "rank", "full_name", "department", "created_at"],
     "barcodes": ["id", "item_id", "code", "format", "label", "created_at"],
     "work_orders": ["id", "number", "title", "status", "created_by", "recipient_id",
                      "recipient_name", "receiver_rank", "receiver_name",

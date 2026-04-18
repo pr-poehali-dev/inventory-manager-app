@@ -251,24 +251,47 @@ function PartnerHistory({ partner, state, periodFrom, periodTo, onClose }: {
   );
 }
 
-function AddPartnerModal({ type, onSave, onClose }: {
-  type: PartnerType; onSave: (p: Omit<Partner, 'id' | 'createdAt'>) => void; onClose: () => void;
+function AddPartnerModal({ type, partner, onSave, onClose }: {
+  type: PartnerType; partner?: Partner; onSave: (p: Omit<Partner, 'id' | 'createdAt'>) => void; onClose: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [contact, setContact] = useState('');
-  const [note, setNote] = useState('');
+  const [name, setName] = useState(partner?.name || '');
+  const [contact, setContact] = useState(partner?.contact || '');
+  const [note, setNote] = useState(partner?.note || '');
+  const [rank, setRank] = useState(partner?.rank || '');
+  const [fullName, setFullName] = useState(partner?.fullName || '');
+  const [department, setDepartment] = useState(partner?.department || '');
+  const isRecipient = type === 'recipient';
+  const isEdit = !!partner;
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-sm animate-scale-in">
+      <DialogContent className="max-w-md animate-scale-in">
         <DialogHeader>
-          <DialogTitle>Добавить {type === 'supplier' ? 'поставщика' : 'получателя'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Редактировать' : 'Добавить'} {type === 'supplier' ? 'поставщика' : 'получателя'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 pt-2">
           <div className="space-y-1.5">
-            <Label>Название *</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder={type === 'supplier' ? 'ООО Поставщик' : 'Отдел / ФИО'} />
+            <Label>{isRecipient ? 'Подразделение / название *' : 'Название *'}</Label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder={type === 'supplier' ? 'ООО Поставщик' : 'Напр.: 8-я рота'} />
           </div>
+          {isRecipient && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Звание / должность</Label>
+                  <Input value={rank} onChange={e => setRank(e.target.value)} placeholder="кладовщик" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">ФИО получателя</Label>
+                  <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Иванов И.И." />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Подразделение (если отличается)</Label>
+                <Input value={department} onChange={e => setDepartment(e.target.value)} placeholder="Можно оставить пустым" />
+              </div>
+            </>
+          )}
           <div className="space-y-1.5">
             <Label>Контакт</Label>
             <Input value={contact} onChange={e => setContact(e.target.value)} placeholder="Телефон, email..." />
@@ -279,8 +302,23 @@ function AddPartnerModal({ type, onSave, onClose }: {
           </div>
           <div className="flex gap-2 pt-1">
             <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
-            <Button disabled={!name.trim()} onClick={() => { onSave({ name, contact, note, type }); onClose(); }} className="flex-1">
-              Добавить
+            <Button
+              disabled={!name.trim()}
+              onClick={() => {
+                onSave({
+                  name: name.trim(),
+                  contact: contact.trim() || undefined,
+                  note: note.trim() || undefined,
+                  rank: isRecipient ? (rank.trim() || undefined) : undefined,
+                  fullName: isRecipient ? (fullName.trim() || undefined) : undefined,
+                  department: isRecipient ? (department.trim() || name.trim() || undefined) : undefined,
+                  type,
+                });
+                onClose();
+              }}
+              className="flex-1"
+            >
+              {isEdit ? 'Сохранить' : 'Добавить'}
             </Button>
           </div>
         </div>
@@ -594,13 +632,44 @@ function PartnerTable({ partners, type, state, onStateChange, periodFrom, period
   periodFrom: Date | null; periodTo: Date | null;
 }) {
   const [search, setSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [fullNameFilter, setFullNameFilter] = useState<string>('all');
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [editPartner, setEditPartner] = useState<Partner | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Partner | null>(null);
 
-  const filtered = partners.filter(p =>
-    !search.trim() || p.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const isRecipient = type === 'recipient';
+
+  const departments = useMemo(() => {
+    if (!isRecipient) return [] as string[];
+    const set = new Set<string>();
+    partners.forEach(p => {
+      const d = (p.department || p.name || '').trim();
+      if (d) set.add(d);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [partners, isRecipient]);
+
+  const fullNamesForDept = useMemo(() => {
+    if (!isRecipient) return [] as string[];
+    const set = new Set<string>();
+    partners
+      .filter(p => departmentFilter === 'all' || (p.department || p.name) === departmentFilter)
+      .forEach(p => { if (p.fullName) set.add(p.fullName); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [partners, isRecipient, departmentFilter]);
+
+  const filtered = partners.filter(p => {
+    const q = search.trim().toLowerCase();
+    if (q) {
+      const hay = `${p.name} ${p.department || ''} ${p.rank || ''} ${p.fullName || ''} ${p.contact || ''} ${p.note || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (isRecipient && departmentFilter !== 'all' && (p.department || p.name) !== departmentFilter) return false;
+    if (isRecipient && fullNameFilter !== 'all' && (p.fullName || '') !== fullNameFilter) return false;
+    return true;
+  });
 
   const getPartnerStats = (p: Partner) => {
     const allOps = p.type === 'supplier'
@@ -628,18 +697,62 @@ function PartnerTable({ partners, type, state, onStateChange, periodFrom, period
     onStateChange(next); crudAction('upsert_partner', { partner: p });
   };
 
+  const handleEdit = (data: Omit<Partner, 'id' | 'createdAt'>) => {
+    if (!editPartner) return;
+    const updated: Partner = { ...editPartner, ...data };
+    const next = { ...state, partners: state.partners.map(p => p.id === updated.id ? updated : p) };
+    onStateChange(next);
+    crudAction('upsert_partner', { partner: updated });
+  };
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <Input placeholder={`Поиск ${type === 'supplier' ? 'поставщиков' : 'получателей'}...`} value={search}
-            onChange={e => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input placeholder={`Поиск ${type === 'supplier' ? 'поставщиков' : 'получателей'} (название, ФИО, звание)...`} value={search}
+              onChange={e => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
+          </div>
+          <Button size="sm" onClick={() => setShowAdd(true)} className="shrink-0">
+            <Icon name="Plus" size={14} className="mr-1" />
+            Добавить
+          </Button>
         </div>
-        <Button size="sm" onClick={() => setShowAdd(true)} className="shrink-0">
-          <Icon name="Plus" size={14} className="mr-1" />
-          Добавить
-        </Button>
+
+        {isRecipient && (departments.length > 0 || fullNamesForDept.length > 0) && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Icon name="Filter" size={12} />Фильтр:
+            </div>
+            <select
+              value={departmentFilter}
+              onChange={e => { setDepartmentFilter(e.target.value); setFullNameFilter('all'); }}
+              className="h-8 text-xs rounded-md border border-border bg-background px-2 hover:border-primary/40 focus:border-primary focus:outline-none"
+            >
+              <option value="all">Все подразделения</option>
+              {departments.map(d => (<option key={d} value={d}>{d}</option>))}
+            </select>
+            {fullNamesForDept.length > 0 && (
+              <select
+                value={fullNameFilter}
+                onChange={e => setFullNameFilter(e.target.value)}
+                className="h-8 text-xs rounded-md border border-border bg-background px-2 hover:border-primary/40 focus:border-primary focus:outline-none"
+              >
+                <option value="all">Все ФИО</option>
+                {fullNamesForDept.map(n => (<option key={n} value={n}>{n}</option>))}
+              </select>
+            )}
+            {(departmentFilter !== 'all' || fullNameFilter !== 'all') && (
+              <button
+                onClick={() => { setDepartmentFilter('all'); setFullNameFilter('all'); }}
+                className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive flex items-center gap-1"
+              >
+                <Icon name="X" size={11} />Сбросить
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -662,7 +775,16 @@ function PartnerTable({ partners, type, state, onStateChange, periodFrom, period
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm text-foreground">{p.name}</div>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap text-xs text-muted-foreground">
+                  <div className="flex items-center gap-x-2 gap-y-0.5 mt-0.5 flex-wrap text-xs text-muted-foreground">
+                    {isRecipient && p.fullName && (
+                      <span className="flex items-center gap-1 text-foreground/80">
+                        <Icon name="UserCheck" size={10} />
+                        {p.rank ? `${p.rank} · ` : ''}{p.fullName}
+                      </span>
+                    )}
+                    {isRecipient && p.department && p.department !== p.name && (
+                      <span className="flex items-center gap-0.5"><Icon name="Building2" size={10} />{p.department}</span>
+                    )}
                     {p.contact && <span className="flex items-center gap-0.5"><Icon name="Phone" size={10} />{p.contact}</span>}
                     {p.note && <span className="truncate max-w-32">{p.note}</span>}
                   </div>
@@ -676,6 +798,11 @@ function PartnerTable({ partners, type, state, onStateChange, periodFrom, period
                     className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
                     title="Разбивка по номенклатурам">
                     <Icon name="Package" size={14} />
+                  </button>
+                  <button onClick={() => setEditPartner(p)}
+                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 flex items-center justify-center transition-colors"
+                    title="Редактировать">
+                    <Icon name="Pencil" size={13} />
                   </button>
                   <button onClick={() => setDeleteConfirm(p)}
                     className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors">
@@ -701,6 +828,7 @@ function PartnerTable({ partners, type, state, onStateChange, periodFrom, period
         />
       )}
       {showAdd && <AddPartnerModal type={type} onSave={handleAdd} onClose={() => setShowAdd(false)} />}
+      {editPartner && <AddPartnerModal type={type} partner={editPartner} onSave={handleEdit} onClose={() => setEditPartner(null)} />}
       {deleteConfirm && (
         <Dialog open onOpenChange={() => setDeleteConfirm(null)}>
           <DialogContent className="max-w-sm animate-scale-in">

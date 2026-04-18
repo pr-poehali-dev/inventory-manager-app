@@ -1,0 +1,4 @@
+ALTER TABLE t_p45174738_inventory_manager_ap.partners
+  ADD COLUMN IF NOT EXISTS rank TEXT,
+  ADD COLUMN IF NOT EXISTS full_name TEXT,
+  ADD COLUMN IF NOT EXISTS department TEXT;

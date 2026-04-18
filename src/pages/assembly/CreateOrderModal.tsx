@@ -46,7 +46,9 @@ export function CreateOrderModal({
 
   const recipientOptions: AutocompleteOption[] = useMemo(() =>
     state.partners.filter(p => p.type === 'recipient').map(p => ({
-      id: p.id, label: p.name, sublabel: p.contact || p.note || undefined,
+      id: p.id,
+      label: p.name,
+      sublabel: [p.rank, p.fullName].filter(Boolean).join(' · ') || p.contact || p.note || undefined,
     })), [state.partners]);
 
   const itemOptions: AutocompleteOption[] = useMemo(() =>
@@ -140,13 +142,44 @@ export function CreateOrderModal({
 
     let finalRecipientId = recipientId;
     let newPartners = [...state.partners];
-    if (recipientLabel.trim() && !recipientId) {
+    let partnerToSync: Partner | null = null;
+    const trimmedDept = recipientLabel.trim();
+    const trimmedRank = receiverRank.trim();
+    const trimmedFullName = receiverName.trim();
+    if (trimmedDept && !recipientId) {
+      // Создаём нового получателя
       const newPartner: Partner = {
-        id: generateId(), name: recipientLabel.trim(), type: 'recipient',
+        id: generateId(),
+        name: trimmedDept,
+        type: 'recipient',
+        department: trimmedDept || undefined,
+        rank: trimmedRank || undefined,
+        fullName: trimmedFullName || undefined,
         createdAt: new Date().toISOString(),
       };
       newPartners = [...state.partners, newPartner];
       finalRecipientId = newPartner.id;
+      partnerToSync = newPartner;
+    } else if (recipientId) {
+      // Обновляем существующего получателя если поля изменились
+      const existing = state.partners.find(p => p.id === recipientId);
+      if (existing) {
+        const needsUpdate =
+          (trimmedDept && existing.department !== trimmedDept) ||
+          (trimmedRank && existing.rank !== trimmedRank) ||
+          (trimmedFullName && existing.fullName !== trimmedFullName);
+        if (needsUpdate) {
+          const updated: Partner = {
+            ...existing,
+            name: trimmedDept || existing.name,
+            department: trimmedDept || existing.department,
+            rank: trimmedRank || existing.rank,
+            fullName: trimmedFullName || existing.fullName,
+          };
+          newPartners = state.partners.map(p => p.id === recipientId ? updated : p);
+          partnerToSync = updated;
+        }
+      }
     }
 
     if (isEdit && editOrder) {
@@ -174,9 +207,8 @@ export function CreateOrderModal({
       };
       onStateChange(next);
       crudAction('upsert_work_order', { workOrder: updated, orderItems: updated.items });
-      if (recipientLabel.trim() && !recipientId) {
-        const newPartner = newPartners[newPartners.length - 1];
-        crudAction('upsert_partner', { partner: newPartner });
+      if (partnerToSync) {
+        crudAction('upsert_partner', { partner: partnerToSync });
       }
       onClose();
       return;
@@ -211,9 +243,8 @@ export function CreateOrderModal({
     onStateChange(next);
     crudAction('upsert_work_order', { workOrder: order, orderItems: order.items });
     crudAction('update_setting', { key: 'orderCounter', value: String(newCounter) });
-    if (recipientLabel.trim() && !recipientId) {
-      const newPartner = newPartners[newPartners.length - 1];
-      crudAction('upsert_partner', { partner: newPartner });
+    if (partnerToSync) {
+      crudAction('upsert_partner', { partner: partnerToSync });
     }
     onClose();
   };
@@ -246,11 +277,22 @@ export function CreateOrderModal({
 
             {/* Recipient autocomplete */}
             <div className="space-y-1.5">
-              <Label>Кому выдаём</Label>
+              <Label>Структурное подразделение — получатель</Label>
               <Autocomplete
                 value={recipientLabel}
                 onChange={v => { setRecipientLabel(v); setRecipientId(''); }}
-                onSelect={opt => { setRecipientLabel(opt.label); setRecipientId(opt.id === '__new__' ? '' : opt.id); }}
+                onSelect={opt => {
+                  setRecipientLabel(opt.label);
+                  const pid = opt.id === '__new__' ? '' : opt.id;
+                  setRecipientId(pid);
+                  if (pid) {
+                    const partner = state.partners.find(p => p.id === pid);
+                    if (partner) {
+                      if (partner.rank && !receiverRank.trim()) setReceiverRank(partner.rank);
+                      if (partner.fullName && !receiverName.trim()) setReceiverName(partner.fullName);
+                    }
+                  }
+                }}
                 options={recipientOptions}
                 placeholder="Введите получателя..."
                 allowCustom
