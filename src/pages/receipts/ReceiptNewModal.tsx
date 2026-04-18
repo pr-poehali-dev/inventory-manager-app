@@ -489,8 +489,16 @@ export function NewReceiptModal({
                         <Label className="text-xs">Товар <span className="text-destructive">*</span></Label>
                         <Autocomplete
                           value={line.itemLabel}
-                          onChange={v => updateLine(line.id, { itemLabel: v, itemId: '', isNew: !state.items.find(i => i.name === v) })}
+                          onChange={v => updateLine(line.id, { itemLabel: v, itemId: '', isNew: v.trim() !== '' && !state.items.find(i => i.name.toLowerCase() === v.toLowerCase()) })}
                           onSelect={opt => {
+                            if (!opt.id || opt.id === '__new__') {
+                              updateLine(line.id, {
+                                itemId: '',
+                                itemLabel: opt.label,
+                                isNew: opt.label.trim() !== '',
+                              });
+                              return;
+                            }
                             const item = state.items.find(i => i.id === opt.id);
                             updateLine(line.id, {
                               itemId: opt.id, itemLabel: opt.label, isNew: false,
