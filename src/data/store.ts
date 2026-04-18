@@ -139,6 +139,8 @@ export type WorkOrder = {
   receiverName?: string;
   issuerRank?: string;
   issuerName?: string;
+  requesterRank?: string;
+  requesterName?: string;
   createdAt: string;
   updatedAt: string;
   items: OrderItem[];

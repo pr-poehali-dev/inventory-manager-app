@@ -192,6 +192,7 @@ TABLE_COLUMNS = {
     "barcodes": ["id", "item_id", "code", "format", "label", "created_at"],
     "work_orders": ["id", "number", "title", "status", "created_by", "recipient_id",
                      "recipient_name", "receiver_rank", "receiver_name",
+                     "issuer_rank", "issuer_name", "requester_rank", "requester_name",
                      "created_at", "updated_at", "comment"],
     "order_items": ["id", "order_id", "item_id", "required_qty", "picked_qty", "status"],
     "receipts": ["id", "number", "status", "supplier_id", "supplier_name", "warehouse_id",

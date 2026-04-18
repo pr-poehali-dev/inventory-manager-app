@@ -46,10 +46,10 @@ export function create0504204Template(): InvoiceTemplate {
     e({ type: 'text', x: 30, y: 140, w: 500, h: 14, text: 'Единица измерения: руб. (с точностью до второго десятичного знака)', fontSize: 9 }),
 
     e({ type: 'text', x: 30, y: 168, w: 80, h: 14, text: 'Затребовал', fontSize: 9, bold: true }),
-    e({ type: 'text', x: 115, y: 168, w: 100, h: 14, text: '', fontSize: 9, align: 'center', source: '{{issuerRank}}' }),
+    e({ type: 'text', x: 115, y: 168, w: 100, h: 14, text: '', fontSize: 9, align: 'center', source: '{{requesterRank}}' }),
     e({ type: 'line', x: 115, y: 182, w: 100, h: 1, lineStyle: 'solid', lineWidth: 1 }),
-    e({ type: 'text', x: 115, y: 183, w: 100, h: 10, text: '(звание)', fontSize: 7, align: 'center', italic: true }),
-    e({ type: 'text', x: 225, y: 168, w: 140, h: 14, text: '', fontSize: 9, align: 'center', source: '{{issuerName}}' }),
+    e({ type: 'text', x: 115, y: 183, w: 100, h: 10, text: '(должность)', fontSize: 7, align: 'center', italic: true }),
+    e({ type: 'text', x: 225, y: 168, w: 140, h: 14, text: '', fontSize: 9, align: 'center', source: '{{requesterName}}' }),
     e({ type: 'line', x: 225, y: 182, w: 140, h: 1, lineStyle: 'solid', lineWidth: 1 }),
     e({ type: 'text', x: 225, y: 183, w: 140, h: 10, text: '(фамилия, инициалы)', fontSize: 7, align: 'center', italic: true }),
 

@@ -32,6 +32,8 @@ export function CreateOrderModal({
   const [receiverName, setReceiverName] = useState(editOrder?.receiverName || '');
   const [issuerRank, setIssuerRank] = useState(editOrder?.issuerRank || '');
   const [issuerName, setIssuerName] = useState(editOrder?.issuerName || '');
+  const [requesterRank, setRequesterRank] = useState(editOrder?.requesterRank || '');
+  const [requesterName, setRequesterName] = useState(editOrder?.requesterName || '');
   const [lines, setLines] = useState<OrderLine[]>(
     editOrder && editOrder.items.length > 0
       ? editOrder.items.map(oi => {
@@ -159,6 +161,8 @@ export function CreateOrderModal({
         receiverName: receiverName.trim() || undefined,
         issuerRank: issuerRank.trim() || undefined,
         issuerName: issuerName.trim() || undefined,
+        requesterRank: requesterRank.trim() || undefined,
+        requesterName: requesterName.trim() || undefined,
         comment: comment.trim() || undefined,
         updatedAt: new Date().toISOString(),
         items: orderItems,
@@ -190,6 +194,8 @@ export function CreateOrderModal({
       receiverName: receiverName.trim() || undefined,
       issuerRank: issuerRank.trim() || undefined,
       issuerName: issuerName.trim() || undefined,
+      requesterRank: requesterRank.trim() || undefined,
+      requesterName: requesterName.trim() || undefined,
       comment: comment.trim() || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -256,6 +262,24 @@ export function CreateOrderModal({
                 allowCustom
               />
               <p className="text-xs text-muted-foreground">Структурное подразделение — получатель (для накладной)</p>
+            </div>
+
+            {/* Requester for invoice */}
+            <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <Icon name="UserPlus" size={12} />
+                Затребовал (кто запросил ТМЦ)
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Должность</Label>
+                  <Input value={requesterRank} onChange={e => setRequesterRank(e.target.value)} placeholder="Напр.: командир взвода" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">ФИО</Label>
+                  <Input value={requesterName} onChange={e => setRequesterName(e.target.value)} placeholder="Сидоров С.С." />
+                </div>
+              </div>
             </div>
 
             {/* Receiver for invoice */}

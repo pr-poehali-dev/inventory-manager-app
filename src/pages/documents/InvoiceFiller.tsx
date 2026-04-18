@@ -20,10 +20,12 @@ function resolveSource(source: string, order: WorkOrder, state: AppState, tpl: I
     '{{recipient}}': order.recipientName || '',
     '{{receiverRank}}': order.receiverRank || '',
     '{{receiverName}}': order.receiverName || '',
+    '{{requesterRank}}': order.requesterRank || '',
+    '{{requesterName}}': order.requesterName || '',
     '{{institution}}': wh?.institution || tpl.companyName || '',
     '{{senderDept}}': wh?.senderDept || wh?.name || '',
-    '{{issuerRank}}': wh?.issuerRank || '',
-    '{{issuerName}}': wh?.issuerName || '',
+    '{{issuerRank}}': order.issuerRank || wh?.issuerRank || '',
+    '{{issuerName}}': order.issuerName || wh?.issuerName || '',
     '{{approverRole}}': wh?.approverRole || tpl.signatoryRole || '',
     '{{approverName}}': wh?.approverName || tpl.signatory || '',
     '{{signatory}}': wh?.approverName || tpl.signatory || '',
@@ -146,7 +148,7 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
       });
       return next;
     });
-  }, [state.warehouses, state.items, order.number, order.recipientName, order.receiverRank, order.receiverName, template.companyName, template.signatory, template.signatoryRole]);
+  }, [state.warehouses, state.items, order.number, order.recipientName, order.receiverRank, order.receiverName, order.requesterRank, order.requesterName, order.issuerRank, order.issuerName, template.companyName, template.signatory, template.signatoryRole]);
 
   const updVal = (id: string, v: string) => setValues(prev => ({ ...prev, [id]: v }));
   const updCell = (tid: string, ri: number, ci: number, v: string) => {
