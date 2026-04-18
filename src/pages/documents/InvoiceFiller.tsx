@@ -273,11 +273,12 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
         WebkitAppearance: 'none',
         color: 'inherit',
       };
+      const textH = el.h || 20;
       return (
-        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, zIndex: 10, pointerEvents: editing ? 'auto' : 'none' }}>
+        <div key={el.id} className="absolute" style={{ left: el.x, top: el.y, width: el.w, height: textH, overflow: 'hidden', background: 'transparent', backgroundColor: 'transparent', pointerEvents: editing ? 'auto' : 'none' }}>
           {editing
-            ? <input className="invoice-input" value={val} onChange={e => updVal(el.id, e.target.value)} style={inputStyle} />
-            : <span style={{ ...inputStyle, display: 'block' }}>{val || '\u00A0'}</span>
+            ? <input className="invoice-input" value={val} onChange={e => updVal(el.id, e.target.value)} style={{ ...inputStyle, height: textH, width: '100%' }} />
+            : <span style={{ ...inputStyle, display: 'block', height: textH, lineHeight: `${textH}px` }}>{val || '\u00A0'}</span>
           }
         </div>
       );
@@ -495,7 +496,6 @@ export default function InvoiceFiller({ template, order, state, onClose }: Props
           appearance: none !important;
           padding: 0 2px !important;
           margin: 0 !important;
-          height: auto !important;
           line-height: inherit !important;
           color: inherit !important;
         }
