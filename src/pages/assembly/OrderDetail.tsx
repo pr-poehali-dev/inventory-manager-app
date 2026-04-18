@@ -469,16 +469,10 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
         *, *::before, *::after {
           outline: none !important;
         }
-        *[style*="dashed"], *[style*="dotted"] {
-          border-style: solid !important;
-          border-color: transparent !important;
-        }
-
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
           html, body { margin: 0 !important; background: #fff !important; }
-          [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; border-color: transparent !important; }
-          *[style*="dashed"], *[style*="dotted"] { border-style: solid !important; border-color: transparent !important; }
+          [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; }
           * { outline: none !important; }
         }
       `;
