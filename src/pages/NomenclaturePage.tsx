@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState, Item, crudAction, generateId, updateLocationStock, updateWarehouseStock } from '@/data/store';
+import { AppState, AssetType, Item, crudAction, generateId, updateLocationStock, updateWarehouseStock } from '@/data/store';
 import ItemDetailModal from '@/components/ItemDetailModal';
 import { UNITS } from '@/constants/units';
 
@@ -13,6 +13,7 @@ function NewItemModal({ state, onStateChange, onClose }: {
 }) {
   const [name, setName] = useState('');
   const [unit, setUnit] = useState('шт');
+  const [assetType, setAssetType] = useState<AssetType>('МЗ');
   const [categoryId, setCategoryId] = useState(state.categories[0]?.id || '');
   const [warehouseId, setWarehouseId] = useState((state.warehouses || [])[0]?.id || '');
   const [locationId, setLocationId] = useState('');
@@ -31,6 +32,7 @@ function NewItemModal({ state, onStateChange, onClose }: {
       id: generateId(),
       name: name.trim(),
       unit,
+      assetType,
       categoryId,
       locationId: locationId || (state.locations[0]?.id || ''),
       description: description.trim() || undefined,
@@ -82,22 +84,30 @@ function NewItemModal({ state, onStateChange, onClose }: {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Нач. количество</Label>
-              <Input type="number" min="0" value={qty} onChange={e => setQty(e.target.value)} />
+              <Label>Тип (МЗ/ОС)</Label>
+              <select value={assetType} onChange={e => setAssetType(e.target.value as AssetType)}
+                className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                <option value="МЗ">МЗ — материальные запасы</option>
+                <option value="ОС">ОС — основные средства</option>
+              </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Категория</Label>
-              <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
-                className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                {state.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <Label>Нач. количество</Label>
+              <Input type="number" min="0" value={qty} onChange={e => setQty(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label>Порог минимума</Label>
               <Input type="number" min="0" value={threshold} onChange={e => setThreshold(e.target.value)} />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Категория</Label>
+            <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
+              className="w-full h-9 px-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+              {state.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
           {(state.warehouses || []).length > 0 && (
             <div className="space-y-1.5">

@@ -182,7 +182,7 @@ TABLE_COLUMNS = {
     "categories": ["id", "name", "parent_id", "color"],
     "locations": ["id", "name", "parent_id", "description", "warehouse_id"],
     "items": ["id", "name", "category_id", "location_id", "description", "unit",
-              "quantity", "low_stock_threshold", "image_url", "created_at", "attachments"],
+              "asset_type", "quantity", "low_stock_threshold", "image_url", "created_at", "attachments"],
     "operations": ["id", "item_id", "type", "quantity", "comment", "from_place",
                     "to_place", "performed_by", "date", "order_id", "location_id",
                     "warehouse_id", "scanned_codes"],

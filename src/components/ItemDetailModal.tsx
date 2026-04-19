@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import { Item, AppState, crudAction } from '@/data/store';
+import { Item, AppState, AssetType, crudAction } from '@/data/store';
 import { useItemPhoto } from '@/hooks/useItemPhoto';
 import OperationModal from './OperationModal';
 import { TechDocsList } from './ItemAttachmentsTab';
@@ -24,7 +24,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   const [activeTab, setActiveTab] = useState<Tab>('info');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [edited, setEdited] = useState({ name: '', unit: '', description: '', categoryId: '', lowStockThreshold: 5 });
+  const [edited, setEdited] = useState<{ name: string; unit: string; assetType: AssetType; description: string; categoryId: string; lowStockThreshold: number }>({ name: '', unit: '', assetType: 'МЗ', description: '', categoryId: '', lowStockThreshold: 5 });
   const liveItem = item ? (state.items.find(i => i.id === item.id) || item) : ({ id: '' } as Item);
   const photo = useItemPhoto(liveItem, state, onStateChange);
 
@@ -81,6 +81,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
       ...liveItem,
       name: edited.name.trim() || liveItem.name,
       unit: edited.unit.trim() || liveItem.unit,
+      assetType: edited.assetType,
       description: edited.description.trim(),
       categoryId: edited.categoryId,
       lowStockThreshold: edited.lowStockThreshold,
@@ -183,7 +184,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                   ) : liveItem.name}
                 </h2>
                 {!editing && (
-                  <button onClick={() => { setEditing(true); setEdited({ name: liveItem.name, unit: liveItem.unit, description: liveItem.description || '', categoryId: liveItem.categoryId || '', lowStockThreshold: liveItem.lowStockThreshold }); }}
+                  <button onClick={() => { setEditing(true); setEdited({ name: liveItem.name, unit: liveItem.unit, assetType: liveItem.assetType || 'МЗ', description: liveItem.description || '', categoryId: liveItem.categoryId || '', lowStockThreshold: liveItem.lowStockThreshold }); }}
                     className="w-8 h-8 rounded-lg border border-border hover:bg-muted flex items-center justify-center shrink-0 transition-colors">
                     <Icon name="Pencil" size={14} />
                   </button>
@@ -296,6 +297,14 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                         className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
                     </div>
                     <div>
+                      <label className="text-xs text-muted-foreground font-medium">Тип (МЗ/ОС)</label>
+                      <select value={edited.assetType} onChange={e => setEdited({...edited, assetType: e.target.value as AssetType})}
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="МЗ">МЗ — материальные запасы</option>
+                        <option value="ОС">ОС — основные средства</option>
+                      </select>
+                    </div>
+                    <div>
                       <label className="text-xs text-muted-foreground font-medium">Категория</label>
                       <select value={edited.categoryId} onChange={e => setEdited({...edited, categoryId: e.target.value})}
                         className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring">
@@ -324,6 +333,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
                   <div className="space-y-0 divide-y divide-border text-sm">
                     {[
                       { label: 'Единица измерения', value: liveItem.unit },
+                      { label: 'Тип', value: liveItem.assetType || 'МЗ' },
                       { label: 'Добавлен', value: new Date(liveItem.createdAt).toLocaleDateString('ru-RU') },
                       { label: 'Категория', value: category?.name || '—' },
                     ].map(row => (

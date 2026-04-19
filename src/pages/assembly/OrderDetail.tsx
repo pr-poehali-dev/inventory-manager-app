@@ -463,6 +463,7 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
       return {
         name: it?.name || '',
         unit: it?.unit || 'шт.',
+        assetType: it?.assetType || 'МЗ',
         qtyReq: String(oi.requiredQty),
         qtyRel: String(oi.pickedQty),
       };
@@ -560,7 +561,7 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
       `;
       if (doc.head) doc.head.appendChild(cleanStyle);
 
-      const rowKeys = new Set(['rowIndex','rowName','rowUnit','rowQtyReq','rowQtyRel','rowPrice','rowSum']);
+      const rowKeys = new Set(['rowIndex','rowName','rowUnit','rowAssetType','rowQtyReq','rowQtyRel','rowPrice','rowSum']);
       const templateRow = doc.querySelector('tr[data-bind="itemsRows"]') as HTMLElement | null;
       if (templateRow && templateRow.parentElement) {
         const parent = templateRow.parentElement;
@@ -573,6 +574,7 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
             rowIndex: String(i + 1),
             rowName: r.name,
             rowUnit: r.unit,
+            rowAssetType: r.assetType,
             rowQtyReq: r.qtyReq,
             rowQtyRel: r.qtyRel,
             rowPrice: '',

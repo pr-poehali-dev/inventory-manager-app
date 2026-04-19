@@ -24,6 +24,8 @@ export type Attachment = {
   uploadedAt: string;
 };
 
+export type AssetType = 'МЗ' | 'ОС';
+
 export type Item = {
   id: string;
   name: string;
@@ -31,6 +33,7 @@ export type Item = {
   locationId: string;
   description?: string;
   unit: string;
+  assetType?: AssetType;
   quantity: number;
   lowStockThreshold: number;
   imageUrl?: string;

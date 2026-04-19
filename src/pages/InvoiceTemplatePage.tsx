@@ -36,6 +36,7 @@ const FIELDS: FieldDef[] = [
   { key: 'rowIndex', label: 'Ячейка: № по порядку', group: 'Ячейки строки' },
   { key: 'rowName', label: 'Ячейка: Наименование', group: 'Ячейки строки' },
   { key: 'rowUnit', label: 'Ячейка: Ед. изм.', group: 'Ячейки строки' },
+  { key: 'rowAssetType', label: 'Ячейка: Тип (МЗ/ОС)', group: 'Ячейки строки' },
   { key: 'rowQtyReq', label: 'Ячейка: Затребовано', group: 'Ячейки строки' },
   { key: 'rowQtyRel', label: 'Ячейка: Отпущено', group: 'Ячейки строки' },
   { key: 'rowPrice', label: 'Ячейка: Цена', group: 'Ячейки строки' },
