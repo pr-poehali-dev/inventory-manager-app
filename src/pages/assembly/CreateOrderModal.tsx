@@ -271,7 +271,7 @@ export function CreateOrderModal({
   return (
     <>
       <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto animate-scale-in">
+        <DialogContent className="max-w-2xl xl:max-w-4xl max-h-[94vh] overflow-y-auto animate-scale-in">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">

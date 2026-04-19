@@ -53,7 +53,8 @@ export function AddItemToLocationModal({
   const freeToPlace = Math.max(0, whAvailable - distributedOnShelf + alreadyHere);
 
   const qtyNum = parseInt(qty) || 0;
-  const isInvalid = !itemId || qtyNum <= 0 || qtyNum > freeToPlace;
+  const alreadyPlaced = alreadyHere > 0;
+  const isInvalid = !itemId || qtyNum <= 0 || qtyNum > freeToPlace || alreadyPlaced;
 
   const handleAdd = () => {
     if (isInvalid) return;
@@ -104,19 +105,22 @@ export function AddItemToLocationModal({
                   const onShelf = (state.locationStocks || []).find(ls => ls.itemId === ws.itemId && ls.locationId === locationId)?.quantity || 0;
                   const distributed = (state.locationStocks || []).filter(ls => ls.itemId === ws.itemId && whLocationIds.has(ls.locationId)).reduce((s, ls) => s + ls.quantity, 0);
                   const free = Math.max(0, ws.quantity - distributed + onShelf);
+                  const placedHere = onShelf > 0;
+                  const disabled = free <= 0 || placedHere;
                   return (
                     <button key={ws.itemId}
-                      onClick={() => { setItemId(ws.itemId); setSearch(ws.item!.name); setQty('1'); }}
-                      disabled={free <= 0}
+                      onClick={() => { if (disabled) return; setItemId(ws.itemId); setSearch(ws.item!.name); setQty('1'); }}
+                      disabled={disabled}
+                      title={placedHere ? 'Этот товар уже на этом стеллаже' : undefined}
                       className={`w-full text-left flex items-center justify-between px-3 py-2.5 text-sm transition-colors border-b border-border/50 last:border-0
-                        ${itemId === ws.itemId ? 'bg-accent' : free <= 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-muted'}`}>
-                      <div>
-                        <div className="font-medium">{ws.item!.name}</div>
+                        ${itemId === ws.itemId ? 'bg-accent' : disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-muted'}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">{ws.item!.name}</div>
                         {cat && <div className="text-xs" style={{ color: cat.color }}>{cat.name}</div>}
                       </div>
                       <div className="text-right shrink-0 ml-2">
-                        <div className={`text-xs font-semibold ${free <= 0 ? 'text-destructive' : 'text-foreground'}`}>
-                          {free > 0 ? `свободно: ${free}` : 'всё размещено'}
+                        <div className={`text-xs font-semibold ${placedHere ? 'text-warning' : free <= 0 ? 'text-destructive' : 'text-foreground'}`}>
+                          {placedHere ? 'уже здесь' : free > 0 ? `свободно: ${free}` : 'всё размещено'}
                         </div>
                         {onShelf > 0 && <div className="text-xs text-primary">здесь: {onShelf}</div>}
                       </div>
@@ -128,16 +132,21 @@ export function AddItemToLocationModal({
 
             {selectedItem && (
               <div className="p-3 bg-muted/50 rounded-xl text-sm space-y-1">
-                <div className="font-semibold">{selectedItem.name}</div>
-                <div className="flex gap-3 text-xs text-muted-foreground">
+                <div className="font-semibold break-words">{selectedItem.name}</div>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                   <span>На складе: <b className="text-foreground">{whAvailable} {selectedItem.unit}</b></span>
                   <span>Свободно: <b className="text-foreground">{freeToPlace} {selectedItem.unit}</b></span>
                 </div>
-                {alreadyHere > 0 && <div className="text-xs text-primary">Уже на этом стеллаже: {alreadyHere} {selectedItem.unit}</div>}
+                {alreadyPlaced && (
+                  <div className="text-xs text-destructive flex items-center gap-1 pt-1">
+                    <Icon name="AlertCircle" size={11} />
+                    Этот товар уже размещён на этом стеллаже ({alreadyHere} {selectedItem.unit})
+                  </div>
+                )}
               </div>
             )}
 
-            {itemId && (
+            {itemId && !alreadyPlaced && (
               <div className="space-y-1.5">
                 <Label>Количество (из {freeToPlace} {selectedItem?.unit} свободных)</Label>
                 <div className="flex items-center gap-2">

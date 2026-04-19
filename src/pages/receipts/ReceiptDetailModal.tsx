@@ -56,7 +56,7 @@ export function ReceiptDetailModal({
   return (
     <>
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in">
+      <DialogContent className="max-w-lg xl:max-w-2xl max-h-[94vh] overflow-y-auto animate-scale-in">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5">
             <div className={`w-8 h-8 rounded-lg ${cfg.bg} ${cfg.color} flex items-center justify-center shrink-0`}>

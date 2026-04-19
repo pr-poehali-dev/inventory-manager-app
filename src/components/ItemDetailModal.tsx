@@ -113,7 +113,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
   return (
     <>
       <Dialog open={!!item} onOpenChange={onClose}>
-        <DialogContent className="max-w-xl p-0 overflow-hidden animate-scale-in max-h-[92vh] flex flex-col">
+        <DialogContent className="max-w-xl lg:max-w-2xl xl:max-w-3xl p-0 overflow-hidden animate-scale-in max-h-[95vh] flex flex-col">
           {/* Header image */}
           <div className="relative h-40 bg-muted overflow-hidden shrink-0 group">
             {liveItem.imageUrl ? (
@@ -176,7 +176,7 @@ export default function ItemDetailModal({ item, state, onStateChange, onClose }:
             {/* Title */}
             <div>
               <div className="flex items-start justify-between gap-2">
-                <h2 className="text-xl font-bold leading-tight flex-1">
+                <h2 className="text-xl font-bold leading-tight flex-1 break-words min-w-0">
                   {editing ? (
                     <input value={edited.name} onChange={e => setEdited({...edited, name: e.target.value})}
                       className="w-full text-xl font-bold bg-transparent border-b-2 border-primary outline-none" />

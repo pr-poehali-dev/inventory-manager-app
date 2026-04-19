@@ -10,13 +10,12 @@ import {
   Receipt, ReceiptLine, ReceiptCustomField,
   Attachment, Partner, Item,
 } from '@/data/store';
+import { UNITS } from '@/constants/units';
 
 const COMMON_DOC_FIELDS = [
   'Номер ТТН', 'Номер заказа', 'Дата поставки', 'Договор №',
   'Счёт-фактура №', 'Водитель', 'Транспортная компания', 'Примечание',
 ];
-
-const UNITS = ['шт', 'кг', 'л', 'м', 'м²', 'м³', 'уп', 'пачка', 'рул', 'упак', 'кор', 'пар'];
 
 type DraftLine = {
   id: string;
@@ -220,7 +219,7 @@ export function NewReceiptModal({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[94vh] overflow-y-auto animate-scale-in">
+      <DialogContent className="max-w-3xl xl:max-w-5xl 2xl:max-w-6xl max-h-[94vh] overflow-y-auto animate-scale-in">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">

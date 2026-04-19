@@ -6,8 +6,7 @@ import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { AppState, Item, crudAction, generateId, updateLocationStock, updateWarehouseStock } from '@/data/store';
 import ItemDetailModal from '@/components/ItemDetailModal';
-
-const UNITS = ['шт', 'кг', 'л', 'м', 'м²', 'уп', 'пачка', 'рул', 'упак', 'кор', 'пар'];
+import { UNITS } from '@/constants/units';
 
 function NewItemModal({ state, onStateChange, onClose }: {
   state: AppState; onStateChange: (s: AppState) => void; onClose: () => void;
