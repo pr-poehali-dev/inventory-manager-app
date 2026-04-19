@@ -537,14 +537,11 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
         *, *::before, *::after {
           outline: none !important;
         }
-        /* Разрешаем переносы в ячейках таблицы товаров — длинные названия должны помещаться */
-        table td, table th {
+        /* Перенос только в ячейке наименования номенклатуры — остальные поля не трогаем */
+        [data-bind="rowName"] {
           white-space: normal !important;
           word-break: break-word !important;
           overflow-wrap: anywhere !important;
-          vertical-align: top !important;
-        }
-        td[data-bind], th[data-bind] {
           overflow: visible !important;
           text-overflow: clip !important;
         }
@@ -553,10 +550,10 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
           html, body { margin: 0 !important; background: #fff !important; }
           [data-bind], [data-bindable-hover] { background: transparent !important; outline: none !important; }
           * { outline: none !important; }
-          table td, table th {
+          [data-bind="rowName"] {
             white-space: normal !important;
             word-break: break-word !important;
-            overflow-wrap: break-word !important;
+            overflow-wrap: anywhere !important;
             overflow: visible !important;
           }
         }
@@ -643,20 +640,18 @@ function HtmlInvoiceView({ html, order, state, onClose }: {
     html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
     [data-bind] { background: transparent !important; outline: none !important; }
     [data-bindable-hover] { background: transparent !important; outline: none !important; }
-    table td, table th {
+    [data-bind="rowName"] {
       white-space: normal !important;
       word-break: break-word !important;
       overflow-wrap: anywhere !important;
       overflow: visible !important;
-      vertical-align: top !important;
     }
   }
   [data-bind] { background: transparent !important; outline: none !important; }
-  table td, table th {
+  [data-bind="rowName"] {
     white-space: normal !important;
     word-break: break-word !important;
     overflow-wrap: anywhere !important;
-    vertical-align: top !important;
   }
 </style>`;
     let html = filledHtml;
