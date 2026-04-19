@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import { AppState, crudAction, getEmptyState, saveState, guardState } from '@/data/store';
+import { AppState, crudAction, getEmptyState, saveState, guardState, loadStateFromServer, saveLocal, clearLocalCache } from '@/data/store';
+import { toast } from 'sonner';
 import { useAuth } from '@/data/auth';
 import { ProfileSection, AlertsSection, TelegramSection } from './settings/ProfileSections';
 import { WarehousesSection, CategoriesSection, LocationsSection } from './settings/EntitySections';
@@ -21,6 +22,29 @@ export default function SettingsPage({ state, onStateChange }: Props) {
   const [saved, setSaved] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ label: string; onConfirm: () => void } | null>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [syncing, setSyncing] = useState(false);
+
+  const handleForceSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const result = await loadStateFromServer();
+      if (!result) {
+        toast.error('Не удалось загрузить данные с сервера. Проверьте соединение.');
+        return;
+      }
+      clearLocalCache();
+      saveLocal(result.state);
+      onStateChange(result.state);
+      setUserName(result.state.currentUser);
+      setThreshold(String(result.state.defaultLowStockThreshold));
+      toast.success('Данные успешно синхронизированы с сервером');
+    } catch {
+      toast.error('Ошибка синхронизации');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const saveProfile = () => {
     const next = { ...state, currentUser: userName, defaultLowStockThreshold: parseInt(threshold) || 5 };
@@ -109,6 +133,33 @@ export default function SettingsPage({ state, onStateChange }: Props) {
 
           {activeSection === 'data' && (
             <div className="space-y-4">
+              <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+                <h2 className="font-semibold text-foreground flex items-center gap-2">
+                  <Icon name="RefreshCw" size={16} className="text-primary" />
+                  Синхронизация с сервером
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Если данные на этом устройстве отличаются от других — нажми кнопку ниже. Локальный кэш очистится, и все данные загрузятся заново из облака.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    disabled={syncing}
+                    onClick={handleForceSync}
+                  >
+                    <Icon name={syncing ? 'Loader2' : 'RefreshCw'} size={14} className={`mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+                    {syncing ? 'Синхронизация…' : 'Синхронизировать с сервером'}
+                  </Button>
+                </div>
+                <div className="p-3 bg-muted/50 border border-border rounded-lg flex items-start gap-2.5">
+                  <Icon name="Info" size={14} className="text-muted-foreground mt-0.5 shrink-0" />
+                  <span className="text-xs text-muted-foreground">
+                    Несохранённые локальные изменения будут заменены данными с сервера. Убедись, что все важные действия уже выполнены.
+                  </span>
+                </div>
+              </div>
+
               <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
                 <h2 className="font-semibold text-foreground flex items-center gap-2">
                   <Icon name="Download" size={16} className="text-primary" />

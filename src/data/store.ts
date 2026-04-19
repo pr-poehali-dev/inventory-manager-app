@@ -568,6 +568,15 @@ export function saveState(state: AppState): void {
   saveStateToServer(state);
 }
 
+/** Очистить локальный кэш состояния приложения. */
+export function clearLocalCache(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+    console.warn('Failed to clear local cache:', e);
+  }
+}
+
 export function generateId(): string {
   return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 }
