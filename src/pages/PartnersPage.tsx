@@ -199,7 +199,7 @@ function PartnerHistory({ partner, state, periodFrom, periodTo, onClose }: {
                 {byItem.map(r => (
                   <div key={r.itemId} className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-card text-sm">
                     <Icon name="Box" size={12} className="text-muted-foreground shrink-0" />
-                    <span className="flex-1 truncate">{r.itemName}</span>
+                    <span className="flex-1 break-words min-w-0">{r.itemName}</span>
                     <span className="text-xs text-muted-foreground">{r.opCount} оп.</span>
                     <span className="font-bold tabular-nums">{r.qty} {r.unit}</span>
                   </div>

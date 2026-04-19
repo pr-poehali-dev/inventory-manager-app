@@ -154,7 +154,7 @@ export function ReceiptDetailModal({
                       <Icon name={done ? 'CheckCircle2' : line.isNew ? 'Sparkles' : 'Package'} size={12} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{item?.name || line.itemName}</div>
+                      <div className="font-medium text-sm break-words">{item?.name || line.itemName}</div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         {line.isNew && <span className="text-primary font-medium">Новый товар</span>}
                       </div>

@@ -217,7 +217,7 @@ export default function HistoryPage({ state }: Props) {
                         .filter(r => totalsDeptFilter === 'all' || (r.byDept.get(totalsDeptFilter) || 0) > 0)
                         .map(r => (
                           <tr key={r.itemId} className="border-b border-border/50 hover:bg-muted/30">
-                            <td className="px-4 py-2 font-medium text-foreground">{r.itemName}</td>
+                            <td className="px-4 py-2 font-medium text-foreground break-words align-top min-w-[160px] max-w-[320px]">{r.itemName}</td>
                             <td className="px-4 py-2 text-right font-bold tabular-nums text-destructive whitespace-nowrap">
                               {r.totalOut} <span className="text-xs font-normal text-muted-foreground">{r.unit}</span>
                             </td>

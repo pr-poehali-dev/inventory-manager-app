@@ -262,7 +262,7 @@ export default function DashboardPage({ state }: Props) {
                 <tbody>
                   {lowStockTable.map((item) => (
                     <tr key={item.id} className="border-b last:border-0">
-                      <td className="py-2.5 pr-3 truncate max-w-[140px] sm:max-w-[180px]">
+                      <td className="py-2.5 pr-3 break-words align-top max-w-[140px] sm:max-w-[220px] md:max-w-none">
                         {item.name}
                       </td>
                       <td className="py-2.5 pr-3 text-right font-bold text-red-500 whitespace-nowrap">
@@ -308,7 +308,7 @@ export default function DashboardPage({ state }: Props) {
                       <td className="py-2.5 pr-3 whitespace-nowrap text-muted-foreground hidden sm:table-cell">
                         {op.formattedDate}
                       </td>
-                      <td className="py-2.5 pr-3 truncate max-w-[120px] sm:max-w-[160px]">
+                      <td className="py-2.5 pr-3 break-words align-top max-w-[120px] sm:max-w-[220px] md:max-w-none">
                         {op.itemName}
                       </td>
                       <td className="py-2.5 pr-3">

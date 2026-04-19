@@ -438,7 +438,7 @@ export default function InventoryPage({ state, onStateChange }: Props) {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-sm text-foreground truncate">
+                      <span className="font-medium text-sm text-foreground break-words min-w-0">
                         {entry.itemName}
                       </span>
                       <span
@@ -580,7 +580,7 @@ export default function InventoryPage({ state, onStateChange }: Props) {
                             key={entry.itemId}
                             className="border-t border-border hover:bg-muted/30"
                           >
-                            <td className="px-3 py-2 font-medium text-foreground truncate max-w-[180px]">
+                            <td className="px-3 py-2 font-medium text-foreground break-words align-top max-w-[180px] md:max-w-[280px] lg:max-w-none">
                               {entry.itemName}
                             </td>
                             <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
