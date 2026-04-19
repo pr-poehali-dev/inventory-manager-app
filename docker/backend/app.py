@@ -532,12 +532,21 @@ def ensure_tables():
     """)
     admin_hash = bcrypt.hashpw(b'admin123', bcrypt.gensalt()).decode()
     cur.execute(f"""
-        INSERT INTO {SCHEMA}.users (id, username, password_hash, display_name, role)
-        VALUES ('user-admin-1', 'admin', %s, 'Администратор', 'admin')
-        ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash
+        INSERT INTO {SCHEMA}.users (id, username, password_hash, display_name, role, is_active)
+        VALUES ('user-admin-1', 'admin', %s, 'Администратор', 'admin', TRUE)
+        ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash, is_active = TRUE
     """, (admin_hash,))
-    cur.execute(f"UPDATE {SCHEMA}.users SET password_hash = %s WHERE username = 'admin'", (admin_hash,))
-    print(f"[INIT] Admin user ensured with password_hash, schema={SCHEMA}")
+    cur.execute(f"UPDATE {SCHEMA}.users SET password_hash = %s, is_active = TRUE WHERE username = 'admin'", (admin_hash,))
+
+    warehouse_hash = bcrypt.hashpw(b'warehouse123', bcrypt.gensalt()).decode()
+    cur.execute(f"""
+        INSERT INTO {SCHEMA}.users (id, username, password_hash, display_name, role, is_active)
+        VALUES ('user-warehouse-1', 'warehouse', %s, 'Кладовщик', 'warehouse', TRUE)
+        ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash, is_active = TRUE
+    """, (warehouse_hash,))
+    cur.execute(f"UPDATE {SCHEMA}.users SET password_hash = %s, is_active = TRUE WHERE username = 'warehouse'", (warehouse_hash,))
+
+    print(f"[INIT] Admin + Warehouse users ensured, schema={SCHEMA}")
     conn.commit()
     cur.close()
     conn.close()

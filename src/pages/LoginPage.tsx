@@ -54,9 +54,10 @@ export default function LoginPage() {
             Войти
           </Button>
         </form>
-        <p className="text-center text-xs text-muted-foreground mt-4">
-          По умолчанию: admin / admin
-        </p>
+        <div className="text-center text-xs text-muted-foreground mt-4 space-y-0.5">
+          <p>Администратор: <span className="font-mono">admin / admin123</span></p>
+          <p>Кладовщик: <span className="font-mono">warehouse / warehouse123</span></p>
+        </div>
       </div>
     </div>
   );

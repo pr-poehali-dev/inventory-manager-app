@@ -18,7 +18,8 @@ import LabelsPage from '@/pages/LabelsPage';
 import AuditPage from '@/pages/AuditPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import InvoiceTemplatePage from '@/pages/InvoiceTemplatePage';
-import { AuthContext, AuthUser, apiLogin, apiLogout, apiMe, setToken, getToken } from '@/data/auth';
+import LoginPage from '@/pages/LoginPage';
+import { AuthContext, AuthUser, apiLogin, apiLogout, apiMe, setToken, getToken, clearToken } from '@/data/auth';
 
 const POLL_INTERVAL = 5000;
 
@@ -31,22 +32,20 @@ function parseQRParams() {
   };
 }
 
-const GUEST_USER: AuthUser = {
-  id: 'guest',
-  username: 'guest',
-  displayName: 'Гость',
-  role: 'admin',
-};
-
 export default function App() {
-  const [authUser, setAuthUser] = useState<AuthUser | null>(GUEST_USER);
-  const [authLoading, setAuthLoading] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     const token = getToken();
-    if (!token) return;
+    if (!token) {
+      setAuthLoading(false);
+      return;
+    }
     apiMe().then(user => {
       if (user) setAuthUser(user);
+      else clearToken();
+      setAuthLoading(false);
     });
   }, []);
 
@@ -61,7 +60,7 @@ export default function App() {
 
   const logout = async () => {
     await apiLogout();
-    setAuthUser(GUEST_USER);
+    setAuthUser(null);
   };
 
   const refreshAuth = async () => {
@@ -229,6 +228,25 @@ export default function App() {
     if (p !== 'warehouse') setQrLocationId(null);
     if (p !== 'assembly')  setQrOrderId(null);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+        <div className="text-muted-foreground text-sm">Загрузка...</div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <AuthContext.Provider value={authCtx}>
+        <TooltipProvider>
+          <Toaster position="top-right" />
+          <LoginPage />
+        </TooltipProvider>
+      </AuthContext.Provider>
+    );
+  }
 
   return (
     <AuthContext.Provider value={authCtx}>
