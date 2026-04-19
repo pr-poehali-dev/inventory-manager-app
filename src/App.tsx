@@ -32,11 +32,22 @@ function parseQRParams() {
   };
 }
 
+// TEMP: авторизация временно отключена — вход происходит автоматически под гостем-админом.
+// Чтобы вернуть — выставить AUTH_DISABLED в false.
+const AUTH_DISABLED = true;
+const GUEST_USER: AuthUser = {
+  id: 'guest',
+  username: 'guest',
+  displayName: 'Гость',
+  role: 'admin',
+};
+
 export default function App() {
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(AUTH_DISABLED ? GUEST_USER : null);
+  const [authLoading, setAuthLoading] = useState(!AUTH_DISABLED);
 
   useEffect(() => {
+    if (AUTH_DISABLED) return;
     const token = getToken();
     if (!token) {
       setAuthLoading(false);
