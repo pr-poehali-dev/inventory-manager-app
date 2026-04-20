@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,22 +11,34 @@ export function MoveItemModal({
 }: {
   itemId: string;
   fromLocationId: string;
-  toLocationId: string;
+  toLocationId?: string;
   state: AppState;
   onStateChange: (s: AppState) => void;
   onClose: () => void;
 }) {
   const item = state.items.find(i => i.id === itemId);
   const fromLoc = state.locations.find(l => l.id === fromLocationId);
-  const toLoc = state.locations.find(l => l.id === toLocationId);
   const fromStock = (state.locationStocks || []).find(ls => ls.itemId === itemId && ls.locationId === fromLocationId)?.quantity || 0;
   const [qty, setQty] = useState(String(fromStock));
+  const [selectedToId, setSelectedToId] = useState<string>(toLocationId || '');
+  const [search, setSearch] = useState('');
 
-  if (!item || !fromLoc || !toLoc) return null;
+  const targetOptions = useMemo(() => {
+    const warehouseId = fromLoc?.warehouseId;
+    return state.locations
+      .filter(l => l.id !== fromLocationId)
+      .filter(l => !warehouseId || !l.warehouseId || l.warehouseId === warehouseId)
+      .filter(l => !search.trim() || l.name.toLowerCase().includes(search.toLowerCase()))
+      .slice(0, 30);
+  }, [state.locations, fromLocationId, fromLoc, search]);
+
+  const toLoc = state.locations.find(l => l.id === selectedToId);
+
+  if (!item || !fromLoc) return null;
   const qtyNum = parseInt(qty) || 0;
 
   const handleMove = () => {
-    if (qtyNum <= 0 || qtyNum > fromStock) return;
+    if (qtyNum <= 0 || qtyNum > fromStock || !selectedToId) return;
 
     let newStocks = [...(state.locationStocks || [])];
 
@@ -37,27 +49,26 @@ export function MoveItemModal({
       else newStocks[srcIdx] = { ...newStocks[srcIdx], quantity: newQty };
     }
 
-    const dstIdx = newStocks.findIndex(ls => ls.itemId === itemId && ls.locationId === toLocationId);
+    const dstIdx = newStocks.findIndex(ls => ls.itemId === itemId && ls.locationId === selectedToId);
     if (dstIdx >= 0) {
       newStocks[dstIdx] = { ...newStocks[dstIdx], quantity: newStocks[dstIdx].quantity + qtyNum };
     } else {
-      newStocks.push({ itemId, locationId: toLocationId, quantity: qtyNum });
+      newStocks.push({ itemId, locationId: selectedToId, quantity: qtyNum });
     }
 
     const remainingInSrc = newStocks.find(ls => ls.itemId === itemId && ls.locationId === fromLocationId);
     let updatedItems = state.items;
     if (!remainingInSrc && item.locationId === fromLocationId) {
-      updatedItems = state.items.map(i => i.id === itemId ? { ...i, locationId: toLocationId } : i);
+      updatedItems = state.items.map(i => i.id === itemId ? { ...i, locationId: selectedToId } : i);
     }
 
     const next = { ...state, locationStocks: newStocks, items: updatedItems };
     onStateChange(next);
-    const fromLS = newStocks.find(ls => ls.itemId === itemId && ls.locationId === fromLocationId);
-    const toLS = newStocks.find(ls => ls.itemId === itemId && ls.locationId === toLocationId);
-    const affectedStocks = [fromLS, toLS].filter(Boolean);
-    for (const ls of affectedStocks) {
-      crudAction('upsert_location_stock', { locationStock: ls });
-    }
+    const fromLS = newStocks.find(ls => ls.itemId === itemId && ls.locationId === fromLocationId)
+      || { itemId, locationId: fromLocationId, quantity: 0 };
+    const toLS = newStocks.find(ls => ls.itemId === itemId && ls.locationId === selectedToId);
+    crudAction('upsert_location_stock', { locationStock: fromLS });
+    if (toLS) crudAction('upsert_location_stock', { locationStock: toLS });
     onClose();
   };
 
@@ -75,13 +86,57 @@ export function MoveItemModal({
         <div className="space-y-4 pt-2">
           <div className="p-3 bg-muted rounded-lg">
             <div className="font-semibold text-sm">{item.name}</div>
-            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
               <span className="flex items-center gap-1"><Icon name="MapPin" size={11} />{fromLoc.name}</span>
               <Icon name="ArrowRight" size={11} />
-              <span className="flex items-center gap-1 text-primary font-medium"><Icon name="MapPin" size={11} />{toLoc.name}</span>
+              {toLoc ? (
+                <span className="flex items-center gap-1 text-primary font-medium"><Icon name="MapPin" size={11} />{toLoc.name}</span>
+              ) : (
+                <span className="text-muted-foreground italic">выберите локацию ниже</span>
+              )}
             </div>
             <div className="text-xs text-muted-foreground mt-1">Доступно на {fromLoc.name}: <b className="text-foreground">{fromStock} {item.unit}</b></div>
           </div>
+
+          {!toLocationId && (
+            <div className="space-y-1.5">
+              <Label>Куда переместить</Label>
+              <Input
+                value={search}
+                onChange={e => { setSearch(e.target.value); setSelectedToId(''); }}
+                placeholder="Поиск локации..."
+                autoFocus
+              />
+              <div className="border border-border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                {targetOptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Не найдено</p>
+                ) : targetOptions.map(loc => {
+                  const stockHere = (state.locationStocks || []).find(ls => ls.itemId === itemId && ls.locationId === loc.id)?.quantity || 0;
+                  const isSelected = selectedToId === loc.id;
+                  return (
+                    <button
+                      key={loc.id}
+                      type="button"
+                      onClick={() => { setSelectedToId(loc.id); setSearch(loc.name); }}
+                      className={`w-full text-left flex items-center justify-between px-3 py-2.5 text-sm transition-colors border-b border-border/50 last:border-0
+                        ${isSelected ? 'bg-accent' : 'hover:bg-muted'}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate flex items-center gap-1.5">
+                          <Icon name="MapPin" size={11} className="text-muted-foreground shrink-0" />
+                          {loc.name}
+                        </div>
+                        {loc.description && <div className="text-xs text-muted-foreground truncate">{loc.description}</div>}
+                      </div>
+                      {stockHere > 0 && (
+                        <div className="text-xs text-primary shrink-0 ml-2">уже здесь: {stockHere}</div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Количество для перемещения</Label>
@@ -96,6 +151,9 @@ export function MoveItemModal({
                 <Icon name="Plus" size={14} />
               </button>
             </div>
+            <button onClick={() => setQty(String(fromStock))} className="text-xs text-primary hover:underline">
+              Всё ({fromStock} {item.unit})
+            </button>
             {qtyNum > fromStock && (
               <p className="text-xs text-destructive flex items-center gap-1">
                 <Icon name="AlertCircle" size={11} />Недостаточно на {fromLoc.name}
@@ -105,7 +163,7 @@ export function MoveItemModal({
 
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} className="flex-1">Отмена</Button>
-            <Button onClick={handleMove} disabled={qtyNum <= 0 || qtyNum > fromStock} className="flex-1">
+            <Button onClick={handleMove} disabled={qtyNum <= 0 || qtyNum > fromStock || !selectedToId} className="flex-1">
               <Icon name="ArrowRight" size={14} className="mr-1.5" />
               Переместить
             </Button>

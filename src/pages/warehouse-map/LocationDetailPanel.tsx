@@ -4,6 +4,7 @@ import Icon from '@/components/ui/icon';
 import { AppState, Location } from '@/data/store';
 import QRDialog from '@/components/QRDialog';
 import { AddItemToLocationModal } from './WarehouseMapModals';
+import { MoveItemModal } from './MoveItemModal';
 import { getStockLevel, stockDotColor } from './WarehouseMapHelpers';
 
 type Props = {
@@ -19,6 +20,7 @@ export default function LocationDetailPanel({
   location, state, onStateChange, onClose, onItemSelect, onItemDragStart,
 }: Props) {
   const [showAddItem, setShowAddItem] = useState(false);
+  const [moveItemId, setMoveItemId] = useState<string | null>(null);
   const locStocks = (state.locationStocks || [])
     .filter(ls => ls.locationId === location.id && ls.quantity > 0)
     .map(ls => ({ ...ls, item: state.items.find(i => i.id === ls.itemId) }))
@@ -126,10 +128,20 @@ export default function LocationDetailPanel({
                   </div>
                 </div>
 
-                <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Icon name="GripHorizontal" size={11} />
-                  <span>Перетащите для перемещения · </span>
-                  <button onClick={() => onItemSelect(ls.itemId)} className="text-primary hover:underline">открыть карточку</button>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Icon name="GripHorizontal" size={11} />
+                    <span>Перетащите · </span>
+                    <button onClick={() => onItemSelect(ls.itemId)} className="text-primary hover:underline">открыть карточку</button>
+                  </div>
+                  <button
+                    onClick={() => setMoveItemId(ls.itemId)}
+                    className="flex items-center gap-1 text-[11px] font-medium text-primary hover:bg-primary/10 px-2 py-1 rounded-md transition-colors shrink-0"
+                    title="Переместить на другую полку"
+                  >
+                    <Icon name="ArrowRightLeft" size={11} />
+                    Переместить
+                  </button>
                 </div>
               </div>
             );
@@ -138,6 +150,15 @@ export default function LocationDetailPanel({
       )}
     </div>
     <QRDialog open={showQR} onClose={() => setShowQR(false)} value={qrValue} title="QR-код локации" />
+    {moveItemId && (
+      <MoveItemModal
+        itemId={moveItemId}
+        fromLocationId={location.id}
+        state={state}
+        onStateChange={onStateChange}
+        onClose={() => setMoveItemId(null)}
+      />
+    )}
     </>
   );
 }
