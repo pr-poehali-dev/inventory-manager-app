@@ -27,6 +27,7 @@ export function MoveItemModal({
     const warehouseId = fromLoc?.warehouseId;
     return state.locations
       .filter(l => l.id !== fromLocationId)
+      .filter(l => !state.locations.some(ch => ch.parentId === l.id))
       .filter(l => !warehouseId || !l.warehouseId || l.warehouseId === warehouseId)
       .filter(l => !search.trim() || l.name.toLowerCase().includes(search.toLowerCase()))
       .slice(0, 30);

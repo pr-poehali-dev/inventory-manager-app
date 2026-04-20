@@ -583,6 +583,17 @@ export function generateId(): string {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+export function isParentLocation(state: AppState, locationId: string): boolean {
+  return state.locations.some(l => l.parentId === locationId);
+}
+
+export function getLeafLocations(state: AppState, warehouseId?: string): Location[] {
+  return state.locations.filter(l =>
+    !state.locations.some(ch => ch.parentId === l.id) &&
+    (!warehouseId || !l.warehouseId || l.warehouseId === warehouseId)
+  );
+}
+
 export function getLocationStock(state: AppState, itemId: string, locationId: string): number {
   return state.locationStocks.find(ls => ls.itemId === itemId && ls.locationId === locationId)?.quantity ?? 0;
 }

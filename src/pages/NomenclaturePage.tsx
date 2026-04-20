@@ -22,19 +22,21 @@ function NewItemModal({ state, onStateChange, onClose }: {
   const [threshold, setThreshold] = useState('5');
   const [error, setError] = useState('');
 
-  const filteredLocations = warehouseId
+  const filteredLocations = (warehouseId
     ? state.locations.filter(l => l.warehouseId === warehouseId)
-    : state.locations;
+    : state.locations
+  ).filter(l => !state.locations.some(ch => ch.parentId === l.id));
 
   const handleSave = () => {
     if (!name.trim()) { setError('Введите название'); return; }
+    const fallbackLeaf = state.locations.find(l => !state.locations.some(ch => ch.parentId === l.id));
     const newItem: Item = {
       id: generateId(),
       name: name.trim(),
       unit,
       assetType,
       categoryId,
-      locationId: locationId || (state.locations[0]?.id || ''),
+      locationId: locationId || (fallbackLeaf?.id || ''),
       description: description.trim() || undefined,
       quantity: parseInt(qty) || 0,
       lowStockThreshold: parseInt(threshold) || 5,

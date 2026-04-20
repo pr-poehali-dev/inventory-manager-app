@@ -150,11 +150,12 @@ export function NewReceiptModal({
       let itemId = line.itemId;
 
       if (!itemId) {
+        const leafLoc = next.locations.find(l => !next.locations.some(ch => ch.parentId === l.id));
         const newItem: Item = {
           id: generateId(),
           name: line.itemLabel.trim(),
           categoryId: line.categoryId || (next.categories[0]?.id || ''),
-          locationId: next.locations[0]?.id || '',
+          locationId: leafLoc?.id || '',
           description: line.description || undefined,
           unit: line.unit,
           quantity: 0,

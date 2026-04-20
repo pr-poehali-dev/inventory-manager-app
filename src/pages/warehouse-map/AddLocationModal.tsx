@@ -3,7 +3,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AppState, Location, crudAction, generateId } from '@/data/store';
+import Icon from '@/components/ui/icon';
+import { AppState, Location, LocationStock, crudAction, generateId } from '@/data/store';
+
+function migrateParentStocksToChild(state: AppState, parentId: string, childId: string): { state: AppState; affected: LocationStock[] } {
+  const parentStocks = (state.locationStocks || []).filter(ls => ls.locationId === parentId && ls.quantity > 0);
+  if (parentStocks.length === 0) return { state, affected: [] };
+  const others = (state.locationStocks || []).filter(ls => ls.locationId !== parentId);
+  const moved: LocationStock[] = parentStocks.map(ls => ({ itemId: ls.itemId, locationId: childId, quantity: ls.quantity }));
+  const zeroed: LocationStock[] = parentStocks.map(ls => ({ itemId: ls.itemId, locationId: parentId, quantity: 0 }));
+  const updatedItems = state.items.map(it => {
+    const wasOnParent = parentStocks.some(ls => ls.itemId === it.id);
+    return wasOnParent && it.locationId === parentId ? { ...it, locationId: childId } : it;
+  });
+  return {
+    state: { ...state, items: updatedItems, locationStocks: [...others, ...moved] },
+    affected: [...zeroed, ...moved],
+  };
+}
 
 export function AddLocationModal({
   state, onStateChange, onClose, editLocation, activeWarehouseId,
@@ -22,6 +39,14 @@ export function AddLocationModal({
   const [batchCount, setBatchCount] = useState(3);
   const [prefix, setPrefix] = useState('');
 
+  const parentHasStockNow = parentId
+    ? (state.locationStocks || []).some(ls => ls.locationId === parentId && ls.quantity > 0)
+    : false;
+  const parentHasChildren = parentId
+    ? state.locations.some(l => l.parentId === parentId)
+    : false;
+  const willMigrate = parentHasStockNow && !parentHasChildren;
+
   const handleSave = () => {
     if (!editLocation && batchMode && batchCount > 1 && prefix.trim()) {
       const newLocs: Location[] = [];
@@ -34,9 +59,16 @@ export function AddLocationModal({
           warehouseId: warehouseId || undefined,
         });
       }
-      const next = { ...state, locations: [...state.locations, ...newLocs] };
+      let next: AppState = { ...state, locations: [...state.locations, ...newLocs] };
+      let migratedStocks: LocationStock[] = [];
+      if (willMigrate && newLocs[0]) {
+        const migration = migrateParentStocksToChild(next, parentId, newLocs[0].id);
+        next = migration.state;
+        migratedStocks = migration.affected;
+      }
       onStateChange(next);
       newLocs.forEach(loc => crudAction('upsert_location', { location: loc }));
+      migratedStocks.forEach(ls => crudAction('upsert_location_stock', { locationStock: ls }));
       onClose();
       return;
     }
@@ -60,8 +92,16 @@ export function AddLocationModal({
         parentId: parentId || undefined,
         warehouseId: warehouseId || undefined,
       };
-      const next = { ...state, locations: [...state.locations, newLoc] };
-      onStateChange(next); crudAction('upsert_location', { location: newLoc });
+      let next: AppState = { ...state, locations: [...state.locations, newLoc] };
+      let migratedStocks: LocationStock[] = [];
+      if (willMigrate) {
+        const migration = migrateParentStocksToChild(next, parentId, newLoc.id);
+        next = migration.state;
+        migratedStocks = migration.affected;
+      }
+      onStateChange(next);
+      crudAction('upsert_location', { location: newLoc });
+      migratedStocks.forEach(ls => crudAction('upsert_location_stock', { locationStock: ls }));
     }
     onClose();
   };
@@ -100,6 +140,14 @@ export function AddLocationModal({
               {topLevel.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </div>
+          {willMigrate && !editLocation && (
+            <div className="p-2.5 bg-primary/5 border border-primary/20 rounded-lg text-xs text-foreground flex items-start gap-2">
+              <Icon name="ArrowDownToLine" size={13} className="text-primary mt-0.5 shrink-0" />
+              <div>
+                На стеллаже сейчас лежат товары — они автоматически переедут на {batchMode && prefix.trim() ? `«${prefix.trim()}1»` : 'эту новую полку'}, чтобы не зависнуть.
+              </div>
+            </div>
+          )}
           {!editLocation && (
             <div className="space-y-2 pt-1">
               <label className="flex items-center gap-2 cursor-pointer">

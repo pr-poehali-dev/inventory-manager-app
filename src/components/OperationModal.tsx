@@ -59,7 +59,10 @@ export default function OperationModal({ open, onClose, item, type, performedBy,
   const warehouses: Warehouse[] = state.warehouses || [];
   const selectedWarehouse = warehouses.find(w => w.id === warehouseId);
   const whStock = warehouseId ? getWarehouseStock(state, item.id, warehouseId) : 0;
-  const warehouseLocations = state.locations.filter(l => l.warehouseId === warehouseId);
+  const warehouseLocations = state.locations.filter(l =>
+    l.warehouseId === warehouseId &&
+    !state.locations.some(ch => ch.parentId === l.id)
+  );
 
   // Qty from scanned + manual
   const scannedQty = scannedCodes.length;
