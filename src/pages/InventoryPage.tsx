@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
-import { AppState, Item, Operation, generateId, crudAction } from '@/data/store';
+import { AppState, Operation, generateId, crudAction } from '@/data/store';
+import QRScanner from '@/components/QRScanner';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ type InventoryEntry = {
   category: string;
   categoryColor: string;
   locationName: string;
+  locationId: string;
 };
 
 type Props = {
@@ -33,6 +35,23 @@ export default function InventoryPage({ state, onStateChange }: Props) {
   const [search, setSearch] = useState('');
   const [showOnlyDiff, setShowOnlyDiff] = useState(false);
   const [confirmApply, setConfirmApply] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanLocationFilter, setScanLocationFilter] = useState<string | null>(null);
+  const [scanFlash, setScanFlash] = useState<{ itemId: string; ts: number } | null>(null);
+  const [scanToast, setScanToast] = useState<{ kind: 'ok' | 'warn' | 'error'; text: string } | null>(null);
+  const [scanCount, setScanCount] = useState(0);
+
+  useEffect(() => {
+    if (!scanToast) return;
+    const t = setTimeout(() => setScanToast(null), 2200);
+    return () => clearTimeout(t);
+  }, [scanToast]);
+
+  useEffect(() => {
+    if (!scanFlash) return;
+    const t = setTimeout(() => setScanFlash(null), 900);
+    return () => clearTimeout(t);
+  }, [scanFlash]);
 
   // ── Lookup maps ──────────────────────────────────────────────────────────
 
@@ -53,8 +72,19 @@ export default function InventoryPage({ state, onStateChange }: Props) {
     return state.warehouses.find(w => w.id === warehouseFilter)?.name ?? 'Склад';
   }, [warehouseFilter, state.warehouses]);
 
+  const scanLocationName = useMemo(() => {
+    if (!scanLocationFilter) return null;
+    return locationMap.get(scanLocationFilter)?.name ?? null;
+  }, [scanLocationFilter, locationMap]);
+
   const filteredEntries = useMemo(() => {
     let list = entries;
+    if (scanLocationFilter) {
+      const childIds = new Set(
+        state.locations.filter(l => l.parentId === scanLocationFilter).map(l => l.id),
+      );
+      list = list.filter(e => e.locationId === scanLocationFilter || childIds.has(e.locationId));
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -65,7 +95,7 @@ export default function InventoryPage({ state, onStateChange }: Props) {
       list = list.filter(e => e.actualQty !== null && e.actualQty !== e.systemQty);
     }
     return list;
-  }, [entries, search, showOnlyDiff]);
+  }, [entries, search, showOnlyDiff, scanLocationFilter, state.locations]);
 
   const progress = useMemo(() => {
     const total = entries.length;
@@ -118,6 +148,7 @@ export default function InventoryPage({ state, onStateChange }: Props) {
           category: cat?.name ?? 'Без категории',
           categoryColor: cat?.color ?? '#94a3b8',
           locationName: loc?.name ?? '',
+          locationId: item.locationId,
         };
       }),
     );
@@ -143,6 +174,46 @@ export default function InventoryPage({ state, onStateChange }: Props) {
       ),
     );
   }, []);
+
+  const handleScanResult = useCallback((result: { type: string; id: string; raw: string }) => {
+    if (result.type === 'item') {
+      const entry = entries.find(e => e.itemId === result.id);
+      if (!entry) {
+        setScanToast({ kind: 'warn', text: 'Товар не входит в инвентаризацию текущего склада' });
+        return;
+      }
+      const next = (entry.actualQty ?? 0) + 1;
+      setEntries(prev => prev.map(e => e.itemId === result.id ? { ...e, actualQty: next } : e));
+      setScanFlash({ itemId: result.id, ts: Date.now() });
+      setScanCount(c => c + 1);
+      setScanToast({ kind: 'ok', text: `${entry.itemName}: +1 (теперь ${next} ${entry.unit})` });
+      return;
+    }
+    if (result.type === 'location') {
+      const loc = locationMap.get(result.id);
+      if (!loc) {
+        setScanToast({ kind: 'warn', text: 'Локация не найдена в базе' });
+        return;
+      }
+      setScanLocationFilter(result.id);
+      setScanToast({ kind: 'ok', text: `Фильтр по локации: ${loc.name}` });
+      return;
+    }
+    if (result.type === 'unknown') {
+      const matchByName = entries.find(e => e.itemName.toLowerCase() === result.id.toLowerCase());
+      if (matchByName) {
+        const next = (matchByName.actualQty ?? 0) + 1;
+        setEntries(prev => prev.map(e => e.itemId === matchByName.itemId ? { ...e, actualQty: next } : e));
+        setScanFlash({ itemId: matchByName.itemId, ts: Date.now() });
+        setScanCount(c => c + 1);
+        setScanToast({ kind: 'ok', text: `${matchByName.itemName}: +1` });
+        return;
+      }
+      setScanToast({ kind: 'error', text: `Код «${result.id.slice(0, 30)}» не распознан` });
+      return;
+    }
+    setScanToast({ kind: 'warn', text: 'Этот QR-код не относится к товару или локации' });
+  }, [entries, locationMap]);
 
   const applyCorrections = useCallback(() => {
     let nextState = { ...state };
@@ -239,9 +310,10 @@ export default function InventoryPage({ state, onStateChange }: Props) {
             <div className="space-y-1 text-sm">
               <p className="font-medium text-foreground">Как проходит инвентаризация</p>
               <p className="text-muted-foreground leading-relaxed">
-                Выберите склад, нажмите "Начать" и введите фактическое количество каждого
-                товара. Система покажет расхождения. По завершении вы сможете применить
-                корректировки — будут созданы операции прихода (излишки) и расхода (недостачи).
+                Выберите склад и нажмите «Начать». Вводите фактическое количество вручную
+                или сканируйте QR-коды товаров — каждый скан добавит +1 к остатку.
+                Можно отсканировать QR полки, чтобы отфильтровать список её товаров.
+                По завершении система создаст операции прихода (излишки) и расхода (недостачи).
               </p>
             </div>
           </div>
@@ -306,7 +378,20 @@ export default function InventoryPage({ state, onStateChange }: Props) {
             {warehouseName} &middot; Проверено {progress.counted} из {progress.total}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            size="sm"
+            onClick={() => setShowScanner(true)}
+            className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <Icon name="ScanLine" size={14} />
+            Сканировать
+            {scanCount > 0 && (
+              <span className="ml-0.5 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full tabular-nums">
+                {scanCount}
+              </span>
+            )}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -318,15 +403,30 @@ export default function InventoryPage({ state, onStateChange }: Props) {
           </Button>
           <Button
             size="sm"
+            variant="default"
             onClick={() => setConfirmApply(true)}
             disabled={summary.discrepancies.length === 0 && summary.counted === 0}
-            className="gap-1.5"
+            className="gap-1.5 bg-success text-success-foreground hover:bg-success/90"
           >
             <Icon name="CheckCircle" size={14} />
             Завершить
           </Button>
         </div>
       </div>
+
+      {scanLocationFilter && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 border border-primary/30 rounded-xl text-sm">
+          <Icon name="MapPin" size={14} className="text-primary" />
+          <span className="font-medium text-foreground">Фильтр по локации:</span>
+          <span className="text-primary font-semibold">{scanLocationName ?? '—'}</span>
+          <button
+            onClick={() => setScanLocationFilter(null)}
+            className="ml-auto text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            <Icon name="X" size={12} />Сбросить
+          </button>
+        </div>
+      )}
 
       {/* Progress bar */}
       <div className="bg-card rounded-xl border border-border shadow-card p-4">
@@ -428,11 +528,12 @@ export default function InventoryPage({ state, onStateChange }: Props) {
             let rowBg = 'bg-card';
             if (isShortage) rowBg = 'bg-destructive/5';
             if (isSurplus) rowBg = 'bg-success/5';
+            const isFlash = scanFlash?.itemId === entry.itemId;
 
             return (
               <div
                 key={entry.itemId}
-                className={`${rowBg} rounded-xl border border-border shadow-card p-4 transition-colors`}
+                className={`${rowBg} rounded-xl border ${isFlash ? 'border-primary ring-2 ring-primary/40' : 'border-border'} shadow-card p-4 transition-all`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   {/* Info */}
@@ -626,6 +727,24 @@ export default function InventoryPage({ state, onStateChange }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <QRScanner
+        open={showScanner}
+        onClose={() => setShowScanner(false)}
+        onResult={handleScanResult}
+      />
+
+      {scanToast && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-8 z-50 animate-slide-up">
+          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium
+            ${scanToast.kind === 'ok' ? 'bg-success text-success-foreground' :
+              scanToast.kind === 'warn' ? 'bg-warning text-warning-foreground' :
+              'bg-destructive text-destructive-foreground'}`}>
+            <Icon name={scanToast.kind === 'ok' ? 'CheckCircle' : scanToast.kind === 'warn' ? 'AlertTriangle' : 'XCircle'} size={15} />
+            {scanToast.text}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
