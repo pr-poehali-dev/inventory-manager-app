@@ -1,0 +1,34 @@
+{
+  "name": "StockBase — Учёт склада",
+  "short_name": "StockBase",
+  "description": "Система учёта товаров на складе со сканированием QR-кодов",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1E40AF",
+  "lang": "ru",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "https://cdn.poehali.dev/projects/af8bccd2-25c5-4813-bdcd-23e358998995/files/371a6820-6ea9-4201-9361-e76ecae376cd.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn.poehali.dev/projects/af8bccd2-25c5-4813-bdcd-23e358998995/files/371a6820-6ea9-4201-9361-e76ecae376cd.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn.poehali.dev/projects/af8bccd2-25c5-4813-bdcd-23e358998995/files/371a6820-6ea9-4201-9361-e76ecae376cd.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    }
+  ]
+}

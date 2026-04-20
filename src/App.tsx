@@ -20,6 +20,7 @@ import DocumentsPage from '@/pages/DocumentsPage';
 import InvoiceTemplatePage from '@/pages/InvoiceTemplatePage';
 import LoginPage from '@/pages/LoginPage';
 import { AuthContext, AuthUser, apiLogin, apiLogout, apiMe, setToken, getToken, clearToken } from '@/data/auth';
+import InstallPWABanner from '@/components/InstallPWABanner';
 
 const POLL_INTERVAL = 5000;
 
@@ -286,6 +287,7 @@ export default function App() {
           {page === 'audit'        && <AuditPage state={state} />}
           {page === 'settings'     && <SettingsPage state={state} onStateChange={handleStateChange} />}
         </Layout>
+        <InstallPWABanner />
       </TooltipProvider>
     </AuthContext.Provider>
   );
