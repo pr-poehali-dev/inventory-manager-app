@@ -16,6 +16,7 @@ export function AddItemToLocationModal({
 }) {
   const location = state.locations.find(l => l.id === locationId);
   const warehouseId = location?.warehouseId;
+  const hasChildren = state.locations.some(l => l.parentId === locationId);
 
   const [itemId, setItemId] = useState('');
   const [qty, setQty] = useState('1');
@@ -75,7 +76,14 @@ export function AddItemToLocationModal({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 pt-2">
-          {!warehouseId ? (
+          {hasChildren ? (
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm text-foreground flex items-start gap-2">
+              <Icon name="Info" size={14} className="text-primary mt-0.5 shrink-0" />
+              <div>
+                <b>Это стеллаж-контейнер.</b> Товар нельзя класть прямо на стеллаж — выбери конкретную полку внутри него.
+              </div>
+            </div>
+          ) : !warehouseId ? (
             <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning flex items-center gap-2">
               <Icon name="AlertTriangle" size={14} />
               Стеллаж не привязан к складу. Отредактируйте локацию.

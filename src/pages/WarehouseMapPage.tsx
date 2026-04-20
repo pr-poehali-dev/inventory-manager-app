@@ -121,6 +121,12 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
     e.preventDefault();
     setDragOverLocationId(null);
     if (!dragState || dragState.fromLocationId === toLocationId) { setDragState(null); return; }
+    const hasChildren = state.locations.some(l => l.parentId === toLocationId);
+    if (hasChildren) {
+      alert('На этот стеллаж нельзя класть товар напрямую — у него есть полки. Перетащите на конкретную полку.');
+      setDragState(null);
+      return;
+    }
     setMoveModal({ itemId: dragState.itemId, fromLocationId: dragState.fromLocationId, toLocationId });
     setDragState(null);
   };
@@ -267,12 +273,41 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
             <div className="space-y-5">
               {topLocations.map(topLoc => {
                 const children = childLocations(topLoc.id);
+                const isParent = children.length > 0;
+                const parentStockUnits = isParent
+                  ? (state.locationStocks || [])
+                      .filter(ls => ls.locationId === topLoc.id && ls.quantity > 0)
+                      .reduce((s, ls) => s + ls.quantity, 0)
+                  : 0;
+                const isSelected = selectedLocationId === topLoc.id;
 
                 return (
                   <div key={topLoc.id} className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: locationColors[topLoc.id] }} />
-                      <span className="text-sm font-semibold text-foreground">{topLoc.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLocationId(isSelected ? null : topLoc.id)}
+                        className={`flex items-center gap-2 rounded-md px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-muted/60 ${isSelected ? 'bg-primary/10' : ''}`}
+                        title={isParent ? 'Открыть панель стеллажа (контейнер для полок)' : 'Открыть локацию'}
+                      >
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: locationColors[topLoc.id] }} />
+                        <span className={`text-sm font-semibold ${isSelected ? 'text-primary' : 'text-foreground'}`}>{topLoc.name}</span>
+                        {isParent && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex items-center gap-1">
+                            <Icon name="Layers" size={10} />
+                            {children.length} полк{children.length === 1 ? 'а' : children.length < 5 ? 'и' : ''}
+                          </span>
+                        )}
+                        {parentStockUnits > 0 && (
+                          <span
+                            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-warning/15 text-warning flex items-center gap-1"
+                            title="На этом стеллаже лежат товары — перенесите их на полки"
+                          >
+                            <Icon name="AlertTriangle" size={10} />
+                            {parentStockUnits} не на полке
+                          </span>
+                        )}
+                      </button>
                       {topLoc.description && <span className="text-xs text-muted-foreground">· {topLoc.description}</span>}
                       <div className="flex-1 h-px bg-border" />
                       <button
@@ -419,6 +454,7 @@ export default function WarehouseMapPage({ state, onStateChange, initialLocation
               onClose={() => setSelectedLocationId(null)}
               onItemSelect={id => setSelectedItemId(id)}
               onItemDragStart={handleItemDragStart}
+              onSelectLocation={id => setSelectedLocationId(id)}
             />
           </div>
         )}
